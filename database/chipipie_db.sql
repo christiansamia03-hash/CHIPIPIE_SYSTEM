@@ -132,8 +132,8 @@ INSERT INTO system_settings (setting_key, setting_value) VALUES
 -- admin / admin123
 -- cashier1 / cashier123
 INSERT INTO users (username, password, full_name, email, role, is_active) VALUES
-  ('admin', '$2y$10$YourHashedPasswordHere1234567890abcdefghijklmnopqrstuv', 'Admin', 'admin@chipipiecafe.com', 'admin', 1),
-  ('cashier1', '$2y$10$YourHashedPasswordHere1234567890abcdefghijklmnopqrstuv', 'Staff 1', 'cashier1@chipipiecafe.com', 'cashier', 1);
+  ('admin', '$2y$10$6Nd1EXZaeWc5ki0y5UtFs.raUqUf6NkFu.sFhNOS3viZMOLWasSmy', 'Admin', 'admin@chipipiecafe.com', 'admin', 1),
+  ('cashier1', '$2y$10$GhR3nPD10tADKOSjNIfgQO0VfhU49VdbicGTMT9PH9NFHcAQStuYi', 'Staff 1', 'cashier1@chipipiecafe.com', 'cashier', 1);
 
 -- Categories
 INSERT INTO categories (name) VALUES

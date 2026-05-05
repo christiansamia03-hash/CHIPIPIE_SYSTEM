@@ -1,7 +1,6 @@
 <?php
 /**
- * ChipiPie Cafe — Database Configuration
- * 
+ * ChipiPie Cafe - Database Configuration
  * Centralizes database connection and email settings.
  * Update credentials for your environment.
  */
@@ -10,16 +9,20 @@
 date_default_timezone_set('Asia/Manila');
 
 // ============ DATABASE CONFIG ============
-define('DB_HOST', 'localhost');
+// CHANGED: 'localhost' to '127.0.0.1' to fix the [2002] connection refusal error
+define('DB_HOST', '127.0.0.1'); 
 define('DB_NAME', 'chipipie_pos');
 define('DB_USER', 'root');
 define('DB_PASS', '');       // Default XAMPP has no password
 define('DB_CHARSET', 'utf8mb4');
 
 // ============ EMAIL CONFIG ============
-// For production, configure SMTP. For XAMPP dev, tokens also display on-screen.
-define('MAIL_FROM', 'christiansamia03@gmail.com');
+define('MAIL_FROM',      'christiansamia03@gmail.com');
 define('MAIL_FROM_NAME', 'ChipiPie Cafe POS');
+define('SMTP_HOST',      'ssl://smtp.gmail.com');
+define('SMTP_PORT',      465);
+define('SMTP_USER',      'christiansamia03@gmail.com');
+define('SMTP_PASS',      'ghrlpoezffzgqtcw');   // Gmail App Password (no spaces)
 
 // Set to true to also return token in API response (for dev/testing)
 define('DEV_MODE', true);
@@ -105,29 +108,74 @@ function generateToken($length = 32) {
 }
 
 /**
- * Send email (with XAMPP dev fallback)
+ * Send email via direct SMTP (bypasses sendmail / php mail())
  */
 function sendEmail($to, $subject, $body) {
-    $headers  = "From: " . MAIL_FROM_NAME . " <" . MAIL_FROM . ">\r\n";
-    $headers .= "Reply-To: " . MAIL_FROM . "\r\n";
-    $headers .= "Content-Type: text/html; charset=UTF-8\r\n";
-    $headers .= "MIME-Version: 1.0\r\n";
-    $headers .= "X-Mailer: PHP/" . phpversion() . "\r\n";
-
-    $sent = @mail($to, $subject, $body, $headers);
-
-    // Log for debugging
     $logDir = __DIR__ . '/../logs';
-    if (!is_dir($logDir)) {
-        mkdir($logDir, 0755, true);
+    if (!is_dir($logDir)) mkdir($logDir, 0755, true);
+
+    // Always save a local copy of the email
+    $emailContent = "<p><strong>To:</strong> $to<br><strong>Subject:</strong> $subject<br><strong>Time:</strong> " . date('Y-m-d H:i:s') . "</p><hr>" . $body;
+    file_put_contents($logDir . '/last_email.html', $emailContent);
+
+    $sent = false;
+    $smtpLog = '';
+
+    try {
+        // Open SSL socket directly to Gmail SMTP
+        $socket = fsockopen(SMTP_HOST, SMTP_PORT, $errno, $errstr, 10);
+        if (!$socket) throw new Exception("Socket error $errno: $errstr");
+
+        $read = function() use ($socket, &$smtpLog) {
+            $r = '';
+            while ($line = fgets($socket, 515)) {
+                $smtpLog .= $line;
+                $r .= $line;
+                if (substr($line, 3, 1) === ' ') break;
+            }
+            return $r;
+        };
+        $write = function($cmd) use ($socket, &$smtpLog) {
+            $smtpLog .= "> $cmd";
+            fputs($socket, $cmd);
+        };
+
+        $read(); // 220 greeting
+        $write("EHLO localhost\r\n");       $read();
+        $write("AUTH LOGIN\r\n");           $read();
+        $write(base64_encode(SMTP_USER) . "\r\n"); $read();
+        $write(base64_encode(SMTP_PASS) . "\r\n"); $resp = $read();
+
+        if (strpos($resp, '235') === false) throw new Exception('AUTH failed: ' . trim($resp));
+
+        $write("MAIL FROM:<" . MAIL_FROM . ">\r\n"); $read();
+        $write("RCPT TO:<$to>\r\n");                 $read();
+        $write("DATA\r\n");                           $read();
+
+        $boundary = md5(time());
+        $message  = "From: " . MAIL_FROM_NAME . " <" . MAIL_FROM . ">\r\n";
+        $message .= "To: $to\r\n";
+        $message .= "Subject: =?UTF-8?B?" . base64_encode($subject) . "?=\r\n";
+        $message .= "MIME-Version: 1.0\r\n";
+        $message .= "Content-Type: text/html; charset=UTF-8\r\n";
+        $message .= "\r\n" . $body . "\r\n.\r\n";
+        $write($message);
+        $dResp = $read();
+
+        if (strpos($dResp, '250') === false) throw new Exception('DATA failed: ' . trim($dResp));
+
+        $write("QUIT\r\n");
+        fclose($socket);
+        $sent = true;
+
+    } catch (Exception $e) {
+        $smtpLog .= "EXCEPTION: " . $e->getMessage() . "\n";
     }
+
+    // Log result
     $logEntry = date('Y-m-d H:i:s') . " | To: $to | Subject: $subject | Sent: " . ($sent ? 'YES' : 'NO') . "\n";
     file_put_contents($logDir . '/email_log.txt', $logEntry, FILE_APPEND);
-
-    // Save email content to file as backup (useful when SMTP not configured)
-    $emailFile = $logDir . '/last_email.html';
-    $emailContent = "<p><strong>To:</strong> $to<br><strong>Subject:</strong> $subject<br><strong>Time:</strong> " . date('Y-m-d H:i:s') . "</p><hr>" . $body;
-    file_put_contents($emailFile, $emailContent);
+    file_put_contents($logDir . '/smtp_debug.log', date('Y-m-d H:i:s') . "\n" . $smtpLog . "\n---\n", FILE_APPEND);
 
     return $sent;
 }
