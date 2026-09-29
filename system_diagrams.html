@@ -1,0 +1,1115 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>ChipiPie Cafe - System Diagrams</title>
+  <script src="https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.min.js"></script>
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;900&display=swap');
+
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    body {
+      font-family: 'Inter', sans-serif;
+      background: #0f0f14;
+      color: #e2e8f0;
+    }
+
+    header {
+      background: linear-gradient(135deg, #1a0a00, #3a1f00);
+      padding: 36px;
+      text-align: center;
+      border-bottom: 1px solid #f59e0b44;
+    }
+
+    header h1 {
+      font-size: 2rem;
+      font-weight: 900;
+      background: linear-gradient(90deg, #f59e0b, #ef4444, #f59e0b);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      background-clip: text;
+    }
+
+    header p {
+      color: #94a3b8;
+      margin-top: 6px;
+      font-size: .9rem;
+    }
+
+    nav {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      justify-content: center;
+      padding: 20px;
+      background: #12121a;
+      border-bottom: 1px solid #1e293b;
+      position: sticky;
+      top: 0;
+      z-index: 100;
+    }
+
+    nav a {
+      background: #1e293b;
+      color: #94a3b8;
+      padding: 7px 16px;
+      border-radius: 999px;
+      text-decoration: none;
+      font-size: .82rem;
+      font-weight: 600;
+      border: 1px solid #334155;
+      transition: all .2s;
+    }
+
+    nav a:hover {
+      background: #f59e0b;
+      color: #0f0f14;
+      border-color: #f59e0b;
+    }
+
+    main {
+      max-width: 860px;
+      margin: 0 auto;
+      padding: 32px 20px;
+    }
+
+    .sec {
+      background: #16161f;
+      border: 1px solid #1e293b;
+      border-radius: 16px;
+      margin-bottom: 40px;
+      overflow: hidden;
+    }
+
+    .sec-head {
+      display: flex;
+      align-items: center;
+      gap: 14px;
+      padding: 20px 28px;
+      background: linear-gradient(90deg, #1a0a00, #1e293b);
+      border-bottom: 1px solid #1e293b;
+    }
+
+    .sec-icon {
+      width: 44px;
+      height: 44px;
+      border-radius: 10px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 1.3rem;
+      flex-shrink: 0;
+    }
+
+    .sec-head h2 {
+      font-size: 1.15rem;
+      font-weight: 700;
+      color: #f1f5f9;
+    }
+
+    .sec-head p {
+      color: #64748b;
+      font-size: .82rem;
+      margin-top: 3px;
+    }
+
+    .badge {
+      display: inline-block;
+      padding: 2px 9px;
+      border-radius: 999px;
+      font-size: .7rem;
+      font-weight: 700;
+      margin-left: 8px;
+    }
+
+    .bg {
+      padding: 28px;
+      overflow-x: auto;
+    }
+
+    .bg .mermaid {
+      display: flex;
+      justify-content: center;
+    }
+
+    .mermaid svg {
+      max-width: 100%;
+      height: auto;
+    }
+
+    .mermaid svg text,
+    .mermaid svg tspan {
+      fill: #ffffff !important;
+    }
+
+    .mermaid svg .nodeLabel,
+    .mermaid svg .label {
+      color: #ffffff !important;
+    }
+
+    .mermaid svg .edgeLabel rect {
+      fill: #1e293b !important;
+    }
+
+    .mermaid svg .node rect,
+    .mermaid svg .node circle,
+    .mermaid svg .node ellipse,
+    .mermaid svg .node polygon,
+    .mermaid svg .node path {
+      stroke: #60a5fa !important;
+    }
+
+    .mermaid svg .actor {
+      fill: #1e3a5f !important;
+      stroke: #60a5fa !important;
+    }
+
+    .mermaid svg .attributeBoxEven {
+      fill: #1e293b !important;
+    }
+
+    .mermaid svg .attributeBoxOdd {
+      fill: #162032 !important;
+    }
+
+    footer {
+      text-align: center;
+      padding: 28px;
+      color: #334155;
+      font-size: .78rem;
+      border-top: 1px solid #1e293b;
+    }
+
+    #toggle-ui-btn {
+      position: fixed;
+      bottom: 20px;
+      right: 20px;
+      z-index: 9999;
+      background: #f59e0b;
+      color: #0f0f14;
+      border: none;
+      border-radius: 999px;
+      padding: 10px 20px;
+      font-size: .82rem;
+      font-weight: 700;
+      cursor: pointer;
+      box-shadow: 0 4px 16px rgba(0, 0, 0, 0.4);
+      transition: opacity 0.3s, transform 0.3s;
+      font-family: 'Inter', sans-serif;
+    }
+
+    #toggle-ui-btn:hover {
+      background: #fbbf24;
+      transform: scale(1.05);
+    }
+
+    #toggle-ui-btn.faded {
+      opacity: 0;
+      pointer-events: none;
+    }
+
+    body.ui-hidden header,
+    body.ui-hidden nav,
+    body.ui-hidden footer {
+      display: none !important;
+    }
+
+    body.ui-hidden main {
+      padding-top: 16px;
+    }
+
+    @media print {
+      * {
+        -webkit-print-color-adjust: exact !important;
+        print-color-adjust: exact !important;
+      }
+
+      nav,
+      header,
+      footer {
+        display: none;
+      }
+
+      body {
+        background: #0f0f14 !important;
+      }
+
+      main {
+        max-width: 100%;
+        padding: 10px;
+      }
+
+      .sec {
+        border: 1px solid #1e293b !important;
+        break-inside: avoid;
+        background: #16161f !important;
+      }
+
+      .sec-head {
+        background: #1a0a00 !important;
+      }
+
+      @page {
+        size: A4 portrait;
+        margin: 12mm;
+      }
+    }
+  </style>
+</head>
+
+<body>
+  <header>
+    <div style="font-size:2.2rem;margin-bottom:10px;">&#9749;&#129383;</div>
+    <h1>ChipiPie Cafe &mdash; System Diagrams</h1>
+    <p>Flowchart &nbsp;&middot;&nbsp; Use Case L0 &amp; L1 &nbsp;&middot;&nbsp; ERD &nbsp;&middot;&nbsp; DFD L0 &amp; L1
+    </p>
+  </header>
+  <main>
+
+    <!-- FC PAGE 1: AUTHENTICATION -->
+    <div class="sec" id="fc">
+      <div class="sec-head">
+        <div class="sec-icon" style="background:#1c1000;">&#128204;</div>
+        <div>
+          <h2>Flowchart Page 1 of 3: Authentication <span class="badge"
+              style="background:#1c1000;color:#fb923c;border:1px solid #c2410c;">Flowchart</span></h2>
+          <p>System entry, login validation, role-based routing</p>
+        </div>
+      </div>
+      <div class="bg">
+        <div class="mermaid">
+          flowchart TD
+          START([START]) --> A[User Opens ChipiPie POS]
+          A --> B{Session Active?}
+          B -- Yes --> ROLE{Check Role}
+          B -- No --> C[/Show Login Page/]
+          C --> D[/Enter Username and Password/]
+          D --> E[Submit Credentials]
+          E --> F{Username Exists?}
+          F -- No --> ERR1[/Show: Invalid Credentials/]
+          ERR1 --> C
+          F -- Yes --> G{Account Active?}
+          G -- No --> ERR2[/Show: Account Deactivated/]
+          ERR2 --> C
+          G -- Yes --> H{Password Match?}
+          H -- No --> ERR3[/Show: Wrong Password/]
+          ERR3 --> C
+          H -- Yes --> ROLE
+          ROLE -- Cashier --> CON_A((A))
+          ROLE -- Admin --> CON_B((B))
+        </div>
+      </div>
+      <p style="text-align:center;color:#f59e0b;font-size:.8rem;padding:10px 0 4px;">&#9660; Connector A &rarr; Cashier
+        Flow (Page 2) &nbsp;&nbsp; Connector B &rarr; Admin Flow (Page 3)</p>
+    </div>
+
+    <!-- FC PAGE 2A: CASHIER - Menu & Cart -->
+    <div class="sec" id="fc2">
+      <div class="sec-head">
+        <div class="sec-icon" style="background:#1c1000;">&#128204;</div>
+        <div>
+          <h2>FC Page 2 of 3: Cashier &mdash; Part 1: Browse &amp; Cart <span class="badge"
+              style="background:#1c1000;color:#fb923c;border:1px solid #c2410c;">Flowchart</span></h2>
+          <p>From Connector A &rarr; Browse menu &rarr; Add to cart &rarr; Connector F</p>
+        </div>
+      </div>
+      <div class="bg">
+        <div class="mermaid">
+          flowchart TD
+          CON_A((A)) --> CASH_START([Cashier Dashboard])
+          CASH_START --> CA[Open New Order View]
+          CA --> CB[/Click Category Shortcut: Coffee - Non-Coffee - Snacks/]
+          CB --> CC[View Supergroup with Subcat Tab Buttons]
+          CC --> CD[/Click Subcat Tab: Hot Coffee or Iced Coffee/]
+          CD --> CE[Browse Items in Selected Tab]
+          CE --> CF[/Select Menu Item/]
+          CF --> CG{Item Has Size Options?}
+          CG -- Yes --> CH[/Show Size Selection Modal/]
+          CH --> CI[/Select Size: Regular - Upsize - 12oz - 16oz/]
+          CI --> CJ[Add to Cart with Selected Size]
+          CG -- No --> CJ
+          CJ --> CK{Add More Items?}
+          CK -- Yes --> CE
+          CK -- No --> CON_F((F))
+        </div>
+      </div>
+      <p style="text-align:center;color:#f59e0b;font-size:.8rem;padding:10px 0 4px;">&#9650; From Connector A (Page 1)
+        &nbsp;&nbsp; Connector F &rarr; Part 2: Checkout</p>
+    </div>
+
+    <!-- FC PAGE 2B: CASHIER - Checkout & Receipt -->
+    <div class="sec" id="fc2b">
+      <div class="sec-head">
+        <div class="sec-icon" style="background:#1c1000;">&#128204;</div>
+        <div>
+          <h2>FC Page 2 of 3: Cashier &mdash; Part 2: Checkout &amp; Receipt <span class="badge"
+              style="background:#1c1000;color:#fb923c;border:1px solid #c2410c;">Flowchart</span></h2>
+          <p>From Connector F &rarr; Payment &rarr; Stock Check &rarr; Receipt &rarr; Connector C</p>
+        </div>
+      </div>
+      <div class="bg">
+        <div class="mermaid">
+          flowchart TD
+          CON_F((F)) --> CL{Cart Empty?}
+          CL -- Yes --> CON_BACK((A))
+          CL -- No --> CM[/Select Payment: Cash or GCash/]
+          CM --> CN[/Click Checkout/]
+          CN --> CO[System Validates Stock]
+          CO --> CP{All Items In Stock?}
+          CP -- No --> CQ[/Show: Out-of-Stock Error/]
+          CQ --> CON_BACK2((A))
+          CP -- Yes --> CR[Deduct Stock from Inventory]
+          CR --> CS[Generate Order Number]
+          CS --> CT[Save Order and Line Items to DB]
+          CT --> CU{Any Item Below Min Stock?}
+          CU -- Yes --> CV[/Show: Low Stock Notification/]
+          CU -- No --> CW[/Show: Order Confirmation/]
+          CV --> CW
+          CW --> CX{New Order?}
+          CX -- Yes --> CON_BACK3((A))
+          CX -- No --> LOGOUT_C([Cashier Logout])
+          LOGOUT_C --> CON_C((C))
+        </div>
+      </div>
+      <p style="text-align:center;color:#f59e0b;font-size:.8rem;padding:10px 0 4px;">&#9650; From Connector F (Part 1)
+        &nbsp;&nbsp; (A) = Back to Browse &nbsp;&nbsp; Connector C &rarr; Login</p>
+    </div>
+    <!-- FC PAGE 3A: ADMIN - Inventory Management -->
+    <div class="sec" id="fc3">
+      <div class="sec-head">
+        <div class="sec-icon" style="background:#1c1000;">&#128204;</div>
+        <div>
+          <h2>FC Page 3 of 3: Admin &mdash; Inventory Management <span class="badge"
+              style="background:#1c1000;color:#fb923c;border:1px solid #c2410c;">Flowchart</span></h2>
+          <p>From Connector B &rarr; Admin Dashboard &rarr; Inventory &rarr; Connector E</p>
+        </div>
+      </div>
+      <div class="bg">
+        <div class="mermaid">
+          flowchart TD
+          CON_B((B)) --> ADM_START([Admin Dashboard])
+          ADM_START --> AB{Select Action}
+          AB -- Inventory --> IA{Inventory Action?}
+          IA --> IA1[/Add New Item with Size Prices/]
+          IA1 --> AB
+          IA --> IA2[/Edit Item or Price/]
+          IA2 --> AB
+          IA --> IA3[/Adjust Stock Level/]
+          IA3 --> AB
+          IA --> IA4[/Toggle Availability/]
+          IA4 --> AB
+          IA --> IA5[/Delete Item/]
+          IA5 --> IA6[Request Bypass Token]
+          IA6 --> IA7[/Enter 15-min Token Code/]
+          IA7 --> IA8{Token Valid?}
+          IA8 -- No --> IA7
+          IA8 -- Yes --> IA9[Delete Item from DB]
+          IA9 --> AB
+          AB -- Users --> CON_E((E))
+        </div>
+      </div>
+      <p style="text-align:center;color:#f59e0b;font-size:.8rem;padding:10px 0 4px;">&#9650; From Connector B (Page 1)
+        &nbsp;&nbsp; Connector E &rarr; User Management</p>
+    </div>
+
+    <!-- FC PAGE 3B: ADMIN - User Management -->
+    <div class="sec" id="fc3b">
+      <div class="sec-head">
+        <div class="sec-icon" style="background:#1c1000;">&#128204;</div>
+        <div>
+          <h2>FC Page 3 of 3: Admin &mdash; User Management <span class="badge"
+              style="background:#1c1000;color:#fb923c;border:1px solid #c2410c;">Flowchart</span></h2>
+          <p>From Connector E &rarr; User Registration &amp; Approval &rarr; Connector D</p>
+        </div>
+      </div>
+      <div class="bg">
+        <div class="mermaid">
+          flowchart TD
+          CON_E((E)) --> UA{User Action?}
+          UA --> UA1[/Register New Cashier - Immediate/]
+          UA1 --> UA1S[Save Cashier Account to DB]
+          UA1S --> UA
+          UA --> UA3[/Register New Admin - Needs Approval/]
+          UA3 --> UA4[Send Approval Email to Owner]
+          UA4 --> UA5{Owner Approves?}
+          UA5 -- Yes --> UA6[Create Admin Account]
+          UA6 --> UA7[/Send Confirmation Email/]
+          UA7 --> UA
+          UA5 -- No --> UA8[/Show: Request Stays Pending/]
+          UA8 --> UA
+          UA --> UA9[/Toggle User Active - Inactive/]
+          UA9 --> UA
+          UA --> CON_D((D))
+        </div>
+      </div>
+      <p style="text-align:center;color:#f59e0b;font-size:.8rem;padding:10px 0 4px;">&#9650; From Connector E
+        (Inventory) &nbsp;&nbsp; Connector D &rarr; Analytics &amp; Orders</p>
+    </div>
+
+    <!-- FC PAGE 3C: ADMIN - Analytics & Orders -->
+    <div class="sec" id="fc3c">
+      <div class="sec-head">
+        <div class="sec-icon" style="background:#1c1000;">&#128204;</div>
+        <div>
+          <h2>FC Page 3 of 3: Admin &mdash; Analytics &amp; Orders <span class="badge"
+              style="background:#1c1000;color:#fb923c;border:1px solid #c2410c;">Flowchart</span></h2>
+          <p>From Connector D &rarr; Analytics &rarr; Orders View &rarr; Logout &rarr; Connector C</p>
+        </div>
+      </div>
+      <div class="bg">
+        <div class="mermaid">
+          flowchart TD
+          CON_D((D)) --> AB2{Select Action}
+          AB2 -- Analytics --> RA[/Select Period: Today - Week - Month - Year/]
+          RA --> RB[/View Revenue and Order KPIs/]
+          RB --> RC[/View Cups Sold and Top Seller/]
+          RC --> RD[/View Weekly or Hourly Revenue Chart/]
+          RD --> RE[/View Top Selling Items List/]
+          RE --> RF[/Print Sales Summary Report/]
+          RF --> AB2
+          AB2 -- Orders --> OA[/View Expandable Order Cards/]
+          OA --> OB{Expand a Card?}
+          OB -- Yes --> OC[/See All Items in That Order/]
+          OC --> OB
+          OB -- No --> OD[/Filter by Period: Today - Week - Month - Year/]
+          OD --> AB2
+          AB2 -- Done --> LOGOUT_A([Admin Logout])
+          LOGOUT_A --> CON_C((C))
+        </div>
+      </div>
+      <p style="text-align:center;color:#f59e0b;font-size:.8rem;padding:10px 0 4px;">&#9650; From Connector D (User
+        Mgmt) &nbsp;&nbsp; Connector C &rarr; Returns to Login (Page 1)</p>
+    </div>
+    <!-- FC COMPLETE -->
+    <div class="sec" id="fc4">
+      <div class="sec-head">
+        <div class="sec-icon" style="background:#1c1000;">&#128204;</div>
+        <div>
+          <h2>Flowchart: Complete Connected Flow <span class="badge"
+              style="background:#1c1000;color:#fb923c;border:1px solid #c2410c;">Flowchart</span></h2>
+          <p>Full system flow: Auth &rarr; Cashier POS &rarr; Admin Management (all connected)</p>
+        </div>
+      </div>
+      <div class="bg">
+        <div class="mermaid">
+          flowchart TD
+          START([START]) --> A[User Opens ChipiPie POS]
+          A --> B{Session Active?}
+          B -- Yes --> ROLE{Check Role}
+          B -- No --> C[/Show Login Page/]
+          C --> D[/Enter Username and Password/]
+          D --> E[Submit Credentials]
+          E --> F{Valid User?}
+          F -- No --> C
+          F -- Yes --> ROLE
+          ROLE -- Cashier --> CASH_START
+          ROLE -- Admin --> ADM_START
+          subgraph CASHIER_FLOW [CASHIER ORDER FLOW]
+          direction TB
+          CASH_START([Cashier Dashboard]) --> CA[Open New Order View]
+          CA --> CB[/Click Category Shortcut: Coffee - Non-Coffee - Snacks/]
+          CB --> CC[View Subcat Tab Buttons]
+          CC --> CD[/Click Subcat Tab to Switch Items/]
+          CD --> CDS{Has Size Options?}
+          CDS -- Yes --> CDSZ[/Select Size in Modal/]
+          CDSZ --> CE
+          CDS -- No --> CE[Add to Cart]
+          CE --> CF{More Items?}
+          CF -- Yes --> CD
+          CF -- No --> CG[/Select Payment: Cash or GCash/]
+          CG --> CH[/Click Checkout/]
+          CH --> CI{Stock OK?}
+          CI -- No --> CJ[/Show: Out of Stock Error/]
+          CJ --> CD
+          CI -- Yes --> CK[Deduct Stock]
+          CK --> CL[Generate Order Number]
+          CL --> CM[Save Order to DB]
+          CM --> CN{Low Stock?}
+          CN -- Yes --> CO[/Show: Low Stock Alert/]
+          CN -- No --> CP[/Show: Order Confirmation/]
+          CO --> CP
+          CP --> CQ{New Order?}
+          CQ -- Yes --> CD
+          CQ -- No --> LOGOUT_C([Logout])
+          end
+          subgraph ADMIN_FLOW [ADMIN MANAGEMENT FLOW]
+          direction TB
+          ADM_START([Admin Dashboard]) --> AB{Select View}
+          AB --> INV[Menu Items]
+          AB --> USR[Users]
+          AB --> ANA[Analytics]
+          AB --> ORD[Orders]
+          INV --> IA{Inventory Action}
+          IA --> IA1[/Add Item with Size Prices/]
+          IA --> IA2[/Edit Item/]
+          IA --> IA3[/Adjust Stock/]
+          IA --> IA4[/Delete - Token Required/]
+          IA4 --> IA5[Request 15-min Token]
+          IA5 --> IA6{Token Valid?}
+          IA6 -- No --> IA5
+          IA6 -- Yes --> IA7[Delete from DB]
+          USR --> UA{User Action}
+          UA --> UA1[/Register New Cashier/]
+          UA --> UA2[/Register New Admin/]
+          UA2 --> UA3[Send Approval Email]
+          UA3 --> UA4{Owner Approves?}
+          UA4 -- Yes --> UA5[Create Admin Account]
+          UA4 -- No --> UA6[/Show: Stays Pending/]
+          UA --> UA7[/Toggle Active Status/]
+          ANA --> RA[/Select Period/]
+          RA --> RB[/View KPIs and Charts/]
+          RB --> RC[/Print Report/]
+          IA7 --> AB
+          IA1 --> AB
+          UA1 --> AB
+          UA5 --> AB
+          RC --> AB
+          AB --> LOGOUT_A([Logout])
+          end
+          LOGOUT_C -. Return to Login .-> C
+          LOGOUT_A -. Return to Login .-> C
+        </div>
+      </div>
+    </div>
+
+    <!-- USE CASE L0 -->
+    <div class="sec" id="uc0">
+      <div class="sec-head">
+        <div class="sec-icon" style="background:#0c1a2e;">&#127760;</div>
+        <div>
+          <h2>Use Case Diagram Level 0 <span class="badge"
+              style="background:#0c1a2e;color:#60a5fa;border:1px solid #1d4ed8;">Context</span></h2>
+          <p>High-level system boundary and external actors</p>
+        </div>
+      </div>
+      <div class="bg">
+        <div class="mermaid">
+          graph LR
+          OWN(["Owner"])
+          ADM(["Admin"])
+          CSH(["Cashier"])
+          EML(["Email System (Gmail SMTP)"])
+          subgraph SYS["ChipiPie Cafe POS System"]
+          F1["Authentication"]
+          F2["Menu and Inventory"]
+          F3["New Order - POS"]
+          F4["User Management"]
+          F5["Analytics and Reports"]
+          F6["Token Authorization"]
+          F7["Orders View"]
+          end
+          ADM --> F1
+          ADM --> F2
+          ADM --> F3
+          ADM --> F4
+          ADM --> F5
+          ADM --> F6
+          ADM --> F7
+          CSH --> F1
+          CSH --> F3
+          CSH --> F7
+          OWN --> F4
+          F5 -.->|sends email alerts| EML
+          F4 -.->|approval emails| EML
+          EML -.->|notifies| OWN
+        </div>
+      </div>
+    </div>
+
+    <!-- UC L1-A -->
+    <div class="sec" id="uc1a">
+      <div class="sec-head">
+        <div class="sec-icon" style="background:#1a0a2e;">&#127919;</div>
+        <div>
+          <h2>Use Case L1: Authentication and User Management <span class="badge"
+              style="background:#1a0a2e;color:#c084fc;border:1px solid #7c3aed;">Level 1</span></h2>
+          <p>Login, registration, approval workflow</p>
+        </div>
+      </div>
+      <div class="bg">
+        <div class="mermaid">
+          graph LR
+          OWN(["Owner"])
+          ADM(["Admin"])
+          CSH(["Cashier"])
+          EML(["Email System"])
+          subgraph AUTH["Authentication"]
+          UC1["Login to System"]
+          UC2["Logout of System"]
+          UC3["Check Session Status"]
+          end
+          subgraph UMGT["User Management"]
+          UC4["Register as Admin - Pending Approval"]
+          UC5["Register New Cashier - Immediate"]
+          UC6["Approve Admin via Email Link"]
+          UC7["Toggle User Active or Inactive"]
+          UC8["View All Users and Pending Requests"]
+          UC9["Resend Approval Email to Owner"]
+          end
+          CON_F((F))
+          OWN --> UC6
+          ADM --> UC1
+          ADM --> UC2
+          ADM --> UC3
+          ADM --> UC4
+          ADM --> UC5
+          ADM --> UC7
+          ADM --> UC8
+          ADM --> UC9
+          CSH --> UC1
+          CSH --> UC2
+          CSH --> UC3
+          UC4 -.->|triggers email| EML
+          UC6 -.->|confirmation email| EML
+          UC9 -.->|resends email| EML
+          UMGT --> CON_F
+        </div>
+      </div>
+      <p style="text-align:center;color:#f59e0b;font-size:.8rem;padding:10px 0 4px;">Connector F &rarr; continues to Use
+        Case L1B</p>
+    </div>
+
+    <!-- UC L1-B -->
+    <div class="sec" id="uc1b">
+      <div class="sec-head">
+        <div class="sec-icon" style="background:#1a0a2e;">&#127919;</div>
+        <div>
+          <h2>Use Case L1: Menu, Orders, POS and Analytics <span class="badge"
+              style="background:#1a0a2e;color:#c084fc;border:1px solid #7c3aed;">Level 1</span></h2>
+          <p>Inventory management, POS order processing, orders view, analytics dashboard</p>
+        </div>
+      </div>
+      <div class="bg">
+        <div class="mermaid">
+          graph LR
+          CON_F((F))
+          ADM(["Admin"])
+          CSH(["Cashier"])
+          subgraph MENU["Menu and Inventory"]
+          UC10["View Menu Items"]
+          UC11["Add Item with Size Price Variants"]
+          UC12["Edit Item or Price"]
+          UC13["Delete Item - Requires Bypass Token"]
+          UC14["Adjust Stock Level"]
+          UC15["Toggle Availability"]
+          UC16["Request 15-min Bypass Token"]
+          end
+          subgraph POS["New Order - POS"]
+          UC17["Use Category Shortcut Bar"]
+          UC18["Switch Subcat via Tab Buttons"]
+          UC19["Add Item to Cart"]
+          UC20["Select Size in Modal"]
+          UC21["Process Checkout - Cash or GCash"]
+          UC22["Receive Low Stock Alert"]
+          end
+          subgraph ORD["Orders View"]
+          UC23["View Expandable Order Cards"]
+          UC24["Expand Card to See Item Details"]
+          UC25["Filter Orders by Period"]
+          end
+          subgraph ANA["Analytics and Reports"]
+          UC26["View Dashboard KPIs"]
+          UC27["View Weekly or Hourly Chart"]
+          UC28["View Top Selling Items"]
+          UC29["Print Sales Summary"]
+          end
+          CON_F --> UC10
+          CON_F --> UC17
+          ADM --> UC10
+          ADM --> UC11
+          ADM --> UC12
+          ADM --> UC13
+          ADM --> UC14
+          ADM --> UC15
+          ADM --> UC16
+          ADM --> UC17
+          ADM --> UC18
+          ADM --> UC19
+          ADM --> UC20
+          ADM --> UC21
+          ADM --> UC22
+          ADM --> UC23
+          ADM --> UC24
+          ADM --> UC25
+          ADM --> UC26
+          ADM --> UC27
+          ADM --> UC28
+          ADM --> UC29
+          CSH --> UC17
+          CSH --> UC18
+          CSH --> UC19
+          CSH --> UC20
+          CSH --> UC21
+          CSH --> UC22
+          CSH --> UC23
+          CSH --> UC24
+          CSH --> UC25
+        </div>
+      </div>
+    </div>
+
+    <!-- ERD -->
+    <div class="sec" id="erd">
+      <div class="sec-head">
+        <div class="sec-icon" style="background:#052e16;">&#128451;</div>
+        <div>
+          <h2>Entity Relationship Diagram (ERD) <span class="badge"
+              style="background:#052e16;color:#4ade80;border:1px solid #166534;">8 Tables</span></h2>
+          <p>Full database schema: chipipie_pos &mdash; attributes, PKs, FKs, relationships</p>
+        </div>
+      </div>
+      <div class="bg">
+        <div class="mermaid">
+          erDiagram
+          USERS {
+          int id PK
+          varchar username UK
+          varchar password
+          varchar full_name
+          varchar email
+          enum role
+          tinyint is_active
+          timestamp created_at
+          timestamp updated_at
+          }
+          ADMIN_TOKENS {
+          int id PK
+          varchar token UK
+          int user_id FK
+          varchar purpose
+          tinyint is_used
+          datetime expires_at
+          datetime used_at
+          timestamp created_at
+          }
+          ADMIN_REGISTRATION_REQUESTS {
+          int id PK
+          varchar username
+          varchar password
+          varchar full_name
+          varchar email
+          varchar approval_token UK
+          enum status
+          datetime approved_at
+          timestamp created_at
+          }
+          CATEGORIES {
+          int id PK
+          varchar name UK
+          timestamp created_at
+          }
+          MENU_ITEMS {
+          int id PK
+          varchar name
+          int category_id FK
+          decimal price
+          text size_prices
+          text image
+          int stock
+          int min_stock
+          tinyint is_available
+          timestamp created_at
+          timestamp updated_at
+          }
+          ORDERS {
+          int id PK
+          varchar order_number
+          int user_id FK
+          decimal total
+          varchar payment_method
+          varchar status
+          timestamp created_at
+          }
+          ORDER_ITEMS {
+          int id PK
+          int order_id FK
+          int menu_item_id FK
+          int quantity
+          decimal unit_price
+          decimal subtotal
+          varchar size
+          }
+          SYSTEM_SETTINGS {
+          varchar setting_key PK
+          text setting_value
+          timestamp updated_at
+          }
+          USERS ||--o{ ADMIN_TOKENS : "has tokens"
+          USERS ||--o{ ORDERS : "places"
+          CATEGORIES ||--o{ MENU_ITEMS : "contains"
+          ORDERS ||--|{ ORDER_ITEMS : "has items"
+          MENU_ITEMS ||--o{ ORDER_ITEMS : "included in"
+        </div>
+      </div>
+    </div>
+
+    <!-- DFD L0 -->
+    <div class="sec" id="dfd0">
+      <div class="sec-head">
+        <div class="sec-icon" style="background:#1c1000;">&#128260;</div>
+        <div>
+          <h2>DFD Level 0: Context Diagram <span class="badge"
+              style="background:#1c1000;color:#fb923c;border:1px solid #c2410c;">DFD</span></h2>
+          <p>Top-level data flows between all external actors and the system</p>
+        </div>
+      </div>
+      <div class="bg">
+        <div class="mermaid">
+          graph TD
+          ADM(["Admin"])
+          CSH(["Cashier"])
+          OWN(["Owner"])
+          EML(["Gmail SMTP"])
+          SYS["Process 0
+          ChipiPie POS System"]
+          ADM -- "login, manage menu, register users, place order, view analytics" --> SYS
+          CSH -- "login, place order, view menu, checkout" --> SYS
+          OWN -- "approve admin via email link" --> SYS
+          SYS -- "dashboard KPIs, charts, order cards, stock alerts" --> ADM
+          SYS -- "order confirmation, stock alert, menu" --> CSH
+          SYS -- "approval and confirmation emails" --> EML
+          EML -- "email notification" --> OWN
+        </div>
+      </div>
+    </div>
+
+    <!-- DFD L1A P1 -->
+    <div class="sec" id="dfd1a">
+      <div class="sec-head">
+        <div class="sec-icon" style="background:#0c1a2e;">&#128260;</div>
+        <div>
+          <h2>DFD Level 1A Part 1: Authentication and User Management <span class="badge"
+              style="background:#0c1a2e;color:#60a5fa;border:1px solid #1d4ed8;">DFD</span></h2>
+          <p>Process 1.0 Authentication and Process 2.0 User Management</p>
+        </div>
+      </div>
+      <div class="bg">
+        <div class="mermaid">
+          graph LR
+          OWN(["Owner"])
+          ADM(["Admin"])
+          EML(["Gmail SMTP"])
+          CSH(["Cashier"])
+          subgraph AUTH["Process 1.0: Authentication"]
+          P1a["Validate Login Credentials"]
+          P1b["Create Session and Role"]
+          DS1a[("D1: users")]
+          end
+          subgraph UMGT["Process 2.0: User Management"]
+          P2a["Register New Cashier"]
+          P2b["Register Admin Request"]
+          P2c["Approve Admin Account"]
+          P2d["Toggle User Active or Inactive"]
+          DS1u[("D1: users")]
+          DS4[("D4: admin_reg_requests")]
+          DS7[("D7: system_settings")]
+          end
+          CON_D((D))
+          OWN --> P2c
+          ADM --> P2a
+          ADM --> P2b
+          ADM --> P2d
+          ADM --> P1a
+          CSH --> P1a
+          P2b -.->|approval email| EML
+          P2c -.->|confirmation email| EML
+          UMGT --> CON_D
+        </div>
+      </div>
+      <p style="text-align:center;color:#f59e0b;font-size:.8rem;padding:10px 0 4px;">Connector D &rarr; continues to DFD
+        L1A Part 2 (Token Management)</p>
+    </div>
+
+    <!-- DFD L1A P2 -->
+    <div class="sec" id="dfd1a2">
+      <div class="sec-head">
+        <div class="sec-icon" style="background:#0c1a2e;">&#128260;</div>
+        <div>
+          <h2>DFD Level 1A Part 2: Token Management <span class="badge"
+              style="background:#0c1a2e;color:#60a5fa;border:1px solid #1d4ed8;">DFD</span></h2>
+          <p>Process 6.0 Token Management (from Connector D) &mdash; 15-minute bypass tokens</p>
+        </div>
+      </div>
+      <div class="bg">
+        <div class="mermaid">
+          graph TD
+          CON_D((D))
+          ADM(["Admin"])
+          DS5[("D5: admin_tokens")]
+          P6["6.0 Token Management
+          15-min Bypass Token"]
+          CON_D --> P6
+          ADM -- "request bypass token for delete" --> P6
+          P6 -- "write token with expiry" --> DS5
+          DS5 -- "token record" --> P6
+          P6 -- "token code to admin" --> ADM
+          ADM -- "submit token to confirm delete" --> P6
+          P6 -- "mark token used" --> DS5
+        </div>
+      </div>
+      <p style="text-align:center;color:#f59e0b;font-size:.8rem;padding:10px 0 4px;">&#9650; From Connector D (DFD L1A
+        Part 1)</p>
+    </div>
+
+    <!-- DFD L1B P1 -->
+    <div class="sec" id="dfd1b">
+      <div class="sec-head">
+        <div class="sec-icon" style="background:#0c1a2e;">&#128260;</div>
+        <div>
+          <h2>DFD Level 1B Part 1: Menu and Inventory Management <span class="badge"
+              style="background:#0c1a2e;color:#60a5fa;border:1px solid #1d4ed8;">DFD</span></h2>
+          <p>Process 3.0 Menu and Inventory Management (size-variant support)</p>
+        </div>
+      </div>
+      <div class="bg">
+        <div class="mermaid">
+          graph LR
+          ADM(["Admin"])
+          CSH(["Cashier"])
+          subgraph MENU["Process 3.0: Menu and Inventory Management"]
+          P3["Manage items with size_prices,
+          validate bypass tokens,
+          update stock and availability"]
+          DS2[("D2: menu_items")]
+          DS5[("D5: admin_tokens")]
+          DS6[("D6: categories")]
+          end
+          CON_E((E))
+          ADM -- "add/edit/delete with token, adjust stock" --> P3
+          P3 -- "updated catalog with size prices" --> ADM
+          P3 -- "available catalog" --> CSH
+          MENU --> CON_E
+        </div>
+      </div>
+      <p style="text-align:center;color:#f59e0b;font-size:.8rem;padding:10px 0 4px;">Connector E &rarr; continues to DFD
+        L1B Part 2 (POS, Orders, Analytics)</p>
+    </div>
+
+    <!-- DFD L1B P2 -->
+    <div class="sec" id="dfd1b2">
+      <div class="sec-head">
+        <div class="sec-icon" style="background:#0c1a2e;">&#128260;</div>
+        <div>
+          <h2>DFD Level 1B Part 2: POS, Orders and Analytics <span class="badge"
+              style="background:#0c1a2e;color:#60a5fa;border:1px solid #1d4ed8;">DFD</span></h2>
+          <p>Process 4.0 Order Processing, 4.1 Orders View, 5.0 Analytics (from Connector E)</p>
+        </div>
+      </div>
+      <div class="bg">
+        <div class="mermaid">
+          graph LR
+          CON_E((E))
+          CSH(["Cashier"])
+          ADM(["Admin"])
+          subgraph ORDER["Process 4.0: POS Order Processing"]
+          P4a["Category Shortcut Bar Navigation"]
+          P4b["Subcat Tab Selection"]
+          P4c["Size Selection Modal"]
+          P4d["Add to Cart and Checkout"]
+          P4e["Deduct Stock, Save Order"]
+          DS2[("D2: menu_items")]
+          DS3[("D3: orders + order_items")]
+          end
+          subgraph ORDV["Process 4.1: Orders View"]
+          P41a["Load Orders Grouped by Order Number"]
+          P41b["Expandable Order Cards"]
+          P41c["Filter by Today / Week / Month / Year"]
+          end
+          subgraph ANA["Process 5.0: Analytics and Reports"]
+          P5a["Dashboard KPIs: Revenue, Orders, Cups, Avg, Top"]
+          P5b["Charts: Weekly / Hourly / Monthly"]
+          P5c["Top Items and Category Breakdown"]
+          P5d["Print Sales Summary"]
+          end
+          CON_E --> P4a
+          CSH --> P4a
+          CSH --> P4b
+          CSH --> P4c
+          CSH --> P4d
+          ADM --> P4a
+          ADM --> P4b
+          ADM --> P4c
+          ADM --> P4d
+          P4e --> CSH
+          ADM --> P41a
+          CSH --> P41a
+          ADM --> P5a
+          ADM --> P5b
+          ADM --> P5c
+          ADM --> P5d
+          P5d --> ADM
+        </div>
+      </div>
+      <p style="text-align:center;color:#f59e0b;font-size:.8rem;padding:10px 0 4px;">&#9650; From Connector E (DFD L1B
+        Part 1)</p>
+    </div>
+
+  </main>
+  <footer>
+    <p>ChipiPie Cafe POS System &mdash; System Documentation &copy; 2026 &nbsp;|&nbsp; Thesis Diagrams &nbsp;|&nbsp; DB:
+      chipipie_pos (8 tables)</p>
+  </footer>
+  <script>
+    mermaid.initialize({
+      startOnLoad: true,
+      theme: "dark",
+      themeVariables: {
+        primaryColor: "#1e3a5f",
+        primaryTextColor: "#ffffff",
+        primaryBorderColor: "#3b82f6",
+        lineColor: "#f59e0b",
+        secondaryColor: "#1e3a5f",
+        tertiaryColor: "#162032",
+        background: "#0f0f14",
+        mainBkg: "#1e3a5f",
+        nodeBorder: "#3b82f6",
+        clusterBkg: "#0f172a",
+        clusterBorder: "#3b82f6",
+        titleColor: "#ffffff",
+        edgeLabelBackground: "#1e293b",
+        fontFamily: "Inter, sans-serif",
+        fontSize: "16px",
+        labelTextColor: "#ffffff",
+        nodeTextColor: "#ffffff",
+        attributeBackgroundColorEven: "#1e293b",
+        attributeBackgroundColorOdd: "#162032"
+      },
+      flowchart: { curve: "basis", useMaxWidth: true, htmlLabels: true, nodeSpacing: 50, rankSpacing: 60 },
+      er: { useMaxWidth: true, fontSize: 14 }
+    });
+    document.addEventListener("DOMContentLoaded", () => {
+      const observer = new MutationObserver(() => {
+        document.querySelectorAll(".mermaid svg text, .mermaid svg tspan").forEach(el => { el.style.fill = "#ffffff"; });
+        document.querySelectorAll(".mermaid svg .nodeLabel, .mermaid svg .label").forEach(el => { el.style.color = "#ffffff"; });
+      });
+      document.querySelectorAll(".mermaid").forEach(el => { observer.observe(el, { childList: true, subtree: true }); });
+    });
+
+    // Toggle UI for screenshots
+    let fadeTimer = null;
+    const btn = document.getElementById('toggle-ui-btn');
+    function toggleUI() {
+      const hidden = document.body.classList.toggle('ui-hidden');
+      btn.textContent = hidden ? '👁 Show UI' : '🙈 Hide UI for Screenshot';
+      if (hidden) {
+        fadeTimer = setTimeout(() => btn.classList.add('faded'), 2000);
+      } else {
+        clearTimeout(fadeTimer);
+        btn.classList.remove('faded');
+      }
+    }
+    btn.addEventListener('click', toggleUI);
+    document.addEventListener('keydown', e => { if (e.key === 'h' || e.key === 'H') toggleUI(); });
+    document.addEventListener('mousemove', () => { if (document.body.classList.contains('ui-hidden')) { btn.classList.remove('faded'); clearTimeout(fadeTimer); fadeTimer = setTimeout(() => btn.classList.add('faded'), 2000); } });
+  </script>
+  <button id="toggle-ui-btn">🙈 Hide UI for Screenshot</button>
+</body>
+
+</html>

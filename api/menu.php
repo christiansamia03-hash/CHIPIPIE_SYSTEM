@@ -30,7 +30,7 @@ else {
 function handleFetchMenu() {
     $db = getDB();
     $stmt = $db->query("
-        SELECT m.id, m.name, c.name AS category, m.price, m.emoji, m.image,
+        SELECT m.id, m.name, c.name AS category, m.price, m.size_prices, m.emoji, m.image,
                m.stock, m.min_stock, m.is_available, m.category_id
         FROM menu_items m
         JOIN categories c ON m.category_id = c.id
@@ -49,18 +49,28 @@ function handleAddItem() {
     $name = trim($input['name'] ?? '');
     $categoryId = intval($input['category_id'] ?? 0);
     $price = floatval($input['price'] ?? 0);
-    $emoji = trim($input['emoji'] ?? '🍽️');
     $image = $input['image'] ?? null;
     $stock = intval($input['stock'] ?? 0);
     $minStock = intval($input['min_stock'] ?? 5);
+    $sizePrices = $input['size_prices'] ?? null;
 
     if (!$name || !$categoryId || $price <= 0) {
         jsonResponse(['success' => false, 'message' => 'Name, category, and valid price required.'], 400);
     }
 
+    // Validate and encode size_prices if provided
+    $sizePricesJson = null;
+    if ($sizePrices && is_array($sizePrices) && count($sizePrices) > 0) {
+        $sizePricesJson = json_encode($sizePrices);
+    } elseif ($sizePrices && is_string($sizePrices)) {
+        // Validate it's valid JSON
+        $decoded = json_decode($sizePrices, true);
+        if ($decoded) $sizePricesJson = $sizePrices;
+    }
+
     $db = getDB();
-    $stmt = $db->prepare("INSERT INTO menu_items (name, category_id, price, emoji, image, stock, min_stock, is_available) VALUES (?, ?, ?, ?, ?, ?, ?, ?)");
-    $stmt->execute([$name, $categoryId, $price, $emoji, $image, $stock, $minStock, $stock > 0 ? 1 : 0]);
+    $stmt = $db->prepare("INSERT INTO menu_items (name, category_id, price, size_prices, image, stock, min_stock, is_available) VALUES (?, ?, ?, ?, ?, ?, ?, ?)");
+    $stmt->execute([$name, $categoryId, $price, $sizePricesJson, $image, $stock, $minStock, $stock > 0 ? 1 : 0]);
 
     jsonResponse(['success' => true, 'message' => "'$name' added to menu.", 'id' => $db->lastInsertId()]);
 }
@@ -82,6 +92,16 @@ function handleUpdateItem() {
     if (isset($input['stock'])) { $fields[] = "stock = ?"; $params[] = intval($input['stock']); }
     if (isset($input['min_stock'])) { $fields[] = "min_stock = ?"; $params[] = intval($input['min_stock']); }
     if (isset($input['is_available'])) { $fields[] = "is_available = ?"; $params[] = intval($input['is_available']); }
+    if (array_key_exists('size_prices', $input)) {
+        $sp = $input['size_prices'];
+        if ($sp && is_array($sp)) {
+            $fields[] = "size_prices = ?"; $params[] = json_encode($sp);
+        } elseif ($sp && is_string($sp)) {
+            $fields[] = "size_prices = ?"; $params[] = $sp;
+        } else {
+            $fields[] = "size_prices = ?"; $params[] = null;
+        }
+    }
 
     if (empty($fields)) jsonResponse(['success' => false, 'message' => 'No fields to update.'], 400);
 

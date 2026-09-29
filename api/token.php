@@ -16,6 +16,7 @@ switch ($action) {
 
 function handleRequestToken() {
     requireAdmin();
+    session_write_close(); // Release session lock before SMTP work
     $input = getJsonInput();
     $purpose = trim($input['purpose'] ?? 'bypass');
     $db = getDB();
@@ -32,20 +33,24 @@ function handleRequestToken() {
     // - Everything else → current admin's email (self-service)
     $storeName = getSetting('store_name') ?: 'ChipiPie Cafe';
 
-    if ($purpose === 'bypass') {
-        // General bypass requires owner approval
+    if ($purpose === 'bypass' || $purpose === 'void_orders') {
+        // These require owner/manager approval — send to owner's email
         $recipientEmail = getSetting('owner_email');
         $recipientLabel = 'Owner (' . $recipientEmail . ')';
-        $bodyIntro = "<p>Admin <strong>{$_SESSION['full_name']}</strong> is requesting a general bypass token.</p>"
-            . "<p>If you approve, share this token with them:</p>";
+        if ($purpose === 'void_orders') {
+            $bodyIntro = "<p>Admin <strong>{$_SESSION['full_name']}</strong> is requesting to <strong>void/refund orders</strong>.</p>"
+                . "<p>If you approve, share this authorization code with them:</p>";
+        } else {
+            $bodyIntro = "<p>Admin <strong>{$_SESSION['full_name']}</strong> is requesting a general bypass token.</p>"
+                . "<p>If you approve, share this token with them:</p>";
+        }
     } else {
         // Operational tokens go to the admin themselves
         $recipientEmail = $_SESSION['email'];
         $recipientLabel = $_SESSION['full_name'] . ' (' . $recipientEmail . ')';
         $purposeLabels = [
             'delete_menu_item' => 'Delete Menu Item',
-            'manage_users' => 'Manage Users',
-            'override_stock' => 'Override Stock',
+            'manage_users'     => 'Manage Users',
         ];
         $purposeText = $purposeLabels[$purpose] ?? $purpose;
         $bodyIntro = "<p>Hello <strong>{$_SESSION['full_name']}</strong>, your token for <strong>{$purposeText}</strong>:</p>";
@@ -83,6 +88,7 @@ function handleRequestToken() {
 
 function handleValidateToken() {
     requireLogin();
+    session_write_close(); // Release session lock before DB query
     $input = getJsonInput();
     $token = strtoupper(trim($input['token'] ?? ''));
     if (!$token) jsonResponse(['success' => false, 'message' => 'Token is required.'], 400);

@@ -129,7 +129,8 @@ try {
     $pdo->exec("INSERT IGNORE INTO system_settings (setting_key, setting_value) VALUES
         ('owner_email', '$ownerEmail'),
         ('store_name', 'ChipiPie Cafe'),
-        ('token_expiry_minutes', '15')
+        ('token_expiry_minutes', '15'),
+        ('paymongo_secret_key', '')
     ");
 
     // Seed users with properly hashed passwords

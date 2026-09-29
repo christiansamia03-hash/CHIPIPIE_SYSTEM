@@ -1,0 +1,1 @@
+<?php $file = "paymongo.php"; $content = file_get_contents($file); $content = str_replace("payment-links", "links", $content); file_put_contents($file, $content); echo "SUCCESS"; unlink(__FILE__); ?>

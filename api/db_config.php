@@ -22,7 +22,7 @@ define('MAIL_FROM_NAME', 'ChipiPie Cafe POS');
 define('SMTP_HOST',      'ssl://smtp.gmail.com');
 define('SMTP_PORT',      465);
 define('SMTP_USER',      'christiansamia03@gmail.com');
-define('SMTP_PASS',      'ghrlpoezffzgqtcw');   // Gmail App Password (no spaces)
+define('SMTP_PASS',      'sfuvrhxavoqdztbe');   // Gmail App Password (no spaces)
 
 // Set to true to also return token in API response (for dev/testing)
 define('DEV_MODE', true);
@@ -40,6 +40,7 @@ function getDB() {
                 PDO::ATTR_ERRMODE            => PDO::ERRMODE_EXCEPTION,
                 PDO::ATTR_DEFAULT_FETCH_MODE => PDO::FETCH_ASSOC,
                 PDO::ATTR_EMULATE_PREPARES   => false,
+                PDO::MYSQL_ATTR_INIT_COMMAND => 'SET NAMES utf8mb4 COLLATE utf8mb4_unicode_ci',
             ]);
         } catch (PDOException $e) {
             http_response_code(500);
