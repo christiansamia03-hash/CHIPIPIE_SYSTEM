@@ -30,7 +30,7 @@
       background: #f5f2ee;
     }
     body.pizza-theme .sidebar {
-      background: linear-gradient(175deg, #7a3a12 0%, #5c2a00 28%, #3d1c00 60%, #1e0e00 100%) !important;
+      /* gradient handled by .sidebar::after pseudo-element overlay */
       border-right-color: #5c2a00 !important;
     }
     body.pizza-theme .sidebar .brand-name { color: #e8a87c !important; }
@@ -42,46 +42,74 @@
       color: #fff !important;
     }
     body.pizza-theme .top-nav {
-      background: linear-gradient(135deg, #7a3210 0%, #5c2a00 100%) !important;
       border-bottom-color: #5c2a00 !important;
     }
     body.pizza-theme .top-nav .user-info,
     body.pizza-theme .top-nav .view-title,
     body.pizza-theme .top-nav i { color: #fff !important; }
-    /* Branch switcher */
-    #branch-btn-coffee {
-      background: linear-gradient(135deg, #3a2f2d 0%, #5c4033 100%);
-      color: #fff;
-    }
-    #branch-btn-pizza {
+    /* Branch switcher (Sliding Toggle) */
+    .branch-switcher-container {
+      position: relative;
+      display: flex;
+      border-bottom: 2px solid var(--cafe-tan);
       background: #f5f1ee;
-      color: #9ca3af;
     }
+    #branch-slider {
+      position: absolute;
+      top: 0;
+      left: 0;
+      height: 100%;
+      width: 50%;
+      background: linear-gradient(135deg, #3a2f2d 0%, #5c4033 100%);
+      transition: transform 0.4s cubic-bezier(0.25, 1, 0.5, 1);
+      z-index: 1;
+    }
+    #branch-slider::after {
+      content: '';
+      position: absolute;
+      inset: 0;
+      background: linear-gradient(135deg, #8b3a0f 0%, #6b2d0a 100%);
+      opacity: 0;
+      transition: opacity 1.5s ease;
+      z-index: -1;
+    }
+    body.pizza-theme #branch-slider {
+      transform: translateX(100%);
+    }
+    body.pizza-theme #branch-slider::after {
+      opacity: 1;
+    }
+    #branch-btn-coffee, #branch-btn-pizza {
+      flex: 1;
+      padding: 11px 0;
+      font-weight: 700;
+      font-size: 13px;
+      border: none;
+      cursor: pointer;
+      letter-spacing: 0.04em;
+      background: transparent;
+      position: relative;
+      z-index: 2;
+      transition: color 0.3s;
+    }
+    #branch-btn-coffee { color: #fff; }
+    #branch-btn-pizza { color: #9ca3af; }
+
     body.pizza-theme #branch-btn-pizza {
-      background: linear-gradient(135deg, #8b3a0f 0%, #6b2d0a 100%) !important;
       color: #fff !important;
     }
     body.pizza-theme #branch-btn-coffee {
-      background: #ede7e0 !important;
       color: #9a7a68 !important;
     }
     body.pizza-theme .pos-cat-shortcut-bar {
       background: #f5f2ee;
       border-bottom-color: #ddd0c0;
     }
-    body.pizza-theme .pos-cat-shortcut-btn {
-      color: #8b3a0f;
-      border-color: #ddd0c0;
-      background: #ffffff;
-    }
-    body.pizza-theme .pos-cat-shortcut-btn.active {
-      background: linear-gradient(135deg, #8b3a0f, #6b2d0a) !important;
-      border-color: #8b3a0f !important;
-      color: #fff !important;
-    }
-    body.pizza-theme .pos-cat-shortcut-btn:hover { background: #ede8e2; }
+
+    /* pos-cat-shortcut-btn.active pizza gradient handled by ::after overlay */
+
+    /* pos-supergroup-header pizza gradient handled by ::after overlay */
     body.pizza-theme .pos-supergroup-header {
-      background: linear-gradient(135deg, #6b2d0a 0%, #3d1c00 100%) !important;
       color: #fff !important;
     }
     body.pizza-theme .pos-supergroup-header i { color: #e8c5a0 !important; }
@@ -96,16 +124,8 @@
     }
     body.pizza-theme .prod-price { color: #c4601a !important; }
     body.pizza-theme .prod-name  { color: #3d1c00 !important; }
-    body.pizza-theme .cart-header {
-      background: linear-gradient(135deg, #7a3210 0%, #5c2a00 100%) !important;
-    }
-    body.pizza-theme .btn-cafe-primary {
-      background: linear-gradient(135deg, #8b3a0f, #6b2d0a) !important;
-      border-color: #7a3210 !important;
-    }
-    body.pizza-theme .btn-cafe-primary:hover {
-      background: linear-gradient(135deg, #7a3210, #5c2a00) !important;
-    }
+    /* cart-header keeps coffee styling in pizza mode — no override */
+    /* btn-cafe-primary pizza gradient handled by ::after overlay */
     body.pizza-theme .search-input:focus {
       border-color: #c4601a !important;
       box-shadow: 0 0 0 3px rgba(196,96,26,0.12) !important;
@@ -114,10 +134,80 @@
       color: #8b3a0f;
       border-color: #ddd0c0;
     }
+    /* pos-subcat-btn.active pizza gradient handled by ::after overlay */
     body.pizza-theme .pos-subcat-btn.active {
-      background: linear-gradient(135deg, #8b3a0f, #6b2d0a);
       border-color: #8b3a0f;
       color: #fff;
+    }
+
+    /* ====== GRADIENT OVERLAY TRANSITIONS (Buttons & Headers) ====== */
+    /* Base: position:relative + isolation so ::after sits behind content */
+    .pos-cat-shortcut-btn.active,
+    .pos-supergroup-header,
+    .pos-subcat-btn.active,
+    .top-nav {
+      position: relative;
+      overflow: hidden;
+      isolation: isolate;
+    }
+
+    /* Pizza-coloured gradient overlays — z-index:-1 keeps them BEHIND text */
+    .pos-cat-shortcut-btn.active::after,
+    .pos-supergroup-header::after,
+    .pos-subcat-btn.active::after {
+      content: '';
+      position: absolute;
+      inset: 0;
+      background: linear-gradient(135deg, #8b3a0f, #6b2d0a);
+      opacity: 0;
+      transition: opacity 1.5s ease;
+      pointer-events: none;
+      z-index: -1;
+      border-radius: inherit;
+    }
+    .pos-supergroup-header::after {
+      background: linear-gradient(135deg, #6b2d0a 0%, #3d1c00 100%);
+    }
+    .top-nav::after {
+      content: '';
+      position: absolute;
+      inset: 0;
+      background: linear-gradient(135deg, #7a3210 0%, #5c2a00 100%);
+      opacity: 0;
+      transition: opacity 1.5s ease;
+      pointer-events: none;
+      z-index: -1;
+      border-radius: inherit;
+    }
+
+
+
+    /* Show pizza overlays when pizza-theme is active */
+    body.pizza-theme .pos-cat-shortcut-btn.active::after,
+    body.pizza-theme .pos-supergroup-header::after,
+    body.pizza-theme .pos-subcat-btn.active::after,
+    body.pizza-theme .top-nav::after { 
+      opacity: 1; 
+    }
+
+    /* ====== SMOOTH THEME TRANSITIONS ====== */
+    /* Only color/background properties animate — layout stays instant */
+    body,
+    .sidebar,
+    .sidebar .sidebar-brand,
+    .cart-header,
+    #branch-btn-coffee,
+    #branch-btn-pizza,
+    .pos-supergroup-header,
+    .pos-cat-shortcut-btn,
+    .pos-cat-shortcut-btn.active,
+    .pos-subcat-btn,
+    .kpi-card {
+      transition:
+        background 1.5s ease,
+        background-color 1.5s ease,
+        border-color 1.5s ease,
+        color 1.5s ease;
     }
 
     * {
@@ -148,7 +238,22 @@
       flex-direction: column;
       padding: 0;
       overflow: hidden;
+      position: relative;
     }
+    /* Pizza gradient overlay — fades in on top of the coffee gradient */
+    .sidebar::after {
+      content: '';
+      position: absolute;
+      inset: 0;
+      background: linear-gradient(175deg, #7a3a12 0%, #5c2a00 28%, #3d1c00 60%, #1e0e00 100%);
+      opacity: 0;
+      transition: opacity 1.5s ease;
+      pointer-events: none;
+      z-index: 0;
+    }
+    body.pizza-theme .sidebar::after { opacity: 1; }
+    /* Keep all sidebar content above the overlay */
+    .sidebar > * { position: relative; z-index: 1; }
 
     .sidebar-brand {
       padding: 20px 20px 16px;
@@ -195,6 +300,9 @@
       margin-top: 4px;
     }
 
+    .nav-link, .nav-item-btn {
+      transition: background 1.5s ease, background-color 1.5s ease, border-left-color 1.5s ease, color 1.5s ease;
+    }
     .nav-item-btn {
       display: flex;
       align-items: center;
@@ -657,6 +765,8 @@
       font-weight: 700;
       letter-spacing: 0.06em;
       text-transform: uppercase;
+      position: relative;
+      isolation: isolate;
     }
 
     /* Sub-category header: Hot Coffee / Iced Coffee etc. */
@@ -739,9 +849,47 @@
       scrollbar-width: none;
     }
     .pos-cat-shortcut-bar::-webkit-scrollbar { display: none; }
-    #coffee-shortcuts, #pizza-shortcuts {
+    #coffee-shortcuts {
       display: flex;
       width: 100%;
+      min-width: 350px;
+      flex-shrink: 0;
+    }
+    #pizza-shortcuts {
+      display: flex;
+      width: 100%;
+      min-width: 750px;
+      flex-shrink: 0;
+    }
+    .shortcut-group {
+      display: flex;
+      position: relative;
+      background: #fff;
+      border-radius: 8px;
+      border: 1.5px solid var(--cafe-tan);
+      overflow: hidden;
+    }
+    .shortcut-slider {
+      position: absolute;
+      top: 0;
+      left: 0;
+      height: 100%;
+      background: var(--cafe-brown);
+      transition: transform 0.3s cubic-bezier(0.25, 1, 0.5, 1), width 0.3s cubic-bezier(0.25, 1, 0.5, 1);
+      z-index: 1;
+      pointer-events: none;
+    }
+    .shortcut-slider::after {
+      content: '';
+      position: absolute;
+      inset: 0;
+      background: linear-gradient(135deg, #8b3a0f, #6b2d0a);
+      opacity: 0;
+      transition: opacity 1.5s ease;
+      z-index: -1;
+    }
+    body.pizza-theme .shortcut-slider::after {
+      opacity: 1;
     }
     .pos-cat-shortcut-btn {
       flex: 1;
@@ -750,28 +898,24 @@
       justify-content: center;
       gap: 6px;
       padding: 8px 10px;
-      border-radius: 0;
+      border: none;
+      border-right: 1.5px solid var(--cafe-tan);
+      background: transparent;
+      color: #222;
       font-size: 13px;
       font-weight: 600;
       cursor: pointer;
-      border: 1.5px solid var(--cafe-tan);
-      border-right: none;
-      background: #fff;
-      color: var(--cafe-brown);
       white-space: nowrap;
-      transition: all 0.15s;
       min-width: 0;
+      position: relative;
+      z-index: 2;
+      transition: color 0.2s;
     }
-    #coffee-shortcuts .pos-cat-shortcut-btn:first-child,
-    #pizza-shortcuts  .pos-cat-shortcut-btn:first-child { border-radius: 8px 0 0 8px; }
-    #coffee-shortcuts .pos-cat-shortcut-btn:last-child,
-    #pizza-shortcuts  .pos-cat-shortcut-btn:last-child  { border-right: 1.5px solid var(--cafe-tan); border-radius: 0 8px 8px 0; }
-    .pos-cat-shortcut-btn:hover {
-      background: #f5f2ef;
+    .pos-cat-shortcut-btn:last-child { border-right: none; }
+    .pos-cat-shortcut-btn:not(.active):hover {
+      color: #222;
     }
     .pos-cat-shortcut-btn.active {
-      background: var(--cafe-brown);
-      border-color: var(--cafe-brown);
       color: #fff;
     }
     /* Sub-category button bar inside each supergroup */
@@ -849,7 +993,7 @@
 
     /* BUTTONS */
     .btn-cafe-primary {
-      background: var(--cafe-brown);
+      background: #5c3d2e;
       color: #fff;
       border: none;
       border-radius: 8px;
@@ -858,11 +1002,16 @@
       font-weight: 600;
       cursor: pointer;
       width: 100%;
-      transition: background 0.15s;
+      transition: background 1.5s ease, background-color 1.5s ease;
     }
-
+    body.pizza-theme .btn-cafe-primary {
+      background: #8b3a0f;
+    }
     .btn-cafe-primary:hover {
       background: #4a2509;
+    }
+    body.pizza-theme .btn-cafe-primary:hover {
+      background: #6b2d0a;
     }
 
     .btn-cafe-secondary {
@@ -2195,6 +2344,17 @@
           </div>
         </div>
 
+        <div class="row g-3 mb-3">
+          <div class="col-lg-12">
+            <div class="kpi-card">
+              <div style="font-weight:600; color:var(--cafe-brown); font-size:14px; margin-bottom:12px;">Hourly Sales — Today</div>
+              <div class="chart-box" style="height:210px;">
+                <canvas id="dashHourlyChart"></canvas>
+              </div>
+            </div>
+          </div>
+        </div>
+
         <div class="row g-3">
           <div class="col-lg-7">
             <div class="kpi-card">
@@ -2231,20 +2391,20 @@
         <div style="flex:1; display:flex; flex-direction:column; overflow:hidden;">
 
           <!-- Branch switcher (Coffee / Pizza) -->
-          <div style="display:flex;border-bottom:2px solid var(--cafe-tan);background:#fff;">
-            <button id="branch-btn-coffee" onclick="switchBranch('coffee')"
-              style="flex:1;padding:11px 0;font-weight:700;font-size:13px;border:none;cursor:pointer;letter-spacing:0.04em;transition:background 0.2s,color 0.2s;">
+          <div class="branch-switcher-container">
+            <div id="branch-slider"></div>
+            <button id="branch-btn-coffee" onclick="switchBranch('coffee')">
               ☕ Coffee
             </button>
-            <button id="branch-btn-pizza" onclick="switchBranch('pizza')"
-              style="flex:1;padding:11px 0;font-weight:700;font-size:13px;border:none;cursor:pointer;letter-spacing:0.04em;transition:background 0.2s,color 0.2s;border-left:1.5px solid var(--cafe-tan);">
+            <button id="branch-btn-pizza" onclick="switchBranch('pizza')">
               🍕 Pizza House
             </button>
           </div>
 
           <!-- Sticky category shortcut bar -->
           <div class="pos-cat-shortcut-bar" id="pos-cat-shortcut-bar">
-            <div id="coffee-shortcuts">
+            <div id="coffee-shortcuts" class="shortcut-group">
+              <div class="shortcut-slider"></div>
               <button class="pos-cat-shortcut-btn active" id="scbtn-coffee" onclick="scrollToCategory('coffee')">
                 <i class="bi bi-cup-hot-fill"></i> Coffee
               </button>
@@ -2255,7 +2415,8 @@
                 <i class="bi bi-egg-fried"></i> Snacks
               </button>
             </div>
-            <div id="pizza-shortcuts" style="display:none;">
+            <div id="pizza-shortcuts" class="shortcut-group" style="display:none;">
+              <div class="shortcut-slider"></div>
               <button class="pos-cat-shortcut-btn active" id="scbtn-pizza" onclick="scrollToCategory('pizza')">
                 <i class="bi bi-circle"></i> Pizza
               </button>
@@ -2272,10 +2433,7 @@
                 <i class="bi bi-lightning"></i> Chickenpops
               </button>
               <button class="pos-cat-shortcut-btn" id="scbtn-combo" onclick="scrollToCategory('combo')">
-                <i class="bi bi-collection"></i> Combo
-              </button>
-              <button class="pos-cat-shortcut-btn" id="scbtn-gipitmeal" onclick="scrollToCategory('gipitmeal')">
-                <i class="bi bi-tags"></i> Gipitmeal
+                <i class="bi bi-collection"></i> Combo & Gipit Meal
               </button>
             </div>
           </div>
@@ -2543,6 +2701,17 @@
         </div>
 
         <div class="row g-3 mb-3">
+          <div class="col-lg-12">
+            <div class="kpi-card">
+              <div style="font-weight:600; color:var(--cafe-brown); font-size:14px; margin-bottom:12px;">Weekly Sales Overview</div>
+              <div class="chart-box" style="height:210px;">
+                <canvas id="repWeeklyChart"></canvas>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="row g-3 mb-3">
           <div class="col-lg-6">
             <div class="kpi-card">
               <div style="font-weight:600; color:var(--cafe-brown); font-size:14px; margin-bottom:12px;">Hourly Sales —
@@ -2681,38 +2850,6 @@
           </table>
         </div>
 
-        <!-- ===== PAYMONGO SETTINGS CARD ===== -->
-        <div class="kpi-card mt-3" id="paymongo-settings-card">
-          <div style="display:flex;align-items:center;gap:12px;margin-bottom:16px;">
-            <div style="background:linear-gradient(135deg,#0070f3,#0099ff);border-radius:10px;width:40px;height:40px;display:flex;align-items:center;justify-content:center;flex-shrink:0;">
-              <svg width="20" height="20" viewBox="0 0 48 48" fill="none"><circle cx="24" cy="24" r="22" stroke="#fff" stroke-width="3"/><path d="M24 14c-5.52 0-10 4.48-10 10s4.48 10 10 10c2.4 0 4.6-.85 6.32-2.26l-3.07-3.07A5.95 5.95 0 0 1 24 30c-3.31 0-6-2.69-6-6s2.69-6 6-6c1.66 0 3.16.67 4.24 1.76L25.17 22.83l8.83 1.18-1.18-8.83-2.34 2.34A9.92 9.92 0 0 0 24 14z" fill="#fff"/></svg>
-            </div>
-            <div>
-              <div style="font-weight:700;color:var(--cafe-brown);font-size:14px;">PayMongo API Key</div>
-              <div style="font-size:12px;color:#888;">Required for GCash Payment Links. Never expose this key in the frontend.</div>
-            </div>
-            <span id="pm-key-badge" style="margin-left:auto;font-size:11px;font-weight:700;padding:4px 10px;border-radius:20px;background:#d1fae5;color:#059669;">&#9679; Configured</span>
-          </div>
-
-          <div style="background:#eff6ff;border:1.5px solid #bfdbfe;border-radius:10px;padding:12px 14px;font-size:12px;color:#1e40af;margin-bottom:16px;display:flex;align-items:flex-start;gap:8px;">
-            <i class="bi bi-info-circle-fill" style="font-size:14px;flex-shrink:0;margin-top:1px;"></i>
-            <span>Get your <strong>Secret Key</strong> from <a href="https://dashboard.paymongo.com/developers" target="_blank" style="color:#1d4ed8;font-weight:700;">PayMongo Dashboard → Developers</a>. Use <code style="background:#dbeafe;padding:1px 5px;border-radius:4px;">sk_test_...</code> for testing and <code style="background:#dbeafe;padding:1px 5px;border-radius:4px;">sk_live_...</code> for production.</span>
-          </div>
-
-          <div style="display:flex;gap:10px;align-items:flex-end;">
-            <div style="flex:1;">
-              <label style="font-size:11px;font-weight:700;color:#6b7280;text-transform:uppercase;letter-spacing:0.06em;display:block;margin-bottom:6px;">Secret Key</label>
-              <input type="password" id="pm-secret-key-input" placeholder="sk_test_xxxxxxxxxxxxxxxxxxxx"
-                style="width:100%;padding:10px 14px;border:2px solid #e5e7eb;border-radius:10px;font-size:13px;font-family:monospace;box-sizing:border-box;transition:border-color 0.15s;"
-                onfocus="this.style.borderColor='#0070f3'" onblur="this.style.borderColor='#e5e7eb'">
-            </div>
-            <button onclick="savePaymongoKey()"
-              style="background:linear-gradient(135deg,#0070f3,#0099ff);color:#fff;border:none;border-radius:10px;padding:10px 20px;font-size:13px;font-weight:700;cursor:pointer;white-space:nowrap;flex-shrink:0;box-shadow:0 4px 12px rgba(0,112,243,0.3);">
-              <i class="bi bi-floppy me-1"></i>Save Key
-            </button>
-          </div>
-          <div id="pm-key-status" style="display:none;margin-top:10px;font-size:12px;border-radius:8px;padding:8px 12px;"></div>
-        </div>
 
       </div>
 
@@ -3206,6 +3343,12 @@
           window.salesChartIns.update();
         }
 
+        // Update dashboard hourly chart
+        if (window.dashHourlyChartIns && stats.hourly_chart) {
+          window.dashHourlyChartIns.data.datasets[0].data = stats.hourly_chart;
+          window.dashHourlyChartIns.update();
+        }
+
         // Update doughnut chart
         if (window.categoryChartIns && stats.cat_breakdown && stats.cat_breakdown.length > 0) {
           const catLabels = stats.cat_breakdown.map(c => c.name);
@@ -3224,28 +3367,34 @@
     let _activeBranch = 'coffee'; // 'coffee' | 'pizza'
 
     function switchBranch(branch) {
+      if (branch === _activeBranch) return;
       _activeBranch = branch;
-      const coffeeBar  = document.getElementById('coffee-shortcuts');
-      const pizzaBar   = document.getElementById('pizza-shortcuts');
-      const coffeeBtn  = document.getElementById('branch-btn-coffee');
-      const pizzaBtn   = document.getElementById('branch-btn-pizza');
+      const coffeeBar = document.getElementById('coffee-shortcuts');
+      const pizzaBar  = document.getElementById('pizza-shortcuts');
 
+      // Show the right shortcut bar immediately
       if (branch === 'coffee') {
-        document.body.classList.remove('pizza-theme');
         if (coffeeBar) coffeeBar.style.display = '';
         if (pizzaBar)  pizzaBar.style.display  = 'none';
-        if (coffeeBtn) { coffeeBtn.style.background = 'var(--cafe-brown)'; coffeeBtn.style.color = '#fff'; }
-        if (pizzaBtn)  { pizzaBtn.style.background  = '#fff'; pizzaBtn.style.color  = '#9ca3af'; }
       } else {
-        document.body.classList.add('pizza-theme');
         if (coffeeBar) coffeeBar.style.display = 'none';
         if (pizzaBar)  pizzaBar.style.display  = '';
-        // CSS class handles button colors — clear inline styles so CSS takes over
-        if (pizzaBtn)  { pizzaBtn.style.background  = ''; pizzaBtn.style.color  = ''; }
-        if (coffeeBtn) { coffeeBtn.style.background = ''; coffeeBtn.style.color = ''; }
       }
       document.getElementById('menu-search').value = '';
+
+      // Render content FIRST while old theme class is still on body.
+      // This ensures all new DOM elements exist before the theme class changes,
+      // so CSS transitions fire on them in both directions.
       renderPOS();
+
+      // THEN switch the theme class — all elements already exist, transitions fire cleanly.
+      requestAnimationFrame(() => requestAnimationFrame(() => {
+        if (branch === 'pizza') {
+          document.body.classList.add('pizza-theme');
+        } else {
+          document.body.classList.remove('pizza-theme');
+        }
+      }));
     }
 
     function renderPOS() {
@@ -3258,11 +3407,11 @@
         { label: 'Snack',      sgId: 'snack',      icon: 'bi-egg-fried',    cats: ['Fork and Fun'] },
       ];
       const pizzaGroups = [
-        { label: 'Pizza',       sgId: 'pizza',       icon: 'bi-circle',         cats: ['Pizza'] },
-        { label: 'Quesadilla',  sgId: 'quesadilla',  icon: 'bi-grid-3x3-gap',   cats: ['Quesadilla'] },
-        { label: 'Patatas',     sgId: 'patatas',     icon: 'bi-bag-heart',       cats: ['Patatas'] },
-        { label: 'Pasta',       sgId: 'pasta',       icon: 'bi-stars',           cats: ['Pasta'] },
-        { label: 'Chickenpops', sgId: 'chickenpops', icon: 'bi-lightning',       cats: ['Chickenpops'] },
+        { label: 'Pizza',       sgId: 'pizza',       icon: 'bi-circle',         cats: ['Pizza'],                        noSubcat: true },
+        { label: 'Quesadilla',  sgId: 'quesadilla',  icon: 'bi-grid-3x3-gap',   cats: ['Quesadilla'],                   noSubcat: true },
+        { label: 'Patatas',     sgId: 'patatas',     icon: 'bi-bag-heart',       cats: ['Patatas'],                      noSubcat: true },
+        { label: 'Pasta',       sgId: 'pasta',       icon: 'bi-stars',           cats: ['Pasta'],                        noSubcat: true },
+        { label: 'Chickenpops', sgId: 'chickenpops', icon: 'bi-lightning',       cats: ['Chickenpops'],                  noSubcat: true },
         { label: 'Combo',       sgId: 'combo',       icon: 'bi-collection',      cats: ['Combo', 'Gipitmeal'] },
       ];
 
@@ -3345,7 +3494,7 @@
       <i class="bi bi-chevron-down sg-chevron"></i>
     </div>
     <div class="pos-supergroup-body" id="sgbody-${sgId}">
-      <div class="pos-subcat-btn-bar">${btnBarHtml}</div>
+      ${sg.noSubcat ? '' : `<div class="pos-subcat-btn-bar">${btnBarHtml}</div>`}
       ${itemsHtml}
     </div>
   </div>`;
@@ -3353,10 +3502,31 @@
 
       grid.innerHTML = anyVisible ? html : '<div class="text-center text-muted py-5">No items found.</div>';
       renderCart();
+
+      // Initialize the slider — snap without animation so it doesn't tweak on load
+      setTimeout(() => {
+        const activeGroup = document.getElementById(_activeBranch + '-shortcuts');
+        if (activeGroup) {
+          const activeBtn = activeGroup.querySelector('.pos-cat-shortcut-btn.active');
+          const targetBtn = activeBtn || activeGroup.querySelector('.pos-cat-shortcut-btn');
+          if (targetBtn) {
+            const sgId = targetBtn.id.replace('scbtn-', '');
+            setActiveShortcutBtn(sgId, true); // true = snap, no animation
+          }
+        }
+      }, 50);
     }
 
     /* ========== CATEGORY SHORTCUT BAR ========== */
     function scrollToCategory(sgId) {
+      // Lock scroll spy so it doesn't fight the slider during smooth scroll
+      _scrollSpyLocked = true;
+      clearTimeout(_scrollSpyLockTimer);
+      _scrollSpyLockTimer = setTimeout(() => { _scrollSpyLocked = false; }, 900);
+
+      // Update active highlight immediately
+      setActiveShortcutBtn(sgId);
+
       const target = document.getElementById('sghdr-' + sgId);
       const scrollArea = document.getElementById('pos-scroll-area');
       if (!target || !scrollArea) return;
@@ -3369,23 +3539,44 @@
         if (hdr) hdr.classList.remove('collapsed');
       }
 
-      const areaTop = scrollArea.getBoundingClientRect().top;
+      const areaTop  = scrollArea.getBoundingClientRect().top;
       const targetTop = target.getBoundingClientRect().top;
       const offset = targetTop - areaTop - 8;
       scrollArea.scrollBy({ top: offset, behavior: 'smooth' });
-
-      // Highlight the clicked button
-      setActiveShortcutBtn(sgId);
     }
 
-    function setActiveShortcutBtn(sgId) {
+    function setActiveShortcutBtn(sgId, noAnimation) {
       document.querySelectorAll('.pos-cat-shortcut-btn').forEach(b => b.classList.remove('active'));
       const btn = document.getElementById('scbtn-' + sgId);
-      if (btn) btn.classList.add('active');
+      if (btn) {
+        btn.classList.add('active');
+        const parent = btn.parentElement;
+        const slider = parent.querySelector('.shortcut-slider');
+        if (slider) {
+          // Use getBoundingClientRect for pixel-perfect positioning (ignores borders/padding)
+          const parentRect = parent.getBoundingClientRect();
+          const btnRect   = btn.getBoundingClientRect();
+          const left  = btnRect.left - parentRect.left;
+          const width = btnRect.width;
+          if (noAnimation) {
+            slider.style.transition = 'none';
+            slider.style.width     = width + 'px';
+            slider.style.transform = `translateX(${left}px)`;
+            requestAnimationFrame(() => requestAnimationFrame(() => {
+              slider.style.transition = '';
+            }));
+          } else {
+            slider.style.width     = width + 'px';
+            slider.style.transform = `translateX(${left}px)`;
+          }
+        }
+      }
     }
 
     // Highlight the shortcut button as user scrolls (attach only once)
     let _scrollSpyAttached = false;
+    let _scrollSpyLocked   = false;   // true while a tab-click is animating
+    let _scrollSpyLockTimer = null;
     function initShortcutScrollSpy() {
       if (_scrollSpyAttached) return;
       const scrollArea = document.getElementById('pos-scroll-area');
@@ -3401,6 +3592,7 @@
           const elTop = el.getBoundingClientRect().top - areaTop;
           if (elTop <= 40) current = id;
         }
+        if (_scrollSpyLocked) return; // tab-click in progress — don't fight it
         setActiveShortcutBtn(current);
       }, { passive: true });
     }
@@ -4558,7 +4750,12 @@
           </tr>`).join('');
 
         // Build orders rows
-        const ordersHtml = res.orders.map(o => `
+        const ordersHtml = res.orders.map(o => {
+          let statusStyle = '';
+          if(o.status === 'Voided') statusStyle = 'color:#dc3545;font-weight:bold;';
+          if(o.status === 'Refunded') statusStyle = 'color:#fd7e14;font-weight:bold;';
+          
+          return `
           <tr>
             <td>${o.order_number}</td>
             <td>${o.date}</td>
@@ -4566,8 +4763,10 @@
             <td style="max-width:240px;font-size:11px;">${o.items || '—'}</td>
             <td>${o.cashier || '—'}</td>
             <td>${o.payment_method}</td>
+            <td style="${statusStyle}">${o.status}</td>
             <td style="text-align:right;">₱${parseFloat(o.total).toLocaleString(undefined, { minimumFractionDigits: 2 })}</td>
-          </tr>`).join('');
+          </tr>`;
+        }).join('');
 
         const avgOrder = res.summary.orders > 0 ? (res.summary.revenue / res.summary.orders) : 0;
 
@@ -4642,9 +4841,9 @@
   </div>
 
   <div class="section">
-    <div class="section-title">Order Transactions (${res.summary.orders})</div>
+    <div class="section-title">Order Transactions (${res.summary.orders} Completed)</div>
     <table>
-      <thead><tr><th>Order #</th><th>Date</th><th>Time</th><th>Items</th><th>Cashier</th><th>Payment</th><th style="text-align:right;">Total</th></tr></thead>
+      <thead><tr><th>Order #</th><th>Date</th><th>Time</th><th>Items</th><th>Cashier</th><th>Payment</th><th>Status</th><th style="text-align:right;">Total</th></tr></thead>
       <tbody>${ordersHtml}</tbody>
     </table>
   </div>
@@ -4935,6 +5134,12 @@
           window.hourlyChartIns.update();
         }
 
+        // Weekly chart in reports
+        if (window.repWeeklyChartIns && stats.weekly_chart) {
+          window.repWeeklyChartIns.data.datasets[0].data = stats.weekly_chart;
+          window.repWeeklyChartIns.update();
+        }
+
         // Monthly chart
         if (window.monthlyChartIns) {
           window.monthlyChartIns.data.labels = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
@@ -5000,13 +5205,55 @@
         }
       });
 
+      /* Dashboard Hourly Line */
+      window.dashHourlyChartIns = new Chart(document.getElementById('dashHourlyChart'), {
+        type: 'line',
+        data: {
+          labels: ['9am','10am','11am','12pm','1pm','2pm','3pm','4pm','5pm','6pm','7pm','8pm','9pm','10pm','11pm','12am','1am','2am'],
+          datasets: [{
+            data: [0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],
+            borderColor: V_TEAL, backgroundColor: 'rgba(8,145,178,0.10)', fill: true, tension: 0.4,
+            pointRadius: 4, pointBackgroundColor: V_TEAL, pointBorderColor: '#fff', pointBorderWidth: 2
+          }]
+        },
+        options: {
+          responsive: true, maintainAspectRatio: false,
+          plugins: { legend: { display: false }, tooltip: { callbacks: { label: ctx => ' ₱' + ctx.raw.toLocaleString() } } },
+          scales: {
+            y: { grid: { color: gridColor }, beginAtZero: true, ticks: { color: tickColor, font: baseFont } },
+            x: { grid: { display: false }, ticks: { color: tickColor, font: baseFont } }
+          }
+        }
+      });
+
+      /* Analytics Weekly Bar */
+      window.repWeeklyChartIns = new Chart(document.getElementById('repWeeklyChart'), {
+        type: 'bar',
+        data: {
+          labels: ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'],
+          datasets: [{
+            data: [0,0,0,0,0,0,0],
+            backgroundColor: [V_BLUE,V_PURPLE,V_GREEN,V_ORANGE,V_RED,V_TEAL,V_PINK],
+            borderRadius: 8, borderSkipped: false,
+          }]
+        },
+        options: {
+          responsive: true, maintainAspectRatio: false,
+          plugins: { legend: { display: false }, tooltip: { callbacks: { label: ctx => ' ₱' + ctx.raw.toLocaleString() } } },
+          scales: {
+            y: { grid: { color: gridColor }, beginAtZero: true, ticks: { color: tickColor, font: baseFont } },
+            x: { grid: { display: false }, ticks: { color: tickColor, font: baseFont } }
+          }
+        }
+      });
+
       /* Hourly Line */
       window.hourlyChartIns = new Chart(document.getElementById('hourlyChart'), {
         type: 'line',
         data: {
-          labels: ['7am','8am','9am','10am','11am','12pm','1pm','2pm','3pm','4pm','5pm','6pm','7pm','8pm','9pm','10pm'],
+          labels: ['9am','10am','11am','12pm','1pm','2pm','3pm','4pm','5pm','6pm','7pm','8pm','9pm','10pm','11pm','12am','1am','2am'],
           datasets: [{
-            data: [0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],
+            data: [0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],
             borderColor: V_TEAL, backgroundColor: 'rgba(8,145,178,0.10)', fill: true, tension: 0.4,
             pointRadius: 4, pointBackgroundColor: V_TEAL, pointBorderColor: '#fff', pointBorderWidth: 2
           }]

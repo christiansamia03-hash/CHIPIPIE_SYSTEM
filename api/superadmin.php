@@ -99,16 +99,23 @@ function handleSADashboard() {
         $weeklyData[$idx] = floatval($r['rev']);
     }
 
-    // Hourly chart (today, 7am-10pm)
+    // Hourly chart (9am to 2am shift)
     $hourlyChart = $db->query("
         SELECT HOUR(created_at) as hr, COALESCE(SUM(total),0) as rev
-        FROM orders WHERE DATE(created_at)=CURDATE() AND status='Completed'
+        FROM orders 
+        WHERE created_at >= CONCAT(DATE(DATE_SUB(NOW(), INTERVAL 3 HOUR)), ' 09:00:00') 
+          AND created_at < CONCAT(DATE_ADD(DATE(DATE_SUB(NOW(), INTERVAL 3 HOUR)), INTERVAL 1 DAY), ' 03:00:00')
+          AND status='Completed'
         GROUP BY HOUR(created_at)
     ")->fetchAll();
-    $hourlyData = array_fill(0, 16, 0);
+    $hourlyData = array_fill(0, 18, 0);
     foreach ($hourlyChart as $r) {
         $h = intval($r['hr']);
-        if ($h >= 7 && $h <= 22) $hourlyData[$h - 7] = floatval($r['rev']);
+        if ($h >= 9) {
+            $hourlyData[$h - 9] = floatval($r['rev']);
+        } elseif ($h <= 2) {
+            $hourlyData[$h + 15] = floatval($r['rev']);
+        }
     }
 
     // Monthly chart (this year)

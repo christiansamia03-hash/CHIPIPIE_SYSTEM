@@ -1284,6 +1284,24 @@
               <i class="bi bi-key-fill"></i> Change My Password
             </button>
           </div>
+
+          <div class="sa-card" style="margin-top:20px;">
+            <div class="sa-card-title"><i class="bi bi-credit-card-fill" style="color:#0070f3;"></i> PayMongo (GCash) Integration</div>
+            <div style="background:#eff6ff;border:1.5px solid #bfdbfe;border-radius:10px;padding:12px 14px;font-size:12px;color:#1e40af;margin-bottom:16px;display:flex;align-items:flex-start;gap:8px;">
+              <i class="bi bi-info-circle-fill" style="font-size:14px;flex-shrink:0;margin-top:1px;"></i>
+              <span>Get your <strong>Secret Key</strong> from <a href="https://dashboard.paymongo.com/developers" target="_blank" style="color:#1d4ed8;font-weight:700;">PayMongo Dashboard → Developers</a>. Use <code style="background:#dbeafe;padding:1px 5px;border-radius:4px;">sk_test_...</code> for testing and <code style="background:#dbeafe;padding:1px 5px;border-radius:4px;">sk_live_...</code> for production.</span>
+            </div>
+            <div style="display:flex;gap:10px;align-items:flex-end;">
+              <div style="flex:1;">
+                <label class="sa-label">Secret Key <span id="sa-pm-key-badge" style="display:inline-block;margin-left:8px;font-size:11px;font-weight:700;padding:2px 8px;border-radius:20px;background:#d1fae5;color:#059669;">&#9679; Configured</span></label>
+                <input type="password" class="sa-input" id="sa-pm-secret-key-input" placeholder="sk_test_xxxxxxxxxxxxxxxxxxxx" style="font-family:monospace;">
+              </div>
+              <button class="sa-btn sa-btn-primary" onclick="saveSAPaymongoKey()" style="white-space:nowrap;flex-shrink:0;">
+                <i class="bi bi-floppy-fill"></i> Save Key
+              </button>
+            </div>
+            <div id="sa-pm-key-status" style="display:none;margin-top:10px;font-size:12px;border-radius:8px;padding:8px 12px;"></div>
+          </div>
         </div>
 
       </div> <!-- /sa-views -->
@@ -1627,12 +1645,7 @@
 
         // Render Weekly Chart
         if (res.weekly_chart) {
-          const wdata = [0,0,0,0,0,0,0];
-          const days = ['Monday','Tuesday','Wednesday','Thursday','Friday','Saturday','Sunday'];
-          res.weekly_chart.forEach(r => {
-            const idx = days.indexOf(r.day);
-            if (idx > -1) wdata[idx] = parseFloat(r.revenue);
-          });
+          const wdata = res.weekly_chart;
           if (window.saChartIns) {
             window.saChartIns.data.datasets[0].data = wdata;
             window.saChartIns.update();
@@ -2173,7 +2186,7 @@
         });
 
         // ── Hourly ──
-        const hourLabels = ['7am','8am','9am','10am','11am','12pm','1pm','2pm','3pm','4pm','5pm','6pm','7pm','8pm','9pm','10pm'];
+        const hourLabels = ['9am','10am','11am','12pm','1pm','2pm','3pm','4pm','5pm','6pm','7pm','8pm','9pm','10pm','11pm','12am','1am','2am'];
         saUpsertChart('sa-hourly-chart', {
           type: 'bar',
           data: { labels: hourLabels,
@@ -2269,6 +2282,45 @@
 
       const res = await saApi('superadmin.php?action=save_settings', { settings });
       saToast(res.message, res.success ? 'success' : 'error');
+    }
+
+    async function saveSAPaymongoKey() {
+      const key = document.getElementById('sa-pm-secret-key-input').value.trim();
+      const statusEl = document.getElementById('sa-pm-key-status');
+      if (!key) {
+        statusEl.style.display = 'block';
+        statusEl.style.background = 'rgba(239,68,68,0.1)';
+        statusEl.style.color = '#ef4444';
+        statusEl.textContent = 'Please enter your PayMongo secret key.';
+        return;
+      }
+      try {
+        const res = await fetch('api/paymongo.php?action=save_key', {
+          method: 'POST',
+          credentials: 'include',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ secret_key: key })
+        });
+        const data = await res.json();
+        statusEl.style.display = 'block';
+        if (data.success) {
+          statusEl.style.background = 'rgba(16,185,129,0.1)';
+          statusEl.style.color = '#10b981';
+          statusEl.textContent = '✓ API key saved successfully.';
+          document.getElementById('sa-pm-secret-key-input').value = '';
+          const badge = document.getElementById('sa-pm-key-badge');
+          if (badge) { badge.style.background = '#d1fae5'; badge.style.color = '#059669'; badge.textContent = '● Configured'; }
+        } else {
+          statusEl.style.background = 'rgba(239,68,68,0.1)';
+          statusEl.style.color = '#ef4444';
+          statusEl.textContent = data.message || 'Failed to save key.';
+        }
+      } catch(e) {
+        statusEl.style.display = 'block';
+        statusEl.style.background = 'rgba(239,68,68,0.1)';
+        statusEl.style.color = '#ef4444';
+        statusEl.textContent = 'Network error. Please try again.';
+      }
     }
 
     async function changeSAPassword() {
