@@ -892,7 +892,7 @@
 
         <div class="sa-nav-label">Approvals</div>
         <button class="sa-nav-btn" id="nav-btn-requests" onclick="saShowView('requests', this)">
-          <i class="bi bi-check2-all"></i> Requests
+          <i class="bi bi-inbox-fill"></i> System Requests
           <span class="badge badge-pulse" id="nav-badge-requests" style="display:none;">0</span>
         </button>
         <button class="sa-nav-btn" id="nav-btn-admin-reqs" onclick="saShowView('admin-reqs', this)">
@@ -1021,6 +1021,9 @@
               </select>
               <button class="sa-btn sa-btn-ghost" onclick="loadRequests()">
                 <i class="bi bi-arrow-clockwise"></i> Refresh
+              </button>
+              <button class="sa-btn sa-btn-ghost" onclick="resetRequestsFilter()" title="Reset to default view">
+                <i class="bi bi-funnel-fill"></i> Reset
               </button>
             </div>
           </div>
@@ -1177,7 +1180,7 @@
             </div>
             <div class="kpi-tile kc-gold">
               <div class="kt-icon"><i class="bi bi-trophy-fill"></i></div>
-              <div class="kt-label">Best Seller Today</div>
+              <div class="kt-label">All-Time Best Seller</div>
               <div class="kt-value" id="an-top-seller" style="font-size:14px;">—</div>
               <div class="kt-sub" id="an-top-seller-sub">No sales yet</div>
             </div>
@@ -1251,6 +1254,11 @@
               <div class="sa-form-row">
                 <label class="sa-label">Token Expiry (minutes)</label>
                 <input type="number" class="sa-input" id="setting-token_expiry_minutes" min="5" max="60">
+              </div>
+              <div class="sa-form-row" style="grid-column: 1 / -1;">
+                <label class="sa-label">Void/Refund Notification Email(s)</label>
+                <input type="text" class="sa-input" id="setting-void_refund_manager_email" placeholder="manager1@example.com, manager2@example.com">
+                <div style="font-size:11px;color:#888;margin-top:4px;">Email addresses (comma-separated) to receive interactive Approve/Reject notifications when a cashier requests an order void or refund.</div>
               </div>
             </div>
             <div style="margin-top:8px;">
@@ -1393,6 +1401,23 @@
         <button class="sa-btn sa-btn-primary" onclick="submitEditUser()">
           <i class="bi bi-floppy-fill"></i> Save Changes
         </button>
+      </div>
+    </div>
+  </div>
+
+    <!-- ── CONFIRMATION MODAL ── -->
+  <div class="sa-modal-overlay" id="sa-confirm-modal">
+    <div class="sa-modal">
+      <div class="sa-modal-header">
+        <h3 id="sa-confirm-title">Confirm Action</h3>
+        <button class="sa-modal-close" onclick="closeModal('sa-confirm-modal')"><i class="bi bi-x-lg"></i></button>
+      </div>
+      <div class="sa-modal-body">
+        <p id="sa-confirm-msg" style="color:var(--sa-text);font-size:14px;margin-bottom:0;"></p>
+      </div>
+      <div class="sa-modal-footer">
+        <button class="sa-btn sa-btn-ghost" onclick="closeModal('sa-confirm-modal')">Cancel</button>
+        <button class="sa-btn sa-btn-primary" id="sa-confirm-btn">Confirm</button>
       </div>
     </div>
   </div>
@@ -1704,27 +1729,53 @@
           return;
         }
 
-        tbody.innerHTML = res.requests.map(r => `
+        const REQ_TYPE_LABELS = {
+          admin_approval:  { label: 'Admin Approval',   color: '#7c3aed' },
+          void_order:      { label: 'Void Order',        color: '#dc2626' },
+          refund_order:    { label: 'Refund Order',      color: '#ea580c' },
+          menu_change:     { label: 'Menu Change',       color: '#0891b2' },
+          setting_change:  { label: 'Setting Change',    color: '#0284c7' },
+          user_deactivate: { label: 'Deactivate Account',color: '#d97706' },
+          user_activate:   { label: 'Activate Account',  color: '#059669' },
+          user_delete:     { label: 'Delete Account',    color: '#b91c1c' },
+          other:           { label: 'Other',             color: '#64748b' },
+        };
+
+        tbody.innerHTML = res.requests.map((r, index) => {
+          const typeInfo = REQ_TYPE_LABELS[r.type] || { label: r.type.replace(/_/g,' '), color: '#64748b' };
+          return `
           <tr>
-            <td style="color:var(--sa-muted);font-size:12px;">#${r.id}</td>
-            <td><span class="badge-sa badge-cashier" style="font-size:10.5px;">${r.type.replace(/_/g,' ')}</span></td>
+            <td style="color:var(--sa-muted);font-size:12px;">${index + 1}</td>
+            <td><span style="background:${typeInfo.color}22;color:${typeInfo.color};border:1px solid ${typeInfo.color}44;border-radius:6px;padding:3px 8px;font-size:10.5px;font-weight:600;white-space:nowrap;">${typeInfo.label}</span></td>
             <td style="font-weight:500;">${r.requester_name || '—'}</td>
             <td>${r.title}</td>
-            <td><span class="badge-sa badge-${r.status}">${r.status}</span></td>
+            <td>
+              <span class="badge-sa badge-${r.status}">${r.status}</span>
+              ${(r.status !== 'pending' && r.review_note) ? '<div style=\'font-size:10px;color:var(--sa-muted);margin-top:2px;\'>' + (r.review_note.includes('Email') ? '\uD83D\uDCE7 via Email' : r.review_note.includes('PIN') ? '\uD83D\uDD11 via PIN' : '\uD83D\uDC64 by SA') + '</div>' : ''}
+            </td>
             <td style="color:var(--sa-muted);font-size:12px;">${new Date(r.created_at).toLocaleDateString('en-PH')}</td>
             <td>
               ${r.status === 'pending' ? `
                 <div style="display:flex;gap:6px;">
                   <button class="sa-btn sa-btn-approve" style="padding:5px 10px;font-size:11px;" onclick="openReviewModal('system', ${r.id}, ${JSON.stringify(r).replace(/"/g,'&quot;')})">
-                    <i class="bi bi-check-circle-fill"></i> Review
+                    <i class="bi bi-check-circle-fill"></i> Approve
+                  </button>
+                  <button class="sa-btn sa-btn-reject" style="padding:5px 10px;font-size:11px;" onclick="quickReject('system', ${r.id})">
+                    <i class="bi bi-x-circle"></i>
                   </button>
                 </div>
               ` : `<span style="font-size:11px;color:var(--sa-muted);">${r.reviewed_at ? new Date(r.reviewed_at).toLocaleDateString('en-PH') : '—'}</span>`}
             </td>
-          </tr>
-        `).join('');
+          </tr>`;
+        }).join('');
 
       } catch (e) { console.error(e); }
+    }
+
+    function resetRequestsFilter() {
+      const filter = document.getElementById('req-status-filter');
+      if (filter) filter.value = 'pending';
+      loadRequests();
     }
 
     async function loadAdminRequests() {
@@ -1741,9 +1792,9 @@
           return;
         }
 
-        tbody.innerHTML = res.admin_requests.map(r => `
+        tbody.innerHTML = res.admin_requests.map((r, index) => `
           <tr>
-            <td style="color:var(--sa-muted);font-size:12px;">#${r.id}</td>
+            <td style="color:var(--sa-muted);font-size:12px;">${index + 1}</td>
             <td style="font-weight:600;">${r.full_name}</td>
             <td><code style="color:#a855f7;background:rgba(109,40,217,0.1);padding:2px 8px;border-radius:5px;">${r.username}</code></td>
             <td style="font-size:12px;color:var(--sa-muted);">${r.email}</td>
@@ -1778,13 +1829,55 @@
                    <strong>Username:</strong> ${data.username || '—'}<br>
                    <strong>Email:</strong> ${data.email || '—'}<br>
                    <br><em style="color:var(--sa-green);">Approving will create this user's admin account immediately.</em>`;
+      } else if (data.type === 'void_order' || data.type === 'refund_order') {
+        const isVoid = data.type === 'void_order';
+        const pl = typeof data.payload === 'string' ? JSON.parse(data.payload||'{}') : (data.payload||{});
+        const color = isVoid ? '#dc2626' : '#ea580c';
+        const icon  = isVoid ? 'bi-slash-circle-fill' : 'bi-arrow-counterclockwise';
+        document.getElementById('review-modal-title').textContent = isVoid ? 'Review Void Request' : 'Review Refund Request';
+        document.getElementById('review-approve-btn').innerHTML  = `<i class="bi bi-check-circle-fill"></i> ${isVoid ? 'Approve Void' : 'Approve Refund'}`;
+        document.getElementById('review-reject-btn').innerHTML   = `<i class="bi bi-x-circle-fill"></i> Reject`;
+        details = `
+          <div style="display:flex;align-items:center;gap:10px;margin-bottom:14px;">
+            <div style="width:38px;height:38px;border-radius:10px;background:${color}22;display:flex;align-items:center;justify-content:center;flex-shrink:0;">
+              <i class="bi ${icon}" style="color:${color};font-size:18px;"></i>
+            </div>
+            <div>
+              <div style="font-weight:700;font-size:15px;color:var(--sa-text);">${isVoid ? 'Order Void Request' : 'Order Refund Request'}</div>
+              <div style="font-size:12px;color:var(--sa-muted);">Submitted by <strong>${data.requester_name || '—'}</strong></div>
+            </div>
+          </div>
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:10px;">
+            <div style="background:var(--sa-bg);border-radius:8px;padding:10px;">
+              <div style="font-size:10px;color:var(--sa-muted);text-transform:uppercase;letter-spacing:0.5px;margin-bottom:3px;">Order ID</div>
+              <div style="font-weight:700;font-size:15px;color:var(--sa-text);">#${pl.order_id || '—'}</div>
+            </div>
+            <div style="background:var(--sa-bg);border-radius:8px;padding:10px;">
+              <div style="font-size:10px;color:var(--sa-muted);text-transform:uppercase;letter-spacing:0.5px;margin-bottom:3px;">Amount</div>
+              <div style="font-weight:700;font-size:15px;color:${color};">₱${pl.amount ? parseFloat(pl.amount).toFixed(2) : '0.00'}</div>
+            </div>
+          </div>
+          <div style="background:var(--sa-bg);border-radius:8px;padding:10px;">
+            <div style="font-size:10px;color:var(--sa-muted);text-transform:uppercase;letter-spacing:0.5px;margin-bottom:4px;">Reason</div>
+            <div style="font-size:13px;color:var(--sa-text);">${pl.reason || data.description || '—'}</div>
+          </div>
+          <div style="margin-top:10px;padding:8px 12px;border-radius:8px;background:${color}11;border:1px solid ${color}33;font-size:12px;color:${color};">
+            <i class="bi bi-exclamation-triangle-fill"></i> 
+            ${isVoid ? 'Approving this will mark the order as Voided and restore all stock.' : 'Approving this will mark the order as Refunded and restore all stock.'}
+          </div>`;
       } else {
         document.getElementById('review-modal-title').textContent = 'Review System Request';
-        details = `<strong>Type:</strong> ${(data.type||'').replace(/_/g,' ')}<br>
+        document.getElementById('review-approve-btn').innerHTML = '<i class="bi bi-check-circle-fill"></i> Approve';
+        document.getElementById('review-reject-btn').innerHTML  = '<i class="bi bi-x-circle-fill"></i> Reject';
+        const REQ_LABELS = {
+          user_deactivate: 'Deactivate Account', user_activate: 'Activate Account',
+          user_delete: 'Delete Account', menu_change: 'Menu Change',
+          setting_change: 'Setting Change', admin_approval: 'Admin Approval', other: 'Other'
+        };
+        details = `<strong>Type:</strong> ${REQ_LABELS[data.type] || (data.type||'').replace(/_/g,' ')}<br>
                    <strong>Title:</strong> ${data.title || '—'}<br>
                    <strong>Requester:</strong> ${data.requester_name || '—'}<br>
-                   <strong>Description:</strong> ${data.description || '—'}<br>
-                   ${data.payload ? `<br><strong>Payload:</strong><br><code style="font-size:11px;color:#a855f7;">${JSON.stringify(data.payload||{},null,2)}</code>` : ''}`;
+                   <strong>Description:</strong> ${data.description || '—'}`;
       }
 
       document.getElementById('review-modal-details').innerHTML = details;
@@ -1816,7 +1909,11 @@
       const saType = type === 'admin_reg' ? 'admin_reg' : 'system';
       const res = await saApi('superadmin.php?action=reject_request', { id, type: saType, note: 'Rejected by Super Admin' });
       saToast(res.message, res.success ? 'success' : 'error');
-      if (res.success) { loadDashboard(); loadAdminRequests(); }
+      if (res.success) {
+        loadDashboard();
+        if (type === 'admin_reg') loadAdminRequests();
+        else loadRequests();
+      }
     }
 
     /* =============================================
@@ -1856,7 +1953,7 @@
                 <button class="sa-btn sa-btn-ghost" style="padding:5px 9px;font-size:11px;" onclick="openEditUserModal(${u.id},'${u.full_name}','${u.email}','${u.role}')">
                   <i class="bi bi-pencil-fill"></i>
                 </button>
-                <button class="sa-btn ${u.is_active == 1 ? 'sa-btn-reject' : 'sa-btn-approve'}" style="padding:5px 9px;font-size:11px;" onclick="toggleUser(${u.id})">
+                <button class="sa-btn ${u.is_active == 1 ? 'sa-btn-reject' : 'sa-btn-approve'}" style="padding:5px 9px;font-size:11px;" onclick="toggleUser(${u.id}, ${u.is_active})">
                   <i class="bi bi-${u.is_active == 1 ? 'pause-circle' : 'play-circle'}-fill"></i>
                 </button>
                 <button class="sa-btn sa-btn-danger" style="padding:5px 9px;font-size:11px;" onclick="deleteUser(${u.id},'${u.full_name}')">
@@ -1941,17 +2038,47 @@
       }
     }
 
-    async function toggleUser(id) {
-      const res = await saApi('superadmin.php?action=toggle_user', { user_id: id });
-      saToast(res.message, res.success ? 'success' : 'error');
-      if (res.success) loadUsers();
+    async function toggleUser(id, currentStatus) {
+      const actionTxt = currentStatus == 1 ? 'Deactivate' : 'Activate';
+      openConfirmModal(
+        `${actionTxt} User`,
+        `Are you sure you want to ${actionTxt.toLowerCase()} this account?`,
+        async () => {
+          const res = await saApi('superadmin.php?action=toggle_user', { user_id: id });
+          saToast(res.message, res.success ? 'success' : 'error');
+          if (res.success) loadUsers();
+        },
+        currentStatus == 1 ? 'var(--sa-danger)' : 'var(--sa-primary)'
+      );
     }
 
     async function deleteUser(id, name) {
-      if (!confirm(`Permanently delete user "${name}"? This cannot be undone.`)) return;
-      const res = await saApi('superadmin.php?action=delete_user', { user_id: id });
-      saToast(res.message, res.success ? 'success' : 'error');
-      if (res.success) { loadUsers(); loadDashboard(); }
+      openConfirmModal(
+        'Delete User',
+        `Are you sure you want to permanently delete user "<b>${name}</b>"?<br><br><span style="color:var(--sa-danger);font-size:12px;">⚠ This action cannot be undone.</span>`,
+        async () => {
+          const res = await saApi('superadmin.php?action=delete_user', { user_id: id });
+          saToast(res.message, res.success ? 'success' : 'error');
+          if (res.success) { loadUsers(); loadDashboard(); }
+        },
+        'var(--sa-danger)'
+      );
+    }
+
+    function openConfirmModal(title, msg, onConfirm, btnColor = 'var(--sa-primary)') {
+      document.getElementById('sa-confirm-title').innerHTML = title;
+      document.getElementById('sa-confirm-msg').innerHTML = msg;
+      
+      const btn = document.getElementById('sa-confirm-btn');
+      btn.style.background = btnColor;
+      btn.style.borderColor = btnColor;
+      
+      btn.onclick = () => {
+        closeModal('sa-confirm-modal');
+        onConfirm();
+      };
+      
+      openModal('sa-confirm-modal');
     }
 
     /* =============================================
@@ -2022,7 +2149,7 @@
         document.getElementById('an-avg-daily').textContent    = fmt(res.avg_daily || 0);
         if (res.top_seller) {
           document.getElementById('an-top-seller').textContent     = res.top_seller.name;
-          document.getElementById('an-top-seller-sub').textContent = `${res.top_seller.sold} sold today`;
+          document.getElementById('an-top-seller-sub').textContent = `${res.top_seller.sold} sold (all time)`;
         } else {
           document.getElementById('an-top-seller').textContent     = '—';
           document.getElementById('an-top-seller-sub').textContent = 'No sales yet';
@@ -2133,7 +2260,7 @@
     }
 
     async function saveSettings() {
-      const keys   = ['store_name','owner_email','superadmin_email','token_expiry_minutes'];
+      const keys   = ['store_name','owner_email','superadmin_email','token_expiry_minutes','void_refund_manager_email'];
       const settings = {};
       keys.forEach(k => {
         const el = document.getElementById(`setting-${k}`);

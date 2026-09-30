@@ -143,13 +143,13 @@ function handleSADashboard() {
         GROUP BY c.id ORDER BY qty DESC
     ")->fetchAll();
 
-    // Top seller (today)
+    // Top seller (all time)
     $topSeller = $db->query("
         SELECT m.name, SUM(oi.quantity) as sold
         FROM order_items oi
         JOIN menu_items m ON oi.menu_item_id = m.id
         JOIN orders o ON oi.order_id = o.id
-        WHERE DATE(o.created_at)=CURDATE() AND o.status='Completed'
+        WHERE o.status='Completed'
         GROUP BY m.id ORDER BY sold DESC LIMIT 1
     ")->fetch();
 
@@ -232,7 +232,7 @@ function handleSARequests() {
         FROM system_requests r
         LEFT JOIN users u ON u.id = r.reviewed_by
         $whereClause
-        ORDER BY r.created_at DESC
+        ORDER BY r.created_at ASC
         LIMIT 200
     ");
     $stmt->execute($params);
@@ -302,8 +302,15 @@ function handleSAApproveRequest() {
         }
 
         $now = date('Y-m-d H:i:s');
+        $saNote = $note ?: 'Approved by Super Admin';
         $db->prepare("UPDATE system_requests SET status='approved', reviewed_by=?, reviewed_at=?, review_note=? WHERE id=?")
-           ->execute([$_SESSION['user_id'], $now, $note, $id]);
+           ->execute([$_SESSION['user_id'], $now, $saNote, $id]);
+
+        // If this request is part of a batch (shared approval_token), approve all siblings too
+        if (!empty($req['approval_token'])) {
+            $db->prepare("UPDATE system_requests SET status='approved', reviewed_by=?, reviewed_at=?, review_note=? WHERE approval_token=? AND status='pending' AND id != ?")
+               ->execute([$_SESSION['user_id'], $now, $saNote, $req['approval_token'], $id]);
+        }
 
         // Execute the payload action
         $payload = $req['payload'] ? json_decode($req['payload'], true) : [];
@@ -332,6 +339,28 @@ function handleSAApproveRequest() {
                 }
                 break;
 
+            case 'refund_order':
+                $orderId = $payload['order_id'] ?? 0;
+                if ($orderId) {
+                    try {
+                        $db->beginTransaction();
+                        $db->prepare("UPDATE orders SET status='Refunded' WHERE id=?")->execute([$orderId]);
+                        $items = $db->prepare("SELECT menu_item_id, quantity FROM order_items WHERE order_id=?");
+                        $items->execute([$orderId]);
+                        foreach ($items->fetchAll() as $item) {
+                            $db->prepare("UPDATE menu_items SET stock=stock+?, is_available=1 WHERE id=?")
+                               ->execute([$item['quantity'], $item['menu_item_id']]);
+                        }
+                        $db->prepare("INSERT INTO order_adjustments (order_id,type,amount,reason,processed_by) VALUES (?,'refund',?,?,?)")
+                           ->execute([$orderId, $payload['amount'] ?? 0, $payload['reason'] ?? '', $_SESSION['user_id']]);
+                        $db->commit();
+                        $message = "Order #{$orderId} refunded and stock restored.";
+                    } catch (Exception $e) {
+                        $db->rollBack();
+                    }
+                }
+                break;
+
             case 'user_deactivate':
                 $userId = $payload['user_id'] ?? 0;
                 if ($userId) {
@@ -345,6 +374,14 @@ function handleSAApproveRequest() {
                 if ($userId) {
                     $db->prepare("UPDATE users SET is_active=1 WHERE id=?")->execute([$userId]);
                     $message = "User activated.";
+                }
+                break;
+
+            case 'user_delete':
+                $userId = $payload['user_id'] ?? 0;
+                if ($userId) {
+                    $db->prepare("DELETE FROM users WHERE id=? AND role != 'super_admin'")->execute([$userId]);
+                    $message = "User account deleted.";
                 }
                 break;
         }
@@ -637,7 +674,7 @@ function handleSASaveSettings() {
     }
 
     $db = getDB();
-    $allowed = ['store_name','owner_email','token_expiry_minutes','superadmin_email','require_superadmin_approval'];
+    $allowed = ['store_name','owner_email','token_expiry_minutes','superadmin_email','require_superadmin_approval','void_refund_manager_email'];
 
     foreach ($settings as $key => $value) {
         if (!in_array($key, $allowed)) continue;
@@ -660,7 +697,7 @@ function handleSubmitRequest() {
     $description = trim($input['description'] ?? '');
     $payload     = $input['payload']          ?? null;
 
-    $validTypes = ['admin_approval','void_order','refund_order','menu_change','setting_change','user_deactivate','user_activate','other'];
+    $validTypes = ['admin_approval','void_order','refund_order','menu_change','setting_change','user_deactivate','user_activate','user_delete','other'];
     if (!in_array($type, $validTypes)) {
         jsonResponse(['success' => false, 'message' => 'Invalid request type.'], 400);
     }

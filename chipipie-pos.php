@@ -318,6 +318,14 @@
       padding: 20px 22px;
     }
 
+    /* Equal-height dashboard stat cards only */
+    .kpi-colored {
+      height: 100%;
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+    }
+
     .kpi-stat {
       font-size: 34px;
       font-weight: 800;
@@ -2127,35 +2135,35 @@
       <!-- DASHBOARD VIEW -->
       <div id="view-dashboard" class="view active">
         <div class="row g-3 mb-4">
-          <div class="col-6 col-lg-3">
+          <div class="col-6 col-lg">
             <div class="kpi-card kpi-colored kc-blue">
               <div class="kpi-label"><i class="bi bi-currency-exchange me-1"></i>Today's Revenue</div>
               <div class="kpi-stat" id="kpi-sales">₱0</div>
               <div class="kpi-trend" id="kpi-sales-trend">From today's orders</div>
             </div>
           </div>
-          <div class="col-6 col-lg-3">
+          <div class="col-6 col-lg">
             <div class="kpi-card kpi-colored kc-purple">
               <div class="kpi-label"><i class="bi bi-bag-check me-1"></i>Orders Today</div>
               <div class="kpi-stat" id="kpi-orders">0</div>
               <div class="kpi-trend">Transactions completed</div>
             </div>
           </div>
-          <div class="col-6 col-lg-2">
+          <div class="col-6 col-lg">
             <div class="kpi-card kpi-colored kc-green">
               <div class="kpi-label"><i class="bi bi-cup-hot me-1"></i>Cups Sold</div>
               <div class="kpi-stat" id="kpi-cups">0</div>
               <div class="kpi-trend" id="kpi-cups-trend">Drinks today</div>
             </div>
           </div>
-          <div class="col-6 col-lg-2">
+          <div class="col-6 col-lg">
             <div class="kpi-card kpi-colored kc-orange">
               <div class="kpi-label"><i class="bi bi-calculator me-1"></i>Avg. Order</div>
               <div class="kpi-stat" id="kpi-avg">₱0</div>
               <div class="kpi-trend">Per transaction</div>
             </div>
           </div>
-          <div class="col-12 col-lg-2">
+          <div class="col-12 col-lg">
             <div class="kpi-card kpi-colored kc-red">
               <div class="kpi-label"><i class="bi bi-trophy me-1"></i>Best Seller</div>
               <div class="kpi-stat" style="font-size:20px;" id="kpi-top">—</div>
@@ -2331,27 +2339,27 @@
         </div>
 
         <!-- Summary Bar -->
-        <div class="row g-2 mb-3" id="orders-summary-bar">
+        <div class="row g-2 mb-3 align-items-stretch" id="orders-summary-bar">
           <div class="col-6 col-md-3">
-            <div class="kpi-card" style="padding:12px 16px;">
+            <div class="kpi-card h-100" style="padding:12px 16px;">
               <div class="kpi-label">Total Orders</div>
               <div class="kpi-stat" id="osum-orders" style="font-size:22px;">0</div>
             </div>
           </div>
           <div class="col-6 col-md-3">
-            <div class="kpi-card" style="padding:12px 16px;">
+            <div class="kpi-card h-100" style="padding:12px 16px;">
               <div class="kpi-label">Total Revenue</div>
               <div class="kpi-stat" id="osum-revenue" style="font-size:22px;">₱0</div>
             </div>
           </div>
           <div class="col-6 col-md-3">
-            <div class="kpi-card" style="padding:12px 16px;">
+            <div class="kpi-card h-100" style="padding:12px 16px;">
               <div class="kpi-label">Avg. Order Value</div>
               <div class="kpi-stat" id="osum-avg" style="font-size:22px;">₱0</div>
             </div>
           </div>
           <div class="col-6 col-md-3">
-            <div class="kpi-card" style="padding:12px 16px;">
+            <div class="kpi-card h-100" style="padding:12px 16px;display:flex;flex-direction:column;justify-content:center;">
               <div class="kpi-label">Period</div>
               <div class="kpi-stat" id="osum-period" style="font-size:14px;font-weight:600;color:var(--cafe-brown);">
                 Today</div>
@@ -2394,7 +2402,7 @@
               <div style="display:flex;flex-direction:column;gap:6px;justify-content:flex-end;">
                 <button id="adj-req-btn" onclick="requestVoidCode()"
                   style="padding:9px 16px;background:linear-gradient(135deg,#dc2626,#b91c1c);color:#fff;border:none;border-radius:8px;font-size:13px;font-weight:700;cursor:pointer;white-space:nowrap;">
-                  <i class="bi bi-envelope-fill me-1"></i>Request Code from Owner
+                  <i class="bi bi-envelope-fill me-1"></i>Submit Request for Approval
                 </button>
                 <button onclick="clearAdjSelection()"
                   style="padding:6px 10px;background:transparent;border:1px solid #e5e7eb;border-radius:7px;color:#9ca3af;font-size:12px;cursor:pointer;text-align:center;">
@@ -2804,6 +2812,25 @@
     </div>
   </div>
 
+  <!-- RESEND APPROVAL MODAL -->
+  <div class="modal fade" id="resendApprovalModal" tabindex="-1">
+    <div class="modal-dialog modal-dialog-centered modal-sm">
+      <div class="modal-content">
+        <div class="modal-header" style="border-bottom:none;padding-bottom:0;">
+          <h5 class="modal-title" style="color:var(--cafe-brown);font-size:16px;">Resend Approval</h5>
+          <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+        </div>
+        <div class="modal-body p-4 pt-3 text-center">
+          <p style="color:#555;font-size:14px;margin-bottom:20px;">Re-send the approval email to the owner? <br><br><span style="font-size:12px;color:#888;">The owner must click the link in their Gmail to approve this admin.</span></p>
+          <div style="display:flex;gap:10px;justify-content:center;">
+            <button type="button" class="btn btn-secondary btn-sm" style="border-radius:6px;padding:6px 16px;" data-bs-dismiss="modal">Cancel</button>
+            <button type="button" class="btn btn-sm" style="background:var(--cafe-brown);color:#fff;border:none;border-radius:6px;padding:6px 16px;" id="resend-confirm-btn" onclick="submitResendApproval()">Resend</button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
   <!-- REQUEST TOGGLE MODAL -->
   <div class="modal fade" id="requestToggleModal" tabindex="-1">
     <div class="modal-dialog modal-dialog-centered modal-sm">
@@ -3140,7 +3167,7 @@
         const bestSellerEl = document.getElementById('kpi-top');
         if (bestSellerEl) bestSellerEl.textContent = stats.top_seller ? stats.top_seller.name : '—';
         const topTrendEl = document.getElementById('kpi-top-trend');
-        if (topTrendEl) topTrendEl.textContent = stats.top_seller ? `${stats.top_seller.sold} units sold` : 'No sales yet';
+        if (topTrendEl) topTrendEl.textContent = stats.top_seller ? `${stats.top_seller.sold} units sold (All time)` : 'No sales yet';
 
         // Recent orders table
         document.getElementById('recent-orders-tbody').innerHTML = orders.slice(0, 5).map(o => `
@@ -4074,11 +4101,11 @@
     }
 
     async function voidOrder(orderId, orderNum) {
-      if (!confirm(`Void order ${orderNum}?\nThis will restore stock. This cannot be undone.`)) return;
+      if (!confirm(`Submit a request to void order ${orderNum}?\nAn email notification will be sent to the manager.`)) return;
       try {
         const res = await api('orders.php?action=void_order', { order_id: orderId });
         if (res.success) {
-          showToast('✅ ' + orderNum + ' voided. Stock restored.');
+          showToast('✅ ' + orderNum + ' void requested for approval.');
           renderOrders();
           updateDashboard();
         } else {
@@ -4314,6 +4341,9 @@
       }
     }
 
+    let _batchApprovalToken = null;
+    let _batchPollInterval  = null;
+
     function openVoidCodeModal() {
       const keys = Object.keys(_adjSelections);
       let voidCount = 0, refCount = 0;
@@ -4333,10 +4363,44 @@
       document.getElementById('void-token-input').value = '';
       document.getElementById('void-token-error').style.display = 'none';
       document.getElementById('void-auth-modal').classList.add('show');
+
+      // Start polling if we have a batch token (submitted via request_void_batch)
+      if (_batchApprovalToken) {
+        stopBatchPoll(); // clear any previous
+        _batchPollInterval = setInterval(pollBatchStatus, 4000);
+      }
     }
 
     function closeVoidAuthModal() {
       document.getElementById('void-auth-modal').classList.remove('show');
+      stopBatchPoll();
+    }
+
+    function stopBatchPoll() {
+      if (_batchPollInterval) { clearInterval(_batchPollInterval); _batchPollInterval = null; }
+    }
+
+    async function pollBatchStatus() {
+      if (!_batchApprovalToken) return stopBatchPoll();
+      try {
+        const res = await api(`orders.php?action=check_batch_status&batch_token=${_batchApprovalToken}`, null, 'GET');
+        if (!res.success) return;
+        if (res.batch_status === 'approved') {
+          stopBatchPoll();
+          _batchApprovalToken = null;
+          closeVoidAuthModal();
+          clearAdjSelection();
+          renderOrders();
+          updateDashboard();
+          const via = res.approved_via || 'Super Admin';
+          showToast(`✅ Request approved by ${via}! Orders processed.`);
+        } else if (res.batch_status === 'rejected') {
+          stopBatchPoll();
+          _batchApprovalToken = null;
+          closeVoidAuthModal();
+          showToast('❌ Request was rejected.');
+        }
+      } catch(e) { /* ignore poll errors silently */ }
     }
 
     async function requestVoidCode() {
@@ -4380,13 +4444,22 @@
       status.style.display = 'none';
 
       try {
-        const res = await api('token.php?action=request', { purpose: 'void_orders' });
+        const payload = Object.keys(_adjSelections).map(id => {
+          return { id, type: _adjSelections[id].type, reason: _adjSelections[id].reason, orderNum: _adjSelections[id].orderNum };
+        });
+        const res = await api('orders.php?action=request_void_batch', { 
+            orders: payload, 
+            manager: document.getElementById('adj-manager-name')?.value || '' 
+        });
         if (res.success) {
           const devBox = document.getElementById('void-dev-token-box');
           const devVal = document.getElementById('void-dev-token-val');
           if (res.dev_token) { devBox.style.display = ''; devVal.textContent = res.dev_token; }
-          else                { devBox.style.display = 'none'; }
+          else               { devBox.style.display = 'none'; }
+          // Store the batch approval token for polling
+          _batchApprovalToken = res.batch_token || null;
           openVoidCodeModal();
+          showToast('✅ Request sent! Waiting for approval…');
         } else {
           status.style.display = '';
           status.textContent   = '⚠ ' + res.message;
@@ -4396,7 +4469,7 @@
         status.textContent   = '⚠ Request failed. Check connection.';
       } finally {
         btn.disabled = false;
-        btn.innerHTML = '<i class="bi bi-envelope-fill me-1"></i>Request Code from Owner';
+        btn.innerHTML = '<i class="bi bi-envelope-fill me-1"></i>Submit Request for Approval';
       }
     }
 
@@ -4433,33 +4506,17 @@
       }, 20000);
 
       try {
-        // Validate token once
-        const valRes = await api('token.php?action=validate', { token });
+        const res = await api('orders.php?action=execute_void_batch_with_code', { token });
         clearTimeout(tid);
-        if (!valRes.success) {
-          errEl.textContent = '⚠ ' + valRes.message;
+        
+        if (!res.success) {
+          errEl.textContent = '⚠ ' + res.message;
           errEl.style.display = ''; _resetBtn(); return;
-        }
-
-        // Process each selected order with its own reason
-        const errors = [];
-        for (const orderId of keys) {
-          const sel    = _adjSelections[orderId];
-          const action = sel.type === 'void' ? 'void_order' : 'refund_order';
-          const perReason = (sel.reason || sel.type === 'void' ? 'Order cancelled' : 'Customer refund').trim();
-          const reason    = mgr ? `${perReason} \u2014 Authorized by: ${mgr}` : perReason;
-          const res    = await api(`orders.php?action=${action}`, { order_id: parseInt(orderId), reason });
-          if (!res.success) errors.push(`${sel.orderNum}: ${res.message}`);
         }
 
         closeVoidAuthModal();
         clearAdjSelection();
-
-        if (errors.length) {
-          showToast('⚠ Some orders failed: ' + errors.join('; '));
-        } else {
-          showToast(`✅ ${keys.length} order${keys.length>1?'s':''} processed. Stock restored.`);
-        }
+        showToast(`✅ Request approved and ${keys.length} order(s) processed!`);
         renderOrders();
         updateDashboard();
 
@@ -5185,9 +5242,14 @@
             <td><span class="badge-cat">${u.role}</span></td>
             <td><span class="${u.is_active == 1 ? 'badge-success' : 'badge-pending'}">${u.is_active == 1 ? 'Active' : 'Inactive'}</span></td>
             <td>
-              <button class="btn btn-sm" style="background:var(--cafe-tan);color:var(--cafe-brown);border:none;border-radius:6px;padding:4px 10px;font-size:12px;" onclick="requestUserToggle(${u.id}, '${u.full_name}', ${u.is_active})">
-                ${u.is_active == 1 ? 'Req Deactivate' : 'Req Activate'}
-              </button>
+              <div style="display:flex;gap:6px;flex-wrap:wrap;">
+                <button class="btn btn-sm" style="background:var(--cafe-tan);color:var(--cafe-brown);border:none;border-radius:6px;padding:4px 10px;font-size:12px;" onclick="requestUserToggle(${u.id}, '${u.full_name}', ${u.is_active})">
+                  ${u.is_active == 1 ? 'Req Deactivate' : 'Req Activate'}
+                </button>
+                <button class="btn btn-sm" style="background:#fee2e2;color:#b91c1c;border:none;border-radius:6px;padding:4px 10px;font-size:12px;" onclick="requestUserDelete(${u.id}, '${u.full_name}')">
+                  <i class="bi bi-trash-fill"></i> Req Delete
+                </button>
+              </div>
             </td>
           </tr>
         `).join('') || '<tr><td colspan="6" class="text-center text-muted py-3">No users found</td></tr>';
@@ -5211,10 +5273,30 @@
       } catch (e) { console.error(e); }
     }
 
-    async function resendApprovalEmail(requestId) {
-      if (!confirm('Re-send the approval email to the owner? The owner must click the link in their Gmail to approve this admin.')) return;
-      const res = await api('auth.php?action=resend_approval', { request_id: requestId });
-      showToast(res.success ? '📧 ' + res.message : '⚠ ' + res.message);
+    let currentResendRequestId = null;
+    function resendApprovalEmail(requestId) {
+      currentResendRequestId = requestId;
+      new bootstrap.Modal(document.getElementById('resendApprovalModal')).show();
+    }
+
+    async function submitResendApproval() {
+      if (!currentResendRequestId) return;
+      const btn = document.getElementById('resend-confirm-btn');
+      const originalText = btn.innerHTML;
+      btn.innerHTML = '<span class="spinner-border spinner-border-sm"></span>...';
+      btn.disabled = true;
+
+      try {
+        const res = await api('auth.php?action=resend_approval', { request_id: currentResendRequestId });
+        showToast(res.success ? '📧 ' + res.message : '⚠ ' + res.message);
+        bootstrap.Modal.getInstance(document.getElementById('resendApprovalModal')).hide();
+      } catch (e) {
+        showToast('⚠ Connection error');
+      } finally {
+        btn.innerHTML = originalText;
+        btn.disabled = false;
+        currentResendRequestId = null;
+      }
     }
 
     async function toggleUser(userId) {
@@ -5224,17 +5306,38 @@
     }
 
     let currentToggleRequest = null;
+
     function requestUserToggle(userId, fullName, isActive) {
       const isDeactivating = isActive == 1;
       const actionName = isDeactivating ? 'Deactivate' : 'Activate';
-      document.getElementById('rtm-msg').innerHTML = `Submit a request to <strong>${actionName.toLowerCase()}</strong> ${fullName}?`;
-      currentToggleRequest = { userId, fullName, isDeactivating, actionName };
+      document.getElementById('rtm-title').textContent = `Request to ${actionName} Account`;
+      document.getElementById('rtm-msg').innerHTML = `Submit a request to <strong>${actionName.toLowerCase()}</strong> the account of <strong>${fullName}</strong>?`;
+      document.getElementById('rtm-confirm-btn').style.background = 'var(--cafe-brown)';
+      currentToggleRequest = {
+        type: isDeactivating ? 'user_deactivate' : 'user_activate',
+        title: `Request to ${actionName} User: ${fullName}`,
+        description: `An admin has requested to ${actionName.toLowerCase()} the account for ${fullName}.`,
+        payload: { user_id: userId, name: fullName }
+      };
+      new bootstrap.Modal(document.getElementById('requestToggleModal')).show();
+    }
+
+    function requestUserDelete(userId, fullName) {
+      document.getElementById('rtm-title').textContent = 'Request to Delete Account';
+      document.getElementById('rtm-msg').innerHTML = `Submit a request to permanently <strong>delete</strong> the account of <strong>${fullName}</strong>?<br><span style="font-size:11px;color:#b91c1c;">This action cannot be undone once approved by the Super Admin.</span>`;
+      document.getElementById('rtm-confirm-btn').style.background = '#b91c1c';
+      currentToggleRequest = {
+        type: 'user_delete',
+        title: `Request to Delete User: ${fullName}`,
+        description: `An admin has requested to permanently delete the account for ${fullName}.`,
+        payload: { user_id: userId, name: fullName }
+      };
       new bootstrap.Modal(document.getElementById('requestToggleModal')).show();
     }
 
     async function submitUserToggleRequest() {
       if (!currentToggleRequest) return;
-      const { userId, fullName, isDeactivating, actionName } = currentToggleRequest;
+      const req = currentToggleRequest;
       const btn = document.getElementById('rtm-confirm-btn');
       const originalText = btn.innerHTML;
       btn.innerHTML = '<span class="spinner-border spinner-border-sm"></span> Submitting...';
@@ -5244,12 +5347,7 @@
         const res = await fetch('api/superadmin.php?action=submit_request', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            type: isDeactivating ? 'user_deactivate' : 'user_activate',
-            title: `Request to ${actionName} User: ${fullName}`,
-            description: `An admin has requested to ${actionName.toLowerCase()} the account for ${fullName}.`,
-            payload: { user_id: userId, name: fullName }
-          })
+          body: JSON.stringify(req)
         });
         const data = await res.json();
         showToast(data.success ? '✅ ' + data.message : '⚠ ' + data.message);
