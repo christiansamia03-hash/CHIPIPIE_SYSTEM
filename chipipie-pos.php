@@ -2804,6 +2804,25 @@
     </div>
   </div>
 
+  <!-- REQUEST TOGGLE MODAL -->
+  <div class="modal fade" id="requestToggleModal" tabindex="-1">
+    <div class="modal-dialog modal-dialog-centered modal-sm">
+      <div class="modal-content">
+        <div class="modal-header" style="border-bottom:none;padding-bottom:0;">
+          <h5 class="modal-title" style="color:var(--cafe-brown);font-size:16px;" id="rtm-title">Confirm Request</h5>
+          <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+        </div>
+        <div class="modal-body p-4 pt-3 text-center">
+          <p id="rtm-msg" style="color:#555;font-size:14px;margin-bottom:20px;"></p>
+          <div style="display:flex;gap:10px;justify-content:center;">
+            <button type="button" class="btn btn-secondary btn-sm" style="border-radius:6px;padding:6px 16px;" data-bs-dismiss="modal">Cancel</button>
+            <button type="button" class="btn btn-sm" style="background:var(--cafe-brown);color:#fff;border:none;border-radius:6px;padding:6px 16px;" id="rtm-confirm-btn" onclick="submitUserToggleRequest()">Submit Request</button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
   <!-- REGISTER USER MODAL (from admin panel) -->
   <div class="modal fade" id="registerUserModal" tabindex="-1">
     <div class="modal-dialog modal-dialog-centered">
@@ -5157,7 +5176,8 @@
       try {
         const res = await api('auth.php?action=users');
         if (!res.success) return;
-        document.getElementById('users-tbody').innerHTML = res.users.map(u => `
+        const visibleUsers = res.users.filter(u => u.role !== 'super_admin');
+        document.getElementById('users-tbody').innerHTML = visibleUsers.map(u => `
           <tr>
             <td style="font-weight:500;">${u.full_name}</td>
             <td><code>${u.username}</code></td>
@@ -5165,8 +5185,8 @@
             <td><span class="badge-cat">${u.role}</span></td>
             <td><span class="${u.is_active == 1 ? 'badge-success' : 'badge-pending'}">${u.is_active == 1 ? 'Active' : 'Inactive'}</span></td>
             <td>
-              <button class="btn btn-sm" style="background:var(--cafe-tan);color:var(--cafe-brown);border:none;border-radius:6px;padding:4px 10px;font-size:12px;" onclick="toggleUser(${u.id})">
-                ${u.is_active == 1 ? 'Deactivate' : 'Activate'}
+              <button class="btn btn-sm" style="background:var(--cafe-tan);color:var(--cafe-brown);border:none;border-radius:6px;padding:4px 10px;font-size:12px;" onclick="requestUserToggle(${u.id}, '${u.full_name}', ${u.is_active})">
+                ${u.is_active == 1 ? 'Req Deactivate' : 'Req Activate'}
               </button>
             </td>
           </tr>
@@ -5201,6 +5221,46 @@
       const res = await api('auth.php?action=toggle_user', { user_id: userId });
       showToast(res.message);
       renderUsers();
+    }
+
+    let currentToggleRequest = null;
+    function requestUserToggle(userId, fullName, isActive) {
+      const isDeactivating = isActive == 1;
+      const actionName = isDeactivating ? 'Deactivate' : 'Activate';
+      document.getElementById('rtm-msg').innerHTML = `Submit a request to <strong>${actionName.toLowerCase()}</strong> ${fullName}?`;
+      currentToggleRequest = { userId, fullName, isDeactivating, actionName };
+      new bootstrap.Modal(document.getElementById('requestToggleModal')).show();
+    }
+
+    async function submitUserToggleRequest() {
+      if (!currentToggleRequest) return;
+      const { userId, fullName, isDeactivating, actionName } = currentToggleRequest;
+      const btn = document.getElementById('rtm-confirm-btn');
+      const originalText = btn.innerHTML;
+      btn.innerHTML = '<span class="spinner-border spinner-border-sm"></span> Submitting...';
+      btn.disabled = true;
+
+      try {
+        const res = await fetch('api/superadmin.php?action=submit_request', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            type: isDeactivating ? 'user_deactivate' : 'user_activate',
+            title: `Request to ${actionName} User: ${fullName}`,
+            description: `An admin has requested to ${actionName.toLowerCase()} the account for ${fullName}.`,
+            payload: { user_id: userId, name: fullName }
+          })
+        });
+        const data = await res.json();
+        showToast(data.success ? '✅ ' + data.message : '⚠ ' + data.message);
+        bootstrap.Modal.getInstance(document.getElementById('requestToggleModal')).hide();
+      } catch (e) {
+        showToast('⚠ Connection error');
+      } finally {
+        btn.innerHTML = originalText;
+        btn.disabled = false;
+        currentToggleRequest = null;
+      }
     }
 
     function showRegisterUserModal() {

@@ -339,6 +339,14 @@ function handleSAApproveRequest() {
                     $message = "User deactivated.";
                 }
                 break;
+
+            case 'user_activate':
+                $userId = $payload['user_id'] ?? 0;
+                if ($userId) {
+                    $db->prepare("UPDATE users SET is_active=1 WHERE id=?")->execute([$userId]);
+                    $message = "User activated.";
+                }
+                break;
         }
 
         logAction('approve_system_request', 'system_request', $id, $message);
@@ -652,7 +660,7 @@ function handleSubmitRequest() {
     $description = trim($input['description'] ?? '');
     $payload     = $input['payload']          ?? null;
 
-    $validTypes = ['admin_approval','void_order','refund_order','menu_change','setting_change','user_deactivate','other'];
+    $validTypes = ['admin_approval','void_order','refund_order','menu_change','setting_change','user_deactivate','user_activate','other'];
     if (!in_array($type, $validTypes)) {
         jsonResponse(['success' => false, 'message' => 'Invalid request type.'], 400);
     }
