@@ -1999,6 +1999,12 @@
         <a href="#" onclick="showRegisterForm()"
           style="font-size:13px; color:var(--cafe-brown); font-weight:500;">Register New Account</a>
       </div>
+      <div class="mt-2 text-center">
+        <a href="superadmin-panel.php"
+          style="font-size:11px; color:#aaa; text-decoration:none; display:inline-flex; align-items:center; gap:4px;">
+          🛡️ Super Admin Panel
+        </a>
+      </div>
     </div>
   </div>
 
@@ -2463,10 +2469,15 @@
 
       <!-- MENU MANAGEMENT VIEW -->
       <div id="view-menu" class="view">
-        <div class="d-flex justify-content-between align-items-center mb-3">
-          <div class="search-wrap">
-            <i class="bi bi-search"></i>
-            <input type="text" class="search-input" id="menu-mgmt-search" oninput="renderMenuTable()">
+        <div class="d-flex justify-content-between align-items-center mb-3 flex-wrap gap-2">
+          <div class="d-flex gap-2 align-items-center flex-wrap">
+            <div class="search-wrap">
+              <i class="bi bi-search"></i>
+              <input type="text" class="search-input" id="menu-mgmt-search" oninput="renderMenuTable()">
+            </div>
+            <div class="d-flex gap-2 flex-wrap" id="menu-mgmt-filter-tabs">
+              <!-- Dynamically populated in renderMenuTable -->
+            </div>
           </div>
           <button class="btn-cafe-primary" style="width: auto; padding: 8px 18px;" data-bs-toggle="modal"
             data-bs-target="#addItemModal">
@@ -3216,7 +3227,12 @@
         const isOutOfStock = item.stock <= 0;
         const isLowStock = item.stock > 0 && item.stock <= item.minStock;
         const stockClass = isOutOfStock ? 'stock-out' : (isLowStock ? 'stock-low' : 'stock-ok');
-        const stockLabel = isOutOfStock ? 'Out of Stock' : (isLowStock ? `Low: ${item.stock}` : `${item.stock} in stock`);
+        
+        let stockIcon = '';
+        if (isOutOfStock) stockIcon = '<i class="bi bi-x-circle-fill me-1"></i>';
+        else if (isLowStock) stockIcon = '<i class="bi bi-exclamation-triangle-fill me-1"></i>';
+        
+        const stockLabel = stockIcon + (isOutOfStock ? 'Out of Stock' : (isLowStock ? `Low: ${item.stock}` : `${item.stock} in stock`));
         const cardClass = isOutOfStock ? 'product-card out-of-stock' : 'product-card';
 
         let priceDisplay = `₱${item.price}`;
@@ -4573,14 +4589,67 @@
       }
     }
 
+    // Group definitions matching the POS ordering grid
+    const MENU_GROUPS = [
+      // ── Coffee Branch ─────────────────────────────────────
+      { label: 'All',         icon: 'bi-grid',              cats: null },   // null = no filter
+      { label: 'Coffee',      icon: 'bi-cup-hot-fill',      cats: ['Hot Coffee', 'Iced Coffee'] },
+      { label: 'Non-Coffee',  icon: 'bi-cup-straw',         cats: ['Classic Milktea', 'Virgin Mojito', 'Citrus Popping Boba', 'Soda Float', 'Matcha Series', 'Frappé'] },
+      { label: 'Snack',       icon: 'bi-egg-fried',         cats: ['Fork and Fun'] },
+      // ── Pizza Branch ──────────────────────────────────────
+      { label: 'Pizza',       icon: 'bi-circle',            cats: ['Pizza'] },
+      { label: 'Quesadilla',  icon: 'bi-grid-3x3-gap',      cats: ['Quesadilla'] },
+      { label: 'Patatas',     icon: 'bi-bag-heart',         cats: ['Patatas'] },
+      { label: 'Pasta',       icon: 'bi-stars',             cats: ['Pasta'] },
+      { label: 'Chickenpops', icon: 'bi-lightning',         cats: ['Chickenpops'] },
+      { label: 'Combo',       icon: 'bi-collection',        cats: ['Combo', 'Gipitmeal'] },
+    ];
+
+    let currentMenuMgmtGroup = MENU_GROUPS[0]; // default = All
+
+    function setMenuMgmtFilter(label, btn) {
+      document.querySelectorAll('#menu-mgmt-filter-tabs .cat-pill').forEach(b => b.classList.remove('active'));
+      btn.classList.add('active');
+      currentMenuMgmtGroup = MENU_GROUPS.find(g => g.label === label) || MENU_GROUPS[0];
+      renderMenuTable();
+    }
+
     /* ========== MENU TABLE ========== */
+    let menuMgmtTabsBuilt = false;
+
     function renderMenuTable() {
+      // Build tabs once
+      if (!menuMgmtTabsBuilt) {
+        const tabsEl = document.getElementById('menu-mgmt-filter-tabs');
+        if (tabsEl) {
+          tabsEl.innerHTML = MENU_GROUPS
+            .filter(g => g.label === 'All' || (menuItems || []).some(m => g.cats && g.cats.includes(m.category)))
+            .map((g, i) => {
+              const sep = (g.label === 'Pizza') ? '<span style="width:1px;background:var(--cafe-tan);height:22px;display:inline-block;margin:0 4px;vertical-align:middle;"></span>' : '';
+              return `${sep}<button class="cat-pill${i === 0 ? ' active' : ''}" onclick="setMenuMgmtFilter('${g.label}', this)"><i class="bi ${g.icon} me-1"></i>${g.label}</button>`;
+            })
+            .join('');
+          menuMgmtTabsBuilt = true;
+        }
+      }
+
       const q = (document.getElementById('menu-mgmt-search')?.value || '').toLowerCase();
-      const filtered = menuItems.filter(m => !q || m.name.toLowerCase().includes(q));
+      const filtered = menuItems.filter(m => {
+        const matchQ = !q || m.name.toLowerCase().includes(q);
+        const matchCat = !currentMenuMgmtGroup.cats || currentMenuMgmtGroup.cats.includes(m.category);
+        return matchQ && matchCat;
+      });
 
       document.getElementById('menu-tbody').innerHTML = filtered.map(item => {
-        const stockBadgeClass = item.stock <= 0 ? 'stock-out' : (item.stock <= item.minStock ? 'stock-low' : 'stock-ok');
-        const stockText = item.stock <= 0 ? 'Out' : item.stock + ' / min ' + item.minStock;
+        const isOut = item.stock <= 0;
+        const isLow = !isOut && item.stock <= item.minStock;
+        const stockBadgeClass = isOut ? 'stock-out' : (isLow ? 'stock-low' : 'stock-ok');
+        
+        let stockIcon = '';
+        if (isOut) stockIcon = '<i class="bi bi-x-circle-fill me-1"></i>';
+        else if (isLow) stockIcon = '<i class="bi bi-exclamation-triangle-fill me-1"></i>';
+
+        const stockText = isOut ? 'No Stock' : (isLow ? 'Low Stock (' + item.stock + ')' : item.stock + ' / min ' + item.minStock);
         return `
     <tr>
       <td>
@@ -4590,7 +4659,7 @@
       <td><span class="badge-cat">${item.category}</span></td>
       <td style="font-weight:600; color:var(--cafe-amber);">₱${item.price}</td>
       <td>
-        <span class="stock-badge ${stockBadgeClass}" style="font-size:11px;">${stockText}</span>
+        <span class="stock-badge ${stockBadgeClass}" style="font-size:11px;">${stockIcon}${stockText}</span>
         <div style="margin-top:4px; display:flex; align-items:center; gap:4px;">
           <button class="qty-btn" onclick="adjustStock(${item.id}, -1)" title="Decrease stock">−</button>
           <span style="font-size:12px; font-weight:600; min-width:20px; text-align:center;">${item.stock}</span>
@@ -4946,6 +5015,11 @@
       try {
         const res = await api('auth.php?action=login', { username: u, password: p });
         if (res.success) {
+          // Super admin has a dedicated panel — redirect there
+          if (res.redirect) {
+            window.location.href = res.redirect;
+            return;
+          }
           currentUser = res.user;
           document.getElementById('sidebar-name').textContent = res.user.full_name;
           document.getElementById('sidebar-role').textContent = res.user.role === 'admin' ? 'Administrator' : 'Cashier';
@@ -5247,6 +5321,11 @@
       // Check for existing session
       api('auth.php?action=session').then(res => {
         if (res.success && res.loggedIn) {
+          // Super admin should use their dedicated panel
+          if (res.user.role === 'super_admin') {
+            window.location.href = 'superadmin-panel.php';
+            return;
+          }
           currentUser = res.user;
           document.getElementById('sidebar-name').textContent = res.user.full_name;
           document.getElementById('sidebar-role').textContent = res.user.role === 'admin' ? 'Administrator' : 'Cashier';

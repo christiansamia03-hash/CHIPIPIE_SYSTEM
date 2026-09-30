@@ -5,6 +5,9 @@
  * Update credentials for your environment.
  */
 
+// Suppress PHP notices/warnings from polluting JSON API responses
+error_reporting(E_ALL & ~E_NOTICE & ~E_WARNING & ~E_DEPRECATED);
+
 // ============ TIMEZONE (must match MySQL) ============
 date_default_timezone_set('Asia/Manila');
 
@@ -92,12 +95,22 @@ function requireLogin() {
 }
 
 /**
- * Check if current user is admin
+ * Check if current user is admin (or super_admin)
  */
 function requireAdmin() {
     requireLogin();
-    if ($_SESSION['role'] !== 'admin') {
+    if (!in_array($_SESSION['role'], ['admin', 'super_admin'])) {
         jsonResponse(['success' => false, 'message' => 'Admin access required.'], 403);
+    }
+}
+
+/**
+ * Check if current user is super_admin
+ */
+function requireSuperAdmin() {
+    requireLogin();
+    if ($_SESSION['role'] !== 'super_admin') {
+        jsonResponse(['success' => false, 'message' => 'Super Admin access required.'], 403);
     }
 }
 

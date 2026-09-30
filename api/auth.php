@@ -74,13 +74,13 @@ function handleLogin() {
 
     // Start session
     ensureSession();
-    $_SESSION['user_id'] = $user['id'];
+    $_SESSION['user_id']  = $user['id'];
     $_SESSION['username'] = $user['username'];
-    $_SESSION['full_name'] = $user['full_name'];
-    $_SESSION['email'] = $user['email'];
-    $_SESSION['role'] = $user['role'];
+    $_SESSION['full_name']= $user['full_name'];
+    $_SESSION['email']    = $user['email'];
+    $_SESSION['role']     = $user['role'];
 
-    jsonResponse([
+    $response = [
         'success' => true,
         'message' => 'Login successful.',
         'user' => [
@@ -90,7 +90,14 @@ function handleLogin() {
             'email'     => $user['email'],
             'role'      => $user['role'],
         ]
-    ]);
+    ];
+
+    // Tell the frontend to redirect super_admin to the dedicated panel
+    if ($user['role'] === 'super_admin') {
+        $response['redirect'] = 'superadmin-panel.php';
+    }
+
+    jsonResponse($response);
 }
 
 // =====================================================
@@ -98,7 +105,33 @@ function handleLogin() {
 // =====================================================
 function handleLogout() {
     ensureSession();
-    session_destroy();
+
+    // Clear all session variables
+    $_SESSION = [];
+
+    // Expire session cookie across all possible paths
+    if (ini_get('session.use_cookies')) {
+        $p = session_get_cookie_params();
+        setcookie(session_name(), '', time() - 86400, $p['path'], $p['domain'], $p['secure'], $p['httponly']);
+        setcookie(session_name(), '', time() - 86400, '/');
+        setcookie(session_name(), '', time() - 86400, '/CHIPIPIE_SYSTEM');
+        setcookie(session_name(), '', time() - 86400, '/CHIPIPIE_SYSTEM/');
+        setcookie(session_name(), '', time() - 86400, '');
+    }
+
+    // Destroy server-side session
+    if (session_status() === PHP_SESSION_ACTIVE) {
+        session_destroy();
+    }
+
+    // If called as a direct browser redirect, redirect back
+    $redirect = $_GET['redirect'] ?? '';
+    if ($redirect) {
+        $safe = basename($redirect);
+        header('Location: ../' . $safe);
+        exit;
+    }
+
     jsonResponse(['success' => true, 'message' => 'Logged out.']);
 }
 
