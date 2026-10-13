@@ -5410,6 +5410,7 @@
         menuBtn.style.display = 'none';
         reportsBtn.style.display = 'none';
         if (usersBtn) usersBtn.style.display = 'none';
+        safeBuildCharts(); // Build charts so Dashboard view works for cashiers too
         showView('pos', document.querySelectorAll('.nav-item-btn')[1]);
       } else {
         mgmtLabel.style.display = 'block';
