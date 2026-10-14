@@ -122,6 +122,33 @@ function generateToken($length = 32) {
 }
 
 /**
+ * Validate password complexity:
+ * - Minimum 8 characters
+ * - At least one uppercase letter (A-Z)
+ * - At least one lowercase letter (a-z)
+ * - At least one number (0-9)
+ */
+function validatePasswordComplexity($password, &$error = '') {
+    if (strlen($password) < 8) {
+        $error = 'Password must be at least 8 characters long.';
+        return false;
+    }
+    if (!preg_match('/[A-Z]/', $password)) {
+        $error = 'Password must contain at least one uppercase letter (A-Z).';
+        return false;
+    }
+    if (!preg_match('/[a-z]/', $password)) {
+        $error = 'Password must contain at least one lowercase letter (a-z).';
+        return false;
+    }
+    if (!preg_match('/[0-9]/', $password)) {
+        $error = 'Password must contain at least one number (0-9).';
+        return false;
+    }
+    return true;
+}
+
+/**
  * Send email via direct SMTP (bypasses sendmail / php mail())
  */
 function sendEmail($to, $subject, $body) {

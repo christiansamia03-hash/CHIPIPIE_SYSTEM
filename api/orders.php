@@ -58,41 +58,72 @@ function handleVoidOrder() {
            $approvalToken
        ]);
 
-    // Send email to manager if configured
+    // Send emails: manager gets notification-only; owner + superadmin get approve/deny (deduplicated)
+    $storeName        = getSetting('store_name') ?: 'ChipiPie Cafe';
     $managerEmailsStr = getSetting('void_refund_manager_email');
+    $ownerEmail       = trim(getSetting('owner_email') ?? '');
+    $superAdminEmail  = trim(getSetting('superadmin_email') ?? '');
+
+    $approveUrl = "http://" . ($_SERVER['HTTP_HOST'] ?? 'localhost') . "/CHIPIPIE_SYSTEM/api/orders.php?action=decide_void_refund&token=" . $approvalToken . "&decision=approve";
+    $rejectUrl  = "http://" . ($_SERVER['HTTP_HOST'] ?? 'localhost') . "/CHIPIPIE_SYSTEM/api/orders.php?action=decide_void_refund&token=" . $approvalToken . "&decision=reject";
+
+    // --- Shared detail rows ---
+    $detailRows = "
+        <tr><td style='padding: 6px 0; font-weight: 600; color: #aaa;'>Order ID:</td><td style='font-weight: 700; color: #fff;'>#{$orderId}</td></tr>
+        <tr><td style='padding: 6px 0; font-weight: 600; color: #aaa;'>Requested By:</td><td>{$requester}</td></tr>
+        <tr><td style='padding: 6px 0; font-weight: 600; color: #aaa;'>Amount:</td><td style='color: #dc2626; font-weight: bold;'>&#8369;" . number_format($order['total'], 2) . "</td></tr>
+        <tr><td style='padding: 6px 0; font-weight: 600; color: #aaa;'>Reason:</td><td>{$reason}</td></tr>";
+
+    // --- Notification-only body (no buttons) ---
+    $notifyBody = "
+    <div style='font-family: Segoe UI, sans-serif; max-width: 500px; margin: 0 auto; padding: 30px; background: #1a1514; color: #f4f4f4; border-radius: 16px; border: 1px solid #332d2c;'>
+        <div style='text-align: center; margin-bottom: 20px;'>
+            <div style='display: inline-block; width: 50px; height: 50px; background: #dc2626; color: #fff; border-radius: 12px; line-height: 50px; font-size: 24px;'>&#9888;</div>
+            <h2 style='color: #fff; margin: 10px 0 5px;'>$storeName</h2>
+            <p style='color: #aaa; font-size: 13px; margin: 0;'>Order Void Request (Notification)</p>
+        </div>
+        <div style='background: #2a2423; border-radius: 12px; padding: 24px; border: 1px solid #3d3533;'>
+            <table style='width: 100%; font-size: 14px; color: #ddd; margin: 0 0 16px 0;'>{$detailRows}</table>
+            <p style='font-size: 12px; color: #888; margin: 0;'>This is a notification only. Approval is handled by the owner/super admin.</p>
+        </div>
+    </div>";
+
+    // --- Approve/deny body ---
+    $actionBody = "
+    <div style='font-family: Segoe UI, sans-serif; max-width: 500px; margin: 0 auto; padding: 30px; background: #1a1514; color: #f4f4f4; border-radius: 16px; border: 1px solid #332d2c;'>
+        <div style='text-align: center; margin-bottom: 20px;'>
+            <div style='display: inline-block; width: 50px; height: 50px; background: #dc2626; color: #fff; border-radius: 12px; line-height: 50px; font-size: 24px;'>&#9888;</div>
+            <h2 style='color: #fff; margin: 10px 0 5px;'>$storeName</h2>
+            <p style='color: #aaa; font-size: 13px; margin: 0;'>Order Void Request &mdash; Action Required</p>
+        </div>
+        <div style='background: #2a2423; border-radius: 12px; padding: 24px; border: 1px solid #3d3533;'>
+            <table style='width: 100%; font-size: 14px; color: #ddd; margin: 0 0 16px 0;'>{$detailRows}</table>
+            <div style='display: flex; gap: 10px; margin-top: 20px; text-align: center;'>
+                <a href='{$approveUrl}' style='flex: 1; display: inline-block; background: #16a34a; color: #fff; padding: 12px 10px; border-radius: 8px; text-decoration: none; font-weight: 600; font-size: 14px;'>&#10003; Approve Void</a>
+                <a href='{$rejectUrl}' style='flex: 1; display: inline-block; background: #3f3f46; color: #fff; padding: 12px 10px; border-radius: 8px; text-decoration: none; font-weight: 600; font-size: 14px;'>&#10007; Reject</a>
+            </div>
+        </div>
+    </div>";
+
+    // Send notification-only to managers
     if ($managerEmailsStr) {
-        $storeName = getSetting('store_name') ?: 'ChipiPie Cafe';
-        
-        $approveUrl = "http://" . ($_SERVER['HTTP_HOST'] ?? 'localhost') . "/CHIPIPIE_SYSTEM/api/orders.php?action=decide_void_refund&token=" . $approvalToken . "&decision=approve";
-        $rejectUrl = "http://" . ($_SERVER['HTTP_HOST'] ?? 'localhost') . "/CHIPIPIE_SYSTEM/api/orders.php?action=decide_void_refund&token=" . $approvalToken . "&decision=reject";
-
-        $body = "
-        <div style='font-family: Segoe UI, sans-serif; max-width: 500px; margin: 0 auto; padding: 30px; background: #1a1514; color: #f4f4f4; border-radius: 16px; border: 1px solid #332d2c;'>
-            <div style='text-align: center; margin-bottom: 20px;'>
-                <div style='display: inline-block; width: 50px; height: 50px; background: #dc2626; color: #fff; border-radius: 12px; line-height: 50px; font-size: 24px;'>⚠️</div>
-                <h2 style='color: #fff; margin: 10px 0 5px;'>$storeName</h2>
-                <p style='color: #aaa; font-size: 13px; margin: 0;'>Order Void Request</p>
-            </div>
-            <div style='background: #2a2423; border-radius: 12px; padding: 24px; border: 1px solid #3d3533;'>
-                <table style='width: 100%; font-size: 14px; color: #ddd; margin: 0 0 16px 0;'>
-                    <tr><td style='padding: 6px 0; font-weight: 600; color: #aaa;'>Order ID:</td><td style='font-weight: 700; color: #fff;'>#{$orderId}</td></tr>
-                    <tr><td style='padding: 6px 0; font-weight: 600; color: #aaa;'>Requested By:</td><td>{$requester}</td></tr>
-                    <tr><td style='padding: 6px 0; font-weight: 600; color: #aaa;'>Amount:</td><td style='color: #dc2626; font-weight: bold;'>₱" . number_format($order['total'], 2) . "</td></tr>
-                    <tr><td style='padding: 6px 0; font-weight: 600; color: #aaa;'>Reason:</td><td>{$reason}</td></tr>
-                </table>
-                <div style='display: flex; gap: 10px; margin-top: 20px; text-align: center;'>
-                    <a href='$approveUrl' style='flex: 1; display: inline-block; background: #16a34a; color: #fff; padding: 12px 10px; border-radius: 8px; text-decoration: none; font-weight: 600; font-size: 14px;'>✅ Approve Void</a>
-                    <a href='$rejectUrl' style='flex: 1; display: inline-block; background: #3f3f46; color: #fff; padding: 12px 10px; border-radius: 8px; text-decoration: none; font-weight: 600; font-size: 14px;'>❌ Reject</a>
-                </div>
-            </div>
-        </div>";
-
-        $managerEmails = array_map('trim', explode(',', $managerEmailsStr));
+        $managerEmails = array_filter(array_map('trim', explode(',', $managerEmailsStr)));
         foreach ($managerEmails as $email) {
             if (filter_var($email, FILTER_VALIDATE_EMAIL)) {
-                sendEmail($email, "$storeName - Void Request: Order #{$orderId}", $body);
+                sendEmail($email, "$storeName - Void Request: Order #{$orderId} (Notification)", $notifyBody);
             }
         }
+    }
+
+    // Send approve/deny to owner and superadmin (deduplicated)
+    $actionRecipients = [];
+    if ($ownerEmail && filter_var($ownerEmail, FILTER_VALIDATE_EMAIL)) {
+        $actionRecipients[] = strtolower($ownerEmail);
+        sendEmail($ownerEmail, "$storeName - Void Request: Order #{$orderId}", $actionBody);
+    }
+    if ($superAdminEmail && filter_var($superAdminEmail, FILTER_VALIDATE_EMAIL)
+        && !in_array(strtolower($superAdminEmail), $actionRecipients)) {
+        sendEmail($superAdminEmail, "$storeName - Void Request: Order #{$orderId}", $actionBody);
     }
 
     jsonResponse(['success' => true, 'message' => 'Void request submitted for manager/admin approval.']);
@@ -132,41 +163,72 @@ function handleRefundOrder() {
            $approvalToken
        ]);
 
-    // Send email to manager if configured
+    // Send emails: manager gets notification-only; owner + superadmin get approve/deny (deduplicated)
+    $storeName        = getSetting('store_name') ?: 'ChipiPie Cafe';
     $managerEmailsStr = getSetting('void_refund_manager_email');
+    $ownerEmail       = trim(getSetting('owner_email') ?? '');
+    $superAdminEmail  = trim(getSetting('superadmin_email') ?? '');
+
+    $approveUrl = "http://" . ($_SERVER['HTTP_HOST'] ?? 'localhost') . "/CHIPIPIE_SYSTEM/api/orders.php?action=decide_void_refund&token=" . $approvalToken . "&decision=approve";
+    $rejectUrl  = "http://" . ($_SERVER['HTTP_HOST'] ?? 'localhost') . "/CHIPIPIE_SYSTEM/api/orders.php?action=decide_void_refund&token=" . $approvalToken . "&decision=reject";
+
+    // --- Shared detail rows ---
+    $detailRows = "
+        <tr><td style='padding: 6px 0; font-weight: 600; color: #aaa;'>Order ID:</td><td style='font-weight: 700; color: #fff;'>#{$orderId}</td></tr>
+        <tr><td style='padding: 6px 0; font-weight: 600; color: #aaa;'>Requested By:</td><td>{$requester}</td></tr>
+        <tr><td style='padding: 6px 0; font-weight: 600; color: #aaa;'>Amount:</td><td style='color: #ea580c; font-weight: bold;'>&#8369;" . number_format($order['total'], 2) . "</td></tr>
+        <tr><td style='padding: 6px 0; font-weight: 600; color: #aaa;'>Reason:</td><td>{$reason}</td></tr>";
+
+    // --- Notification-only body (no buttons) ---
+    $notifyBody = "
+    <div style='font-family: Segoe UI, sans-serif; max-width: 500px; margin: 0 auto; padding: 30px; background: #1a1514; color: #f4f4f4; border-radius: 16px; border: 1px solid #332d2c;'>
+        <div style='text-align: center; margin-bottom: 20px;'>
+            <div style='display: inline-block; width: 50px; height: 50px; background: #ea580c; color: #fff; border-radius: 12px; line-height: 50px; font-size: 24px;'>&#9888;</div>
+            <h2 style='color: #fff; margin: 10px 0 5px;'>$storeName</h2>
+            <p style='color: #aaa; font-size: 13px; margin: 0;'>Order Refund Request (Notification)</p>
+        </div>
+        <div style='background: #2a2423; border-radius: 12px; padding: 24px; border: 1px solid #3d3533;'>
+            <table style='width: 100%; font-size: 14px; color: #ddd; margin: 0 0 16px 0;'>{$detailRows}</table>
+            <p style='font-size: 12px; color: #888; margin: 0;'>This is a notification only. Approval is handled by the owner/super admin.</p>
+        </div>
+    </div>";
+
+    // --- Approve/deny body ---
+    $actionBody = "
+    <div style='font-family: Segoe UI, sans-serif; max-width: 500px; margin: 0 auto; padding: 30px; background: #1a1514; color: #f4f4f4; border-radius: 16px; border: 1px solid #332d2c;'>
+        <div style='text-align: center; margin-bottom: 20px;'>
+            <div style='display: inline-block; width: 50px; height: 50px; background: #ea580c; color: #fff; border-radius: 12px; line-height: 50px; font-size: 24px;'>&#9888;</div>
+            <h2 style='color: #fff; margin: 10px 0 5px;'>$storeName</h2>
+            <p style='color: #aaa; font-size: 13px; margin: 0;'>Order Refund Request &mdash; Action Required</p>
+        </div>
+        <div style='background: #2a2423; border-radius: 12px; padding: 24px; border: 1px solid #3d3533;'>
+            <table style='width: 100%; font-size: 14px; color: #ddd; margin: 0 0 16px 0;'>{$detailRows}</table>
+            <div style='display: flex; gap: 10px; margin-top: 20px; text-align: center;'>
+                <a href='{$approveUrl}' style='flex: 1; display: inline-block; background: #16a34a; color: #fff; padding: 12px 10px; border-radius: 8px; text-decoration: none; font-weight: 600; font-size: 14px;'>&#10003; Approve Refund</a>
+                <a href='{$rejectUrl}' style='flex: 1; display: inline-block; background: #3f3f46; color: #fff; padding: 12px 10px; border-radius: 8px; text-decoration: none; font-weight: 600; font-size: 14px;'>&#10007; Reject</a>
+            </div>
+        </div>
+    </div>";
+
+    // Send notification-only to managers
     if ($managerEmailsStr) {
-        $storeName = getSetting('store_name') ?: 'ChipiPie Cafe';
-        
-        $approveUrl = "http://" . ($_SERVER['HTTP_HOST'] ?? 'localhost') . "/CHIPIPIE_SYSTEM/api/orders.php?action=decide_void_refund&token=" . $approvalToken . "&decision=approve";
-        $rejectUrl = "http://" . ($_SERVER['HTTP_HOST'] ?? 'localhost') . "/CHIPIPIE_SYSTEM/api/orders.php?action=decide_void_refund&token=" . $approvalToken . "&decision=reject";
-
-        $body = "
-        <div style='font-family: Segoe UI, sans-serif; max-width: 500px; margin: 0 auto; padding: 30px; background: #1a1514; color: #f4f4f4; border-radius: 16px; border: 1px solid #332d2c;'>
-            <div style='text-align: center; margin-bottom: 20px;'>
-                <div style='display: inline-block; width: 50px; height: 50px; background: #ea580c; color: #fff; border-radius: 12px; line-height: 50px; font-size: 24px;'>⚠️</div>
-                <h2 style='color: #fff; margin: 10px 0 5px;'>$storeName</h2>
-                <p style='color: #aaa; font-size: 13px; margin: 0;'>Order Refund Request</p>
-            </div>
-            <div style='background: #2a2423; border-radius: 12px; padding: 24px; border: 1px solid #3d3533;'>
-                <table style='width: 100%; font-size: 14px; color: #ddd; margin: 0 0 16px 0;'>
-                    <tr><td style='padding: 6px 0; font-weight: 600; color: #aaa;'>Order ID:</td><td style='font-weight: 700; color: #fff;'>#{$orderId}</td></tr>
-                    <tr><td style='padding: 6px 0; font-weight: 600; color: #aaa;'>Requested By:</td><td>{$requester}</td></tr>
-                    <tr><td style='padding: 6px 0; font-weight: 600; color: #aaa;'>Amount:</td><td style='color: #ea580c; font-weight: bold;'>₱" . number_format($order['total'], 2) . "</td></tr>
-                    <tr><td style='padding: 6px 0; font-weight: 600; color: #aaa;'>Reason:</td><td>{$reason}</td></tr>
-                </table>
-                <div style='display: flex; gap: 10px; margin-top: 20px; text-align: center;'>
-                    <a href='$approveUrl' style='flex: 1; display: inline-block; background: #16a34a; color: #fff; padding: 12px 10px; border-radius: 8px; text-decoration: none; font-weight: 600; font-size: 14px;'>✅ Approve Refund</a>
-                    <a href='$rejectUrl' style='flex: 1; display: inline-block; background: #3f3f46; color: #fff; padding: 12px 10px; border-radius: 8px; text-decoration: none; font-weight: 600; font-size: 14px;'>❌ Reject</a>
-                </div>
-            </div>
-        </div>";
-
-        $managerEmails = array_map('trim', explode(',', $managerEmailsStr));
+        $managerEmails = array_filter(array_map('trim', explode(',', $managerEmailsStr)));
         foreach ($managerEmails as $email) {
             if (filter_var($email, FILTER_VALIDATE_EMAIL)) {
-                sendEmail($email, "$storeName - Refund Request: Order #{$orderId}", $body);
+                sendEmail($email, "$storeName - Refund Request: Order #{$orderId} (Notification)", $notifyBody);
             }
         }
+    }
+
+    // Send approve/deny to owner and superadmin (deduplicated)
+    $actionRecipients = [];
+    if ($ownerEmail && filter_var($ownerEmail, FILTER_VALIDATE_EMAIL)) {
+        $actionRecipients[] = strtolower($ownerEmail);
+        sendEmail($ownerEmail, "$storeName - Refund Request: Order #{$orderId}", $actionBody);
+    }
+    if ($superAdminEmail && filter_var($superAdminEmail, FILTER_VALIDATE_EMAIL)
+        && !in_array(strtolower($superAdminEmail), $actionRecipients)) {
+        sendEmail($superAdminEmail, "$storeName - Refund Request: Order #{$orderId}", $actionBody);
     }
 
     jsonResponse(['success' => true, 'message' => 'Refund request submitted for manager/admin approval.']);
@@ -724,51 +786,80 @@ function handleRequestVoidBatch() {
         </tr>";
     }
 
+    $storeName        = getSetting('store_name') ?: 'ChipiPie Cafe';
     $managerEmailsStr = getSetting('void_refund_manager_email');
-    $ownerEmailStr = getSetting('owner_email');
-    
-    $allEmails = array_map('trim', explode(',', $managerEmailsStr . ',' . $ownerEmailStr));
-    $allEmails = array_unique(array_filter($allEmails));
-    
-    if (!empty($allEmails)) {
-        $storeName = getSetting('store_name') ?: 'ChipiPie Cafe';
-        
-        $approveUrl = "http://" . ($_SERVER['HTTP_HOST'] ?? 'localhost') . "/CHIPIPIE_SYSTEM/api/orders.php?action=decide_void_refund&token=" . $approvalToken . "&decision=approve";
-        $rejectUrl = "http://" . ($_SERVER['HTTP_HOST'] ?? 'localhost') . "/CHIPIPIE_SYSTEM/api/orders.php?action=decide_void_refund&token=" . $approvalToken . "&decision=reject";
+    $ownerEmail       = trim(getSetting('owner_email') ?? '');
+    $superAdminEmail  = trim(getSetting('superadmin_email') ?? '');
 
-        $body = "
-        <div style='font-family: Segoe UI, sans-serif; max-width: 500px; margin: 0 auto; padding: 30px; background: #1a1514; color: #f4f4f4; border-radius: 16px; border: 1px solid #332d2c;'>
-            <div style='text-align: center; margin-bottom: 20px;'>
-                <div style='display: inline-block; width: 50px; height: 50px; background: #dc2626; color: #fff; border-radius: 12px; line-height: 50px; font-size: 24px;'>⚠️</div>
-                <h2 style='color: #fff; margin: 10px 0 5px;'>$storeName</h2>
-                <p style='color: #aaa; font-size: 13px; margin: 0;'>Batch Void/Refund Request</p>
-            </div>
-            <div style='background: #2a2423; border-radius: 12px; padding: 24px; border: 1px solid #3d3533;'>
-                <p style='color: #ddd; margin-top: 0;'>Requested By: <strong>{$requester}</strong></p>
-                <table style='width: 100%; font-size: 14px; text-align: left; margin: 0 0 16px 0; border-collapse: collapse;'>
-                    <tr>
-                        <th style='border-bottom: 1px solid #444; padding-bottom: 4px; color:#888;'>ID</th>
-                        <th style='border-bottom: 1px solid #444; padding-bottom: 4px; color:#888;'>Reason</th>
-                        <th style='border-bottom: 1px solid #444; padding-bottom: 4px; color:#888;'>Amount</th>
-                    </tr>
-                    {$orderListHtml}
-                </table>
-                <div style='text-align:center;margin:24px 0;'>
-                    <p style='font-size:12px;color:#aaa;margin-bottom:6px;'>Or provide this PIN code to the cashier:</p>
-                    <span style='background:#3a2f2d;color:#fff;padding:12px 24px;border-radius:10px;font-size:24px;font-weight:700;letter-spacing:4px;font-family:monospace;'>$pinCode</span>
-                </div>
-                <div style='display: flex; gap: 10px; margin-top: 20px; text-align: center;'>
-                    <a href='$approveUrl' style='flex: 1; display: inline-block; background: #16a34a; color: #fff; padding: 12px 10px; border-radius: 8px; text-decoration: none; font-weight: 600; font-size: 14px;'>✅ Approve All</a>
-                    <a href='$rejectUrl' style='flex: 1; display: inline-block; background: #3f3f46; color: #fff; padding: 12px 10px; border-radius: 8px; text-decoration: none; font-weight: 600; font-size: 14px;'>❌ Reject All</a>
-                </div>
-            </div>
-        </div>";
+    $approveUrl = "http://" . ($_SERVER['HTTP_HOST'] ?? 'localhost') . "/CHIPIPIE_SYSTEM/api/orders.php?action=decide_void_refund&token=" . $approvalToken . "&decision=approve";
+    $rejectUrl  = "http://" . ($_SERVER['HTTP_HOST'] ?? 'localhost') . "/CHIPIPIE_SYSTEM/api/orders.php?action=decide_void_refund&token=" . $approvalToken . "&decision=reject";
 
-        foreach ($allEmails as $email) {
+    // --- Shared order table ---
+    $orderTable = "
+        <p style='color: #ddd; margin-top: 0;'>Requested By: <strong>{$requester}</strong></p>
+        <table style='width: 100%; font-size: 14px; text-align: left; margin: 0 0 16px 0; border-collapse: collapse;'>
+            <tr>
+                <th style='border-bottom: 1px solid #444; padding-bottom: 4px; color:#888;'>ID</th>
+                <th style='border-bottom: 1px solid #444; padding-bottom: 4px; color:#888;'>Reason</th>
+                <th style='border-bottom: 1px solid #444; padding-bottom: 4px; color:#888;'>Amount</th>
+            </tr>
+            {$orderListHtml}
+        </table>";
+
+    // --- Notification-only body (manager) ---
+    $notifyBody = "
+    <div style='font-family: Segoe UI, sans-serif; max-width: 500px; margin: 0 auto; padding: 30px; background: #1a1514; color: #f4f4f4; border-radius: 16px; border: 1px solid #332d2c;'>
+        <div style='text-align: center; margin-bottom: 20px;'>
+            <div style='display: inline-block; width: 50px; height: 50px; background: #dc2626; color: #fff; border-radius: 12px; line-height: 50px; font-size: 24px;'>&#9888;</div>
+            <h2 style='color: #fff; margin: 10px 0 5px;'>$storeName</h2>
+            <p style='color: #aaa; font-size: 13px; margin: 0;'>Batch Void/Refund Request (Notification)</p>
+        </div>
+        <div style='background: #2a2423; border-radius: 12px; padding: 24px; border: 1px solid #3d3533;'>
+            {$orderTable}
+            <p style='font-size: 12px; color: #888; margin: 0;'>This is a notification only. Approval is handled by the owner/super admin.</p>
+        </div>
+    </div>";
+
+    // --- Approve/deny body (owner + superadmin) ---
+    $actionBody = "
+    <div style='font-family: Segoe UI, sans-serif; max-width: 500px; margin: 0 auto; padding: 30px; background: #1a1514; color: #f4f4f4; border-radius: 16px; border: 1px solid #332d2c;'>
+        <div style='text-align: center; margin-bottom: 20px;'>
+            <div style='display: inline-block; width: 50px; height: 50px; background: #dc2626; color: #fff; border-radius: 12px; line-height: 50px; font-size: 24px;'>&#9888;</div>
+            <h2 style='color: #fff; margin: 10px 0 5px;'>$storeName</h2>
+            <p style='color: #aaa; font-size: 13px; margin: 0;'>Batch Void/Refund Request &mdash; Action Required</p>
+        </div>
+        <div style='background: #2a2423; border-radius: 12px; padding: 24px; border: 1px solid #3d3533;'>
+            {$orderTable}
+            <div style='text-align:center;margin:24px 0;'>
+                <p style='font-size:12px;color:#aaa;margin-bottom:6px;'>Or provide this PIN code to the cashier:</p>
+                <span style='background:#3a2f2d;color:#fff;padding:12px 24px;border-radius:10px;font-size:24px;font-weight:700;letter-spacing:4px;font-family:monospace;'>$pinCode</span>
+            </div>
+            <div style='display: flex; gap: 10px; margin-top: 20px; text-align: center;'>
+                <a href='{$approveUrl}' style='flex: 1; display: inline-block; background: #16a34a; color: #fff; padding: 12px 10px; border-radius: 8px; text-decoration: none; font-weight: 600; font-size: 14px;'>&#10003; Approve All</a>
+                <a href='{$rejectUrl}' style='flex: 1; display: inline-block; background: #3f3f46; color: #fff; padding: 12px 10px; border-radius: 8px; text-decoration: none; font-weight: 600; font-size: 14px;'>&#10007; Reject All</a>
+            </div>
+        </div>
+    </div>";
+
+    // Send notification-only to managers
+    if ($managerEmailsStr) {
+        $managerEmails = array_filter(array_map('trim', explode(',', $managerEmailsStr)));
+        foreach ($managerEmails as $email) {
             if (filter_var($email, FILTER_VALIDATE_EMAIL)) {
-                sendEmail($email, "$storeName - Batch Void/Refund Request", $body);
+                sendEmail($email, "$storeName - Batch Void/Refund Request (Notification)", $notifyBody);
             }
         }
+    }
+
+    // Send approve/deny to owner and superadmin (deduplicated)
+    $actionRecipients = [];
+    if ($ownerEmail && filter_var($ownerEmail, FILTER_VALIDATE_EMAIL)) {
+        $actionRecipients[] = strtolower($ownerEmail);
+        sendEmail($ownerEmail, "$storeName - Batch Void/Refund Request", $actionBody);
+    }
+    if ($superAdminEmail && filter_var($superAdminEmail, FILTER_VALIDATE_EMAIL)
+        && !in_array(strtolower($superAdminEmail), $actionRecipients)) {
+        sendEmail($superAdminEmail, "$storeName - Batch Void/Refund Request", $actionBody);
     }
 
     $resp = ['success' => true, 'message' => 'Requests submitted to Super Admin & Managers.', 'batch_token' => $approvalToken];

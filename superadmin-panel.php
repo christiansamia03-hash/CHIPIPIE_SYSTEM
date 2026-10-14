@@ -658,6 +658,50 @@
     .log-detail { font-size: 11.5px; color: var(--sa-muted); margin-top: 2px; word-break: break-word; }
     .log-time   { font-size: 11px; color: var(--sa-muted2); margin-top: 2px; }
 
+    /* ── AUDIT LOG BREAKDOWN ── */
+    .log-breakdown {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      margin-bottom: 16px;
+    }
+    .log-cat-pill {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      padding: 5px 12px;
+      border-radius: 20px;
+      font-size: 11.5px;
+      font-weight: 600;
+      cursor: pointer;
+      border: 1.5px solid transparent;
+      transition: all 0.18s ease;
+      user-select: none;
+    }
+    .log-cat-pill:hover { opacity: 0.82; transform: translateY(-1px); }
+    .log-cat-pill.active { border-color: currentColor !important; box-shadow: 0 0 0 3px rgba(0,0,0,0.08); }
+    .log-cat-pill .pill-count {
+      background: rgba(0,0,0,0.12);
+      border-radius: 10px;
+      padding: 1px 6px;
+      font-size: 10.5px;
+      font-weight: 700;
+    }
+    .log-search-bar {
+      width: 100%;
+      padding: 8px 12px;
+      border: 1.5px solid var(--sa-border);
+      border-radius: 8px;
+      font-size: 12.5px;
+      background: var(--sa-bg2);
+      color: var(--sa-text);
+      outline: none;
+      margin-bottom: 14px;
+      transition: border-color 0.2s;
+    }
+    .log-search-bar:focus { border-color: var(--sa-accent); }
+    .log-list-wrap { max-height: 520px; overflow-y: auto; }
+
     /* ── SETTINGS ── */
     .settings-grid {
       display: grid;
@@ -847,21 +891,140 @@
       <h1 class="sa-login-title">Super Admin Panel</h1>
       <p class="sa-login-sub">ChipiPie Cafe — System Control Center</p>
 
-      <form onsubmit="saHandleLogin(event)">
-        <div class="sa-form-row">
-          <label class="sa-label">Username</label>
-          <input type="text" id="sa-login-user" class="sa-input" placeholder="superadmin" autocomplete="username" required>
+      <!-- STEP 1: CREDENTIALS -->
+      <div id="sa-step-credentials">
+        <form onsubmit="saHandleLogin(event)">
+          <div class="sa-form-row">
+            <label class="sa-label">Username</label>
+            <input type="text" id="sa-login-user" class="sa-input" placeholder="superadmin" autocomplete="username" required>
+          </div>
+          <div class="sa-form-row">
+            <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:6px;">
+              <label class="sa-label" style="margin-bottom:0;">Password</label>
+              <a href="#" onclick="saShowForgotStep1(); return false;" style="font-size:11.5px; color:var(--sa-accent); text-decoration:none;">Forgot Password?</a>
+            </div>
+            <input type="password" id="sa-login-pass" class="sa-input" placeholder="••••••••" autocomplete="current-password" required>
+          </div>
+          <button type="submit" id="sa-login-btn" class="sa-btn sa-btn-primary w-100" style="width:100%;justify-content:center;padding:13px;font-size:14px;margin-top:8px;">
+            <i class="bi bi-shield-lock-fill"></i> Sign In as Super Admin
+          </button>
+        </form>
+      </div>
+
+      <!-- STEP 2: TWO-FACTOR AUTHENTICATION (2FA) -->
+      <div id="sa-step-2fa" style="display:none;">
+        <div style="background:rgba(245,158,11,0.08); border:1px solid rgba(245,158,11,0.25); border-radius:12px; padding:14px; margin-bottom:18px; text-align:center;">
+          <div style="font-size:26px; margin-bottom:4px;">📬</div>
+          <div style="font-size:14px; font-weight:600; color:var(--sa-text); margin-bottom:3px;">Two-Factor Authentication</div>
+          <div style="font-size:12px; color:var(--sa-muted); line-height:1.4;">
+            A confirmation token was sent to <strong id="sa-2fa-email-display" style="color:var(--sa-accent); word-break:break-all;"></strong>
+          </div>
         </div>
-        <div class="sa-form-row">
-          <label class="sa-label">Password</label>
-          <input type="password" id="sa-login-pass" class="sa-input" placeholder="••••••••" autocomplete="current-password" required>
+
+        <form onsubmit="saHandleVerify2FA(event)">
+          <div class="sa-form-row">
+            <label class="sa-label" style="text-align:center; display:block; font-size:12px;">Enter 6-Digit Code</label>
+            <input type="text" id="sa-2fa-code" class="sa-input" maxlength="6" placeholder="000000" autocomplete="one-time-code" required
+                   style="text-align:center; font-family:Consolas, Monaco, monospace; font-size:26px; font-weight:700; letter-spacing:8px; padding:12px; text-transform:uppercase;">
+          </div>
+
+          <div id="sa-dev-hint" style="display:none; margin-bottom:14px; font-size:11.5px; color:#10b981; background:rgba(16,185,129,0.1); border:1px solid rgba(16,185,129,0.25); border-radius:8px; padding:7px 10px; text-align:center;">
+            💡 Dev Mode Token: <code id="sa-dev-code-val" style="font-weight:700;"></code> (auto-filled)
+          </div>
+
+          <button type="submit" id="sa-verify-btn" class="sa-btn sa-btn-primary w-100" style="width:100%;justify-content:center;padding:13px;font-size:14px;margin-top:6px;">
+            <i class="bi bi-shield-check"></i> Verify & Sign In
+          </button>
+        </form>
+
+        <div style="display:flex; justify-content:space-between; align-items:center; margin-top:14px; font-size:12px;">
+          <button type="button" onclick="saResend2FA()" id="sa-resend-btn" style="background:none; border:none; color:var(--sa-accent); cursor:pointer; padding:4px 0; font-size:12px; display:inline-flex; align-items:center; gap:4px;">
+            <i class="bi bi-arrow-clockwise"></i> Resend Code
+          </button>
+          <button type="button" onclick="saCancel2FA()" style="background:none; border:none; color:var(--sa-muted); cursor:pointer; padding:4px 0; font-size:12px; display:inline-flex; align-items:center; gap:4px;">
+            <i class="bi bi-arrow-left"></i> Back to Login
+          </button>
         </div>
-        <button type="submit" id="sa-login-btn" class="sa-btn sa-btn-primary w-100" style="width:100%;justify-content:center;padding:13px;font-size:14px;margin-top:8px;">
-          <i class="bi bi-shield-lock-fill"></i> Sign In as Super Admin
-        </button>
-      </form>
+      </div>
+
+      <!-- STEP 3: FORGOT PASSWORD - REQUEST CODE -->
+      <div id="sa-step-forgot-request" style="display:none;">
+        <div style="background:rgba(245,158,11,0.08); border:1px solid rgba(245,158,11,0.25); border-radius:12px; padding:14px; margin-bottom:18px; text-align:center;">
+          <div style="font-size:26px; margin-bottom:4px;">🔑</div>
+          <div style="font-size:14px; font-weight:600; color:var(--sa-text); margin-bottom:3px;">Reset Super Admin Password</div>
+          <div style="font-size:12px; color:var(--sa-muted); line-height:1.4;">
+            Enter your Super Admin username or registered email to receive a 6-digit recovery code.
+          </div>
+        </div>
+
+        <form onsubmit="saHandleSendForgotCode(event)">
+          <div class="sa-form-row">
+            <label class="sa-label">Username or Email</label>
+            <input type="text" id="sa-forgot-user" class="sa-input" placeholder="superadmin or email" required>
+          </div>
+          <button type="submit" id="sa-forgot-send-btn" class="sa-btn sa-btn-primary w-100" style="width:100%;justify-content:center;padding:13px;font-size:14px;margin-top:8px;">
+            <i class="bi bi-send-fill"></i> Send Recovery Code
+          </button>
+        </form>
+
+        <div style="margin-top:14px; text-align:center;">
+          <a href="#" onclick="saHideForgot(); return false;" style="font-size:12px; color:var(--sa-muted); text-decoration:none;">
+            <i class="bi bi-arrow-left"></i> Back to Login
+          </a>
+        </div>
+      </div>
+
+      <!-- STEP 4: FORGOT PASSWORD - VERIFY & RESET -->
+      <div id="sa-step-forgot-reset" style="display:none;">
+        <div style="background:rgba(245,158,11,0.08); border:1px solid rgba(245,158,11,0.25); border-radius:12px; padding:14px; margin-bottom:18px; text-align:center;">
+          <div style="font-size:26px; margin-bottom:4px;">📬</div>
+          <div style="font-size:14px; font-weight:600; color:var(--sa-text); margin-bottom:3px;">Enter Recovery Code</div>
+          <div style="font-size:12px; color:var(--sa-muted); line-height:1.4;">
+            Code sent to: <strong id="sa-forgot-email-display" style="color:var(--sa-accent); word-break:break-all;"></strong>
+          </div>
+        </div>
+
+        <form onsubmit="saHandleResetPassword(event)">
+          <div class="sa-form-row">
+            <label class="sa-label" style="text-align:center; display:block; font-size:12px;">Enter 6-Digit Code</label>
+            <input type="text" id="sa-forgot-code" class="sa-input" maxlength="6" placeholder="000000" required
+                   style="text-align:center; font-family:Consolas, Monaco, monospace; font-size:26px; font-weight:700; letter-spacing:8px; padding:12px; text-transform:uppercase;">
+          </div>
+
+          <div id="sa-forgot-dev-hint" style="display:none; margin-bottom:14px; font-size:11.5px; color:#10b981; background:rgba(16,185,129,0.1); border:1px solid rgba(16,185,129,0.25); border-radius:8px; padding:7px 10px; text-align:center;">
+            💡 Dev Mode Token: <code id="sa-forgot-dev-code" style="font-weight:700;"></code> (auto-filled)
+          </div>
+
+          <div class="sa-form-row">
+            <label class="sa-label">New Password</label>
+            <input type="password" id="sa-forgot-new-pass" class="sa-input" placeholder="••••••••" required minlength="8">
+            <div style="font-size:11px; color:var(--sa-muted); margin-top:4px;">
+              Min. 8 characters with uppercase, lowercase, and number.
+            </div>
+          </div>
+
+          <div class="sa-form-row">
+            <label class="sa-label">Confirm New Password</label>
+            <input type="password" id="sa-forgot-confirm-pass" class="sa-input" placeholder="••••••••" required minlength="8">
+          </div>
+
+          <button type="submit" id="sa-forgot-submit-btn" class="sa-btn sa-btn-primary w-100" style="width:100%;justify-content:center;padding:13px;font-size:14px;margin-top:6px;">
+            <i class="bi bi-shield-check"></i> Reset Password
+          </button>
+        </form>
+
+        <div style="display:flex; justify-content:space-between; align-items:center; margin-top:14px; font-size:12px;">
+          <button type="button" onclick="saHandleResendForgotCode()" id="sa-forgot-resend-btn" style="background:none; border:none; color:var(--sa-accent); cursor:pointer; padding:4px 0; font-size:12px; display:inline-flex; align-items:center; gap:4px;">
+            <i class="bi bi-arrow-clockwise"></i> Resend Code
+          </button>
+          <button type="button" onclick="saHideForgot()" style="background:none; border:none; color:var(--sa-muted); cursor:pointer; padding:4px 0; font-size:12px; display:inline-flex; align-items:center; gap:4px;">
+            <i class="bi bi-arrow-left"></i> Back to Login
+          </button>
+        </div>
+      </div>
 
       <div id="sa-login-error" style="display:none; margin-top:14px; background:rgba(239,68,68,0.1); border:1px solid rgba(239,68,68,0.3); border-radius:10px; padding:11px 14px; font-size:13px; color:#ef4444;"></div>
+      <div id="sa-login-success" style="display:none; margin-top:14px; background:rgba(16,185,129,0.1); border:1px solid rgba(16,185,129,0.3); border-radius:10px; padding:11px 14px; font-size:13px; color:#10b981;"></div>
 
       <div style="margin-top:20px; text-align:center;">
         <a href="chipipie-pos.php" style="font-size:12px; color:var(--sa-muted); text-decoration:none;">
@@ -1225,8 +1388,19 @@
               <i class="bi bi-arrow-clockwise"></i> Refresh
             </button>
           </div>
-          <div class="sa-card" id="logs-container">
-            <div style="color:var(--sa-muted);font-size:13px;padding:20px 0;text-align:center;">Loading...</div>
+
+          <!-- Category Breakdown -->
+          <div class="sa-card" style="margin-bottom:16px;">
+            <div class="sa-card-title" style="margin-bottom:12px;"><i class="bi bi-pie-chart-fill"></i> Category Breakdown</div>
+            <div class="log-breakdown" id="log-breakdown"><div style="color:var(--sa-muted);font-size:12px;">Loading...</div></div>
+          </div>
+
+          <!-- Log List -->
+          <div class="sa-card" id="logs-card">
+            <input class="log-search-bar" id="log-search" type="text" placeholder="🔍  Search logs by action, user, or details…" oninput="filterLogs()">
+            <div class="log-list-wrap">
+              <div id="logs-container"><div style="color:var(--sa-muted);font-size:13px;padding:20px 0;text-align:center;">Loading...</div></div>
+            </div>
           </div>
         </div>
 
@@ -1273,11 +1447,12 @@
             <div class="sa-form-grid">
               <div class="sa-form-row">
                 <label class="sa-label">New Password</label>
-                <input type="password" class="sa-input" id="sa-new-pass" placeholder="Min. 6 characters">
+                <input type="password" class="sa-input" id="sa-new-pass" placeholder="Min. 8 characters" minlength="8">
+                <div style="font-size:11px; color:var(--sa-muted); margin-top:4px;">Min. 8 characters with uppercase, lowercase, and number.</div>
               </div>
               <div class="sa-form-row">
                 <label class="sa-label">Confirm Password</label>
-                <input type="password" class="sa-input" id="sa-new-pass-confirm" placeholder="Repeat password">
+                <input type="password" class="sa-input" id="sa-new-pass-confirm" placeholder="Repeat password" minlength="8">
               </div>
             </div>
             <button class="sa-btn sa-btn-danger" onclick="changeSAPassword()">
@@ -1359,7 +1534,8 @@
         <div class="sa-form-grid">
           <div class="sa-form-row">
             <label class="sa-label">Password *</label>
-            <input type="password" class="sa-input" id="cu-pass" placeholder="Min. 6 chars">
+            <input type="password" class="sa-input" id="cu-pass" placeholder="Min. 8 chars (uppercase, lowercase, number)">
+            <div style="font-size:11px; color:var(--sa-muted); margin-top:4px;">Min. 8 characters with uppercase, lowercase, and number.</div>
           </div>
           <div class="sa-form-row">
             <label class="sa-label">Role *</label>
@@ -1410,7 +1586,8 @@
         <div style="font-size:12px;font-weight:700;color:var(--sa-muted);text-transform:uppercase;letter-spacing:0.08em;margin-bottom:12px;">Reset Password</div>
         <div class="sa-form-row">
           <label class="sa-label">New Password (leave blank to keep current)</label>
-          <input type="password" class="sa-input" id="eu-new-pass" placeholder="Min. 6 characters">
+          <input type="password" class="sa-input" id="eu-new-pass" placeholder="Min. 8 chars (uppercase, lowercase, number)">
+          <div style="font-size:11px; color:var(--sa-muted); margin-top:4px;">Min. 8 characters with uppercase, lowercase, and number.</div>
         </div>
         <div id="eu-result" style="display:none;margin-top:10px;font-size:13px;padding:10px 14px;border-radius:9px;"></div>
       </div>
@@ -1498,14 +1675,38 @@
       const u    = document.getElementById('sa-login-user').value.trim();
       const p    = document.getElementById('sa-login-pass').value.trim();
       const errEl= document.getElementById('sa-login-error');
+      const succEl= document.getElementById('sa-login-success');
       const btn  = document.getElementById('sa-login-btn');
-      errEl.style.display = 'none';
+      if (errEl) errEl.style.display = 'none';
+      if (succEl) succEl.style.display = 'none';
       btn.disabled = true;
       btn.innerHTML = '<i class="bi bi-hourglass-split"></i> Signing in...';
 
       try {
         const res = await saApi('auth.php?action=login', { username: u, password: p });
-        if (res.success && res.user.role === 'super_admin') {
+        if (res.requires_2fa) {
+          // Switch to 2FA verification step
+          document.getElementById('sa-step-credentials').style.display = 'none';
+          document.getElementById('sa-step-2fa').style.display = 'block';
+          document.getElementById('sa-2fa-email-display').textContent = res.masked_email || 'your email';
+          const codeInput = document.getElementById('sa-2fa-code');
+          codeInput.value = '';
+          if (res.dev_code) {
+            document.getElementById('sa-dev-hint').style.display = 'block';
+            document.getElementById('sa-dev-code-val').textContent = res.dev_code;
+            codeInput.value = res.dev_code;
+          } else {
+            document.getElementById('sa-dev-hint').style.display = 'none';
+          }
+          if (succEl) {
+            succEl.textContent = res.message || 'Security code sent to your email!';
+            succEl.style.display = 'block';
+          }
+          setTimeout(() => codeInput.focus(), 100);
+          btn.disabled = false;
+          btn.innerHTML = '<i class="bi bi-shield-lock-fill"></i> Sign In as Super Admin';
+          return;
+        } else if (res.success && res.user.role === 'super_admin') {
           saCurrentUser = res.user;
           activateSAApp();
         } else if (res.success && res.user.role !== 'super_admin') {
@@ -1524,8 +1725,273 @@
       btn.innerHTML = '<i class="bi bi-shield-lock-fill"></i> Sign In as Super Admin';
     }
 
+    async function saHandleVerify2FA(e) {
+      e.preventDefault();
+      const code   = document.getElementById('sa-2fa-code').value.trim();
+      const errEl  = document.getElementById('sa-login-error');
+      const succEl = document.getElementById('sa-login-success');
+      const btn    = document.getElementById('sa-verify-btn');
+      if (errEl) errEl.style.display = 'none';
+      if (succEl) succEl.style.display = 'none';
+      if (!code) return;
+
+      btn.disabled = true;
+      btn.innerHTML = '<i class="bi bi-hourglass-split"></i> Verifying Code...';
+
+      try {
+        const res = await saApi('auth.php?action=verify_2fa', { code: code });
+        if (res.success && res.user && res.user.role === 'super_admin') {
+          saCurrentUser = res.user;
+          activateSAApp();
+        } else {
+          errEl.textContent = res.message || 'Invalid or expired code.';
+          errEl.style.display = 'block';
+        }
+      } catch (err) {
+        errEl.textContent = 'Verification error. Please try again.';
+        errEl.style.display = 'block';
+      }
+
+      btn.disabled = false;
+      btn.innerHTML = '<i class="bi bi-shield-check"></i> Verify & Sign In';
+    }
+
+    async function saResend2FA() {
+      const btn   = document.getElementById('sa-resend-btn');
+      const errEl = document.getElementById('sa-login-error');
+      const succEl= document.getElementById('sa-login-success');
+      if (errEl) errEl.style.display = 'none';
+      if (succEl) succEl.style.display = 'none';
+
+      btn.disabled = true;
+      btn.innerHTML = '<i class="bi bi-hourglass-split"></i> Resending...';
+
+      try {
+        const res = await saApi('auth.php?action=resend_2fa', {});
+        if (res.success) {
+          succEl.textContent = res.message || 'New code sent to your email!';
+          succEl.style.display = 'block';
+          if (res.dev_code) {
+            document.getElementById('sa-dev-hint').style.display = 'block';
+            document.getElementById('sa-dev-code-val').textContent = res.dev_code;
+            document.getElementById('sa-2fa-code').value = res.dev_code;
+          }
+        } else {
+          errEl.textContent = res.message || 'Could not resend code.';
+          errEl.style.display = 'block';
+        }
+      } catch (e) {
+        errEl.textContent = 'Error contacting server.';
+        errEl.style.display = 'block';
+      }
+
+      setTimeout(() => {
+        btn.disabled = false;
+        btn.innerHTML = '<i class="bi bi-arrow-clockwise"></i> Resend Code';
+      }, 5000);
+    }
+
+    async function saCancel2FA() {
+      try {
+        await saApi('auth.php?action=cancel_2fa', {});
+      } catch(e) {}
+      document.getElementById('sa-step-2fa').style.display = 'none';
+      document.getElementById('sa-step-credentials').style.display = 'block';
+      const errEl = document.getElementById('sa-login-error');
+      const succEl= document.getElementById('sa-login-success');
+      if (errEl) errEl.style.display = 'none';
+      if (succEl) succEl.style.display = 'none';
+      document.getElementById('sa-login-pass').value = '';
+    }
+
+    /* =============================================
+       PASSWORD COMPLEXITY HELPER
+    ============================================= */
+    function checkPasswordComplexity(p) {
+      if (!p || p.length < 8) return 'Password must be at least 8 characters long.';
+      if (!/[A-Z]/.test(p)) return 'Password must contain at least one uppercase letter (A-Z).';
+      if (!/[a-z]/.test(p)) return 'Password must contain at least one lowercase letter (a-z).';
+      if (!/[0-9]/.test(p)) return 'Password must contain at least one number (0-9).';
+      return '';
+    }
+
+    /* =============================================
+       FORGOT PASSWORD (Super Admin)
+    ============================================= */
+    let saForgotPendingUser = '';
+
+    function saShowForgotStep1() {
+      document.getElementById('sa-step-credentials').style.display = 'none';
+      document.getElementById('sa-step-2fa').style.display = 'none';
+      document.getElementById('sa-step-forgot-reset').style.display = 'none';
+      document.getElementById('sa-step-forgot-request').style.display = 'block';
+      const errEl = document.getElementById('sa-login-error');
+      const succEl = document.getElementById('sa-login-success');
+      if (errEl) errEl.style.display = 'none';
+      if (succEl) succEl.style.display = 'none';
+      setTimeout(() => {
+        const inp = document.getElementById('sa-forgot-user');
+        if (inp) inp.focus();
+      }, 100);
+    }
+
+    function saHideForgot() {
+      document.getElementById('sa-step-forgot-request').style.display = 'none';
+      document.getElementById('sa-step-forgot-reset').style.display = 'none';
+      document.getElementById('sa-step-credentials').style.display = 'block';
+      const errEl = document.getElementById('sa-login-error');
+      const succEl = document.getElementById('sa-login-success');
+      if (errEl) errEl.style.display = 'none';
+      if (succEl) succEl.style.display = 'none';
+    }
+
+    async function saHandleSendForgotCode(e) {
+      e.preventDefault();
+      const errEl = document.getElementById('sa-login-error');
+      const succEl = document.getElementById('sa-login-success');
+      errEl.style.display = 'none'; succEl.style.display = 'none';
+
+      const identifier = document.getElementById('sa-forgot-user').value.trim();
+      if (!identifier) {
+        errEl.textContent = 'Please enter your username or email.';
+        errEl.style.display = 'block';
+        return;
+      }
+
+      const btn = document.getElementById('sa-forgot-send-btn');
+      btn.disabled = true;
+      btn.innerHTML = '<span class="spinner-border spinner-border-sm me-1"></span> Sending code...';
+
+      try {
+        const res = await saApi('auth.php?action=forgot_password', { identifier });
+        if (res.success) {
+          saForgotPendingUser = res.identifier || identifier;
+          document.getElementById('sa-forgot-email-display').textContent = res.masked_email || 'your email';
+          document.getElementById('sa-step-forgot-request').style.display = 'none';
+          document.getElementById('sa-step-forgot-reset').style.display = 'block';
+          document.getElementById('sa-forgot-code').value = '';
+          document.getElementById('sa-forgot-new-pass').value = '';
+          document.getElementById('sa-forgot-confirm-pass').value = '';
+          if (res.dev_code) {
+            document.getElementById('sa-forgot-dev-hint').style.display = 'block';
+            document.getElementById('sa-forgot-dev-code').textContent = res.dev_code;
+            document.getElementById('sa-forgot-code').value = res.dev_code;
+          } else {
+            document.getElementById('sa-forgot-dev-hint').style.display = 'none';
+          }
+          succEl.textContent = res.message;
+          succEl.style.display = 'block';
+          setTimeout(() => {
+            const inp = document.getElementById('sa-forgot-code');
+            if (inp) inp.focus();
+          }, 100);
+        } else {
+          errEl.textContent = res.message || 'Could not send recovery code.';
+          errEl.style.display = 'block';
+        }
+      } catch (err) {
+        errEl.textContent = 'Connection error. Please try again.';
+        errEl.style.display = 'block';
+      } finally {
+        btn.disabled = false;
+        btn.innerHTML = '<i class="bi bi-send-fill"></i> Send Recovery Code';
+      }
+    }
+
+    async function saHandleResendForgotCode() {
+      const btn = document.getElementById('sa-forgot-resend-btn');
+      const errEl = document.getElementById('sa-login-error');
+      const succEl = document.getElementById('sa-login-success');
+      errEl.style.display = 'none'; succEl.style.display = 'none';
+      if (!saForgotPendingUser) {
+        saShowForgotStep1();
+        return;
+      }
+      btn.disabled = true;
+      btn.innerHTML = '<span class="spinner-border spinner-border-sm me-1"></span> Resending...';
+      try {
+        const res = await saApi('auth.php?action=forgot_password', { identifier: saForgotPendingUser });
+        if (res.success) {
+          succEl.textContent = res.message || 'Recovery code resent.';
+          succEl.style.display = 'block';
+          if (res.dev_code) {
+            document.getElementById('sa-forgot-dev-hint').style.display = 'block';
+            document.getElementById('sa-forgot-dev-code').textContent = res.dev_code;
+            document.getElementById('sa-forgot-code').value = res.dev_code;
+          }
+        } else {
+          errEl.textContent = res.message || 'Failed to resend code.';
+          errEl.style.display = 'block';
+        }
+      } catch (err) {
+        errEl.textContent = 'Server error. Please try again.';
+        errEl.style.display = 'block';
+      } finally {
+        setTimeout(() => {
+          btn.disabled = false;
+          btn.innerHTML = '<i class="bi bi-arrow-clockwise"></i> Resend Code';
+        }, 3000);
+      }
+    }
+
+    async function saHandleResetPassword(e) {
+      e.preventDefault();
+      const errEl = document.getElementById('sa-login-error');
+      const succEl = document.getElementById('sa-login-success');
+      errEl.style.display = 'none'; succEl.style.display = 'none';
+
+      const token = document.getElementById('sa-forgot-code').value.trim();
+      const newPass = document.getElementById('sa-forgot-new-pass').value.trim();
+      const confirmPass = document.getElementById('sa-forgot-confirm-pass').value.trim();
+
+      if (!token) {
+        errEl.textContent = 'Please enter the 6-digit recovery code.';
+        errEl.style.display = 'block'; return;
+      }
+      if (newPass !== confirmPass) {
+        errEl.textContent = 'Passwords do not match.';
+        errEl.style.display = 'block'; return;
+      }
+      const pwdErr = checkPasswordComplexity(newPass);
+      if (pwdErr) {
+        errEl.textContent = pwdErr;
+        errEl.style.display = 'block'; return;
+      }
+
+      const btn = document.getElementById('sa-forgot-submit-btn');
+      btn.disabled = true;
+      btn.innerHTML = '<span class="spinner-border spinner-border-sm me-1"></span> Updating password...';
+
+      try {
+        const res = await saApi('auth.php?action=reset_password_code', {
+          identifier: saForgotPendingUser,
+          token,
+          new_password: newPass
+        });
+        if (res.success) {
+          saHideForgot();
+          succEl.textContent = '🎉 ' + (res.message || 'Password reset successful! You can now sign in.');
+          succEl.style.display = 'block';
+          document.getElementById('sa-login-pass').value = '';
+          document.getElementById('sa-login-user').value = saForgotPendingUser;
+          saForgotPendingUser = '';
+        } else {
+          errEl.textContent = res.message || 'Could not reset password.';
+          errEl.style.display = 'block';
+        }
+      } catch (err) {
+        errEl.textContent = 'Connection error. Please try again.';
+        errEl.style.display = 'block';
+      } finally {
+        btn.disabled = false;
+        btn.innerHTML = '<i class="bi bi-shield-check"></i> Reset Password';
+      }
+    }
+
     function activateSAApp() {
       document.getElementById('sa-login-screen').style.display = 'none';
+      document.getElementById('sa-step-2fa').style.display = 'none';
+      document.getElementById('sa-step-credentials').style.display = 'block';
       document.getElementById('sa-app').style.display = 'flex';
       document.getElementById('sa-sidebar-name').textContent = saCurrentUser.full_name;
       document.getElementById('sa-sidebar-avatar').textContent = saCurrentUser.full_name.charAt(0).toUpperCase();
@@ -1539,7 +2005,11 @@
         const appEl = document.getElementById('sa-app');
         const loginEl = document.getElementById('sa-login-screen');
         if (appEl) appEl.style.display = 'none';
-        if (loginEl) loginEl.style.display = 'flex';
+        if (loginEl) {
+          loginEl.style.display = 'flex';
+          document.getElementById('sa-step-2fa').style.display = 'none';
+          document.getElementById('sa-step-credentials').style.display = 'block';
+        }
         const passEl = document.getElementById('sa-login-pass');
         if (passEl) passEl.value = '';
       } catch (e) {}
@@ -1708,6 +2178,8 @@
         approve_system_request:     { icon: 'bi-check2-all',         color: 'rgba(16,185,129,0.15)', iconColor: '#10b981' },
         reject_system_request:      { icon: 'bi-slash-circle-fill',  color: 'rgba(239,68,68,0.15)',  iconColor: '#ef4444' },
         save_system_settings:       { icon: 'bi-gear-fill',          color: 'rgba(109,40,217,0.15)', iconColor: '#a855f7' },
+        superadmin_login:           { icon: 'bi-shield-check',       color: 'rgba(16,185,129,0.15)', iconColor: '#10b981' },
+        admin_login:                { icon: 'bi-shield-lock-fill',   color: 'rgba(5,150,105,0.15)',  iconColor: '#059669' },
       };
       const style = icons[log.action] || { icon: 'bi-activity', color: 'rgba(100,116,139,0.15)', iconColor: '#64748b' };
       const time  = new Date(log.created_at).toLocaleString('en-PH', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' });
@@ -1998,6 +2470,26 @@
         password:  document.getElementById('cu-pass').value.trim(),
         role:      document.getElementById('cu-role').value,
       };
+
+      if (!data.full_name || !data.username || !data.email || !data.password) {
+        resEl.style.display = 'block';
+        resEl.style.background = 'rgba(239,68,68,0.1)';
+        resEl.style.color      = '#ef4444';
+        resEl.style.border     = '1px solid rgba(239,68,68,0.3)';
+        resEl.textContent      = 'All fields are required.';
+        return;
+      }
+
+      const pwdErr = checkPasswordComplexity(data.password);
+      if (pwdErr) {
+        resEl.style.display = 'block';
+        resEl.style.background = 'rgba(239,68,68,0.1)';
+        resEl.style.color      = '#ef4444';
+        resEl.style.border     = '1px solid rgba(239,68,68,0.3)';
+        resEl.textContent      = pwdErr;
+        return;
+      }
+
       try {
         const res = await saApi('superadmin.php?action=create_user', data);
         resEl.style.display = 'block';
@@ -2026,6 +2518,18 @@
       const userId  = document.getElementById('eu-id').value;
       const newPass = document.getElementById('eu-new-pass').value.trim();
       const resEl   = document.getElementById('eu-result');
+
+      if (newPass) {
+        const pwdErr = checkPasswordComplexity(newPass);
+        if (pwdErr) {
+          resEl.style.display = 'block';
+          resEl.style.background = 'rgba(239,68,68,0.1)';
+          resEl.style.color      = '#ef4444';
+          resEl.style.border     = '1px solid rgba(239,68,68,0.3)';
+          resEl.textContent      = pwdErr;
+          return;
+        }
+      }
 
       try {
         const res = await saApi('superadmin.php?action=update_user', {
@@ -2242,19 +2746,113 @@
     /* =============================================
        AUDIT LOGS
     ============================================= */
+    /* ── Audit log state ── */
+    let _allLogs        = [];
+    let _activeLogCat   = 'all';
+
+    /* Category meta — maps action key → display label + color */
+    const LOG_CATEGORIES = {
+      all:                        { label: 'All',                 color: '#64748b', icon: 'bi-list-ul' },
+      approve_admin_registration: { label: 'Approved',            color: '#10b981', icon: 'bi-check-circle-fill' },
+      reject_admin_registration:  { label: 'Rejected',            color: '#ef4444', icon: 'bi-x-circle-fill' },
+      approve_system_request:     { label: 'Req Approved',        color: '#059669', icon: 'bi-check2-all' },
+      reject_system_request:      { label: 'Req Rejected',        color: '#dc2626', icon: 'bi-slash-circle-fill' },
+      save_system_settings:       { label: 'Save Settings',       color: '#a855f7', icon: 'bi-gear-fill' },
+      create_user:                { label: 'Create User',         color: '#3b82f6', icon: 'bi-person-plus-fill' },
+      delete_user:                { label: 'Delete User',         color: '#ef4444', icon: 'bi-trash-fill' },
+      reset_password:             { label: 'Reset Password',      color: '#f59e0b', icon: 'bi-key-fill' },
+      toggle_user:                { label: 'Toggle User',         color: '#0891b2', icon: 'bi-person-dash-fill' },
+      submit_request:             { label: 'Submit Request',      color: '#6366f1', icon: 'bi-send-fill' },
+      superadmin_login:           { label: 'Super Admin Login',   color: '#10b981', icon: 'bi-shield-check' },
+      admin_login:                { label: 'Admin Login (2FA)',   color: '#059669', icon: 'bi-shield-lock-fill' },
+    };
+
     async function loadLogs() {
       try {
-        const res = await saApi('superadmin.php?action=logs&limit=100');
+        const res = await saApi('superadmin.php?action=logs&limit=200');
         if (!res.success) return;
 
-        const el = document.getElementById('logs-container');
-        if (!res.logs.length) {
-          el.innerHTML = '<div class="sa-empty"><i class="bi bi-journal"></i><p>No audit logs yet</p></div>';
-          return;
-        }
-
-        el.innerHTML = res.logs.map(renderLogEntry).join('');
+        _allLogs = res.logs || [];
+        _activeLogCat = 'all';
+        document.getElementById('log-search').value = '';
+        renderLogBreakdown();
+        renderLogList();
       } catch (e) { console.error(e); }
+    }
+
+    function renderLogBreakdown() {
+      /* Count per action */
+      const counts = {};
+      _allLogs.forEach(l => {
+        counts[l.action] = (counts[l.action] || 0) + 1;
+      });
+
+      const breakdown = document.getElementById('log-breakdown');
+      if (!_allLogs.length) {
+        breakdown.innerHTML = '<span style="color:var(--sa-muted);font-size:12px;">No data yet</span>';
+        return;
+      }
+
+      /* Build pills: All first, then known categories, then any unknown actions */
+      const knownKeys = Object.keys(LOG_CATEGORIES).filter(k => k !== 'all');
+      const unknownKeys = Object.keys(counts).filter(k => !LOG_CATEGORIES[k]);
+
+      const allMeta = LOG_CATEGORIES['all'];
+      let pills = `<span class="log-cat-pill ${_activeLogCat === 'all' ? 'active' : ''}"
+        style="background:${allMeta.color}18;color:${allMeta.color};"
+        onclick="setLogCat('all')">
+        <i class="bi ${allMeta.icon}"></i> ${allMeta.label}
+        <span class="pill-count">${_allLogs.length}</span>
+      </span>`;
+
+      [...knownKeys, ...unknownKeys].forEach(key => {
+        if (!counts[key]) return; /* skip if no entries for this category */
+        const meta = LOG_CATEGORIES[key] || { label: key.replace(/_/g,' '), color: '#64748b', icon: 'bi-activity' };
+        const isActive = _activeLogCat === key;
+        pills += `<span class="log-cat-pill ${isActive ? 'active' : ''}"
+          style="background:${meta.color}18;color:${meta.color};"
+          onclick="setLogCat('${key}')">
+          <i class="bi ${meta.icon}"></i> ${meta.label}
+          <span class="pill-count">${counts[key]}</span>
+        </span>`;
+      });
+
+      breakdown.innerHTML = pills;
+    }
+
+    function setLogCat(cat) {
+      _activeLogCat = cat;
+      document.getElementById('log-search').value = '';
+      renderLogBreakdown();
+      renderLogList();
+    }
+
+    function filterLogs() {
+      renderLogList();
+    }
+
+    function renderLogList() {
+      const el      = document.getElementById('logs-container');
+      const query   = (document.getElementById('log-search')?.value || '').toLowerCase();
+      const catKey  = _activeLogCat;
+
+      let filtered = _allLogs.filter(l => {
+        const catMatch = catKey === 'all' || l.action === catKey;
+        if (!catMatch) return false;
+        if (!query) return true;
+        return (
+          (l.action         || '').toLowerCase().includes(query) ||
+          (l.actor_username || '').toLowerCase().includes(query) ||
+          (l.details        || '').toLowerCase().includes(query) ||
+          (l.target_type    || '').toLowerCase().includes(query)
+        );
+      });
+
+      if (!filtered.length) {
+        el.innerHTML = '<div class="sa-empty"><i class="bi bi-journal"></i><p>No logs match this filter</p></div>';
+        return;
+      }
+      el.innerHTML = filtered.map(renderLogEntry).join('');
     }
 
     /* =============================================
@@ -2329,7 +2927,8 @@
 
       if (!newPass) { saToast('Enter a new password', 'error'); return; }
       if (newPass !== confirmPass) { saToast('Passwords do not match', 'error'); return; }
-      if (newPass.length < 6) { saToast('Password must be at least 6 characters', 'error'); return; }
+      const pwdErr = checkPasswordComplexity(newPass);
+      if (pwdErr) { saToast(pwdErr, 'error'); return; }
 
       if (!confirm('Change your Super Admin password?')) return;
 
@@ -2374,9 +2973,21 @@
     ============================================= */
     window.addEventListener('DOMContentLoaded', () => {
       saApi('auth.php?action=session').then(res => {
-        if (res.success && res.loggedIn && res.user.role === 'super_admin') {
+        if (res.success && res.loggedIn && res.user && res.user.role === 'super_admin') {
           saCurrentUser = res.user;
           activateSAApp();
+        } else if (res.pending_2fa) {
+          // Resume pending 2FA step if page reloaded
+          document.getElementById('sa-step-credentials').style.display = 'none';
+          document.getElementById('sa-step-2fa').style.display = 'block';
+          document.getElementById('sa-2fa-email-display').textContent = res.masked_email || 'your email';
+          const codeInput = document.getElementById('sa-2fa-code');
+          codeInput.value = '';
+          if (res.dev_code) {
+            document.getElementById('sa-dev-hint').style.display = 'block';
+            document.getElementById('sa-dev-code-val').textContent = res.dev_code;
+            codeInput.value = res.dev_code;
+          }
         }
       }).catch(() => {});
     });

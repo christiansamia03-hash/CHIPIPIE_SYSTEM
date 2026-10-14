@@ -1682,7 +1682,8 @@
       align-items: center;
       justify-content: center;
       z-index: 10000;
-      overflow: hidden;
+      overflow-y: auto;
+      padding: 24px 16px;
     }
 
     .login-card {
@@ -1690,10 +1691,22 @@
       backdrop-filter: blur(10px);
       width: 100%;
       max-width: 400px;
-      padding: 40px;
+      padding: 36px 32px;
       border-radius: 20px;
       box-shadow: 0 20px 50px rgba(0, 0, 0, 0.5);
       border: 1px solid rgba(255, 255, 255, 0.2);
+      margin: auto;
+    }
+
+    .register-card {
+      max-width: 620px;
+      padding: 28px 36px;
+    }
+
+    @media (max-width: 576px) {
+      .register-card {
+        padding: 22px 20px;
+      }
     }
 
     .login-brand {
@@ -2131,91 +2144,251 @@
         <h3>ChipiPie Cafe</h3>
         <p>Point of Sales Login</p>
       </div>
-      <form onsubmit="handleLogin(event)">
-        <div class="mb-3">
-          <label class="form-label">Username</label>
-          <input type="text" id="login-user" class="form-control" required>
+      <!-- STEP 1: CREDENTIALS -->
+      <div id="pos-step-credentials">
+        <form onsubmit="handleLogin(event)">
+          <div class="mb-3">
+            <label class="form-label">Username</label>
+            <input type="text" id="login-user" class="form-control" required>
+          </div>
+          <div class="mb-4">
+            <div class="d-flex justify-content-between align-items-center mb-1">
+              <label class="form-label mb-0">Password</label>
+              <a href="#" onclick="showPosForgotStep1(); return false;" style="font-size:12px; color:var(--cafe-brown); text-decoration:none;">Forgot Password?</a>
+            </div>
+            <input type="password" id="login-pass" class="form-control" required>
+          </div>
+          <button type="submit" id="pos-login-btn" class="btn-cafe-primary btn-lg w-100" style="font-size:16px; padding:12px;">Sign In</button>
+        </form>
+      </div>
+
+      <!-- STEP 2: 2FA VERIFICATION (Manager Approval) -->
+      <div id="pos-step-2fa" style="display:none;">
+        <div style="background:#fdf8f4; border:1px solid #ebd9cc; border-radius:12px; padding:14px; margin-bottom:16px; text-align:center;">
+          <div style="font-size:26px; margin-bottom:4px;">🔐</div>
+          <div style="font-size:14px; font-weight:700; color:var(--cafe-dark, #2b1f1d); margin-bottom:3px;">Manager Authorization (2FA)</div>
+          <div style="font-size:12px; color:#777; line-height:1.4;">
+            A confirmation code was sent to the Manager email:<br>
+            <strong id="pos-2fa-email" style="color:var(--cafe-brown, #5c3d2e); word-break:break-all;"></strong>
+          </div>
         </div>
-        <div class="mb-4">
-          <label class="form-label">Password</label>
-          <input type="password" id="login-pass" class="form-control" required>
+
+        <form onsubmit="handlePosVerify2FA(event)">
+          <div class="mb-3 text-center">
+            <label class="form-label" style="font-size:12px; font-weight:600; color:#555;">Enter 6-Digit Code</label>
+            <input type="text" id="pos-2fa-code" class="form-control text-center" maxlength="6" placeholder="000000" autocomplete="one-time-code" required
+                   style="font-family:Consolas, Monaco, monospace; font-size:26px; font-weight:700; letter-spacing:8px; padding:10px; text-transform:uppercase;">
+          </div>
+
+          <div id="pos-dev-hint" style="display:none; margin-bottom:14px; font-size:11.5px; color:#0f5132; background:#d1e7dd; border:1px solid #badbcc; border-radius:8px; padding:7px 10px; text-align:center;">
+            💡 Dev Mode Token: <code id="pos-dev-code-val" style="font-weight:700;"></code> (auto-filled)
+          </div>
+
+          <button type="submit" id="pos-verify-btn" class="btn-cafe-primary btn-lg w-100" style="font-size:15px; padding:11px;">
+            <i class="bi bi-shield-check"></i> Verify & Sign In
+          </button>
+        </form>
+
+        <div style="display:flex; justify-content:space-between; align-items:center; margin-top:14px; font-size:12px;">
+          <button type="button" onclick="handlePosResend2FA()" id="pos-resend-btn" style="background:none; border:none; color:var(--cafe-brown, #5c3d2e); cursor:pointer; padding:4px 0; font-size:12px; font-weight:600; display:inline-flex; align-items:center; gap:4px;">
+            <i class="bi bi-arrow-clockwise"></i> Resend Code
+          </button>
+          <button type="button" onclick="handlePosCancel2FA()" style="background:none; border:none; color:#888; cursor:pointer; padding:4px 0; font-size:12px; display:inline-flex; align-items:center; gap:4px;">
+            <i class="bi bi-arrow-left"></i> Back to Login
+          </button>
         </div>
-        <button type="submit" class="btn-cafe-primary btn-lg w-100" style="font-size:16px; padding:12px;">Sign
-          In</button>
-      </form>
+      </div>
+
+      <!-- STEP 3: FORGOT PASSWORD - REQUEST CODE -->
+      <div id="pos-step-forgot-request" style="display:none;">
+        <div style="background:#fdf8f4; border:1px solid #ebd9cc; border-radius:12px; padding:14px; margin-bottom:16px; text-align:center;">
+          <div style="font-size:26px; margin-bottom:4px;">🔑</div>
+          <div style="font-size:14px; font-weight:700; color:var(--cafe-dark, #2b1f1d); margin-bottom:3px;">Forgot Password</div>
+          <div style="font-size:12px; color:#777; line-height:1.4;">
+            Enter your username or email address and we'll send a 6-digit recovery code to your inbox.
+          </div>
+        </div>
+
+        <form onsubmit="handlePosSendForgotCode(event)">
+          <div class="mb-3">
+            <label class="form-label" style="font-size:12.5px;">Username or Email</label>
+            <input type="text" id="pos-forgot-user" class="form-control" placeholder="Enter username or email" required>
+          </div>
+          <button type="submit" id="pos-forgot-send-btn" class="btn-cafe-primary btn-lg w-100" style="font-size:15px; padding:11px;">
+            <i class="bi bi-send-fill me-1"></i> Send Recovery Code
+          </button>
+        </form>
+
+        <div class="mt-3 text-center">
+          <a href="#" onclick="hidePosForgot(); return false;" style="font-size:12px; color:var(--cafe-brown); text-decoration:none;">
+            <i class="bi bi-arrow-left"></i> Back to Sign In
+          </a>
+        </div>
+      </div>
+
+      <!-- STEP 4: FORGOT PASSWORD - VERIFY & RESET -->
+      <div id="pos-step-forgot-reset" style="display:none;">
+        <div style="background:#fdf8f4; border:1px solid #ebd9cc; border-radius:12px; padding:14px; margin-bottom:16px; text-align:center;">
+          <div style="font-size:26px; margin-bottom:4px;">📬</div>
+          <div style="font-size:14px; font-weight:700; color:var(--cafe-dark, #2b1f1d); margin-bottom:3px;">Reset Your Password</div>
+          <div style="font-size:12px; color:#777; line-height:1.4;">
+            A 6-digit recovery code was sent to:<br>
+            <strong id="pos-forgot-email-display" style="color:var(--cafe-brown, #5c3d2e); word-break:break-all;"></strong>
+          </div>
+        </div>
+
+        <form onsubmit="handlePosResetPassword(event)">
+          <div class="mb-3 text-center">
+            <label class="form-label" style="font-size:12px; font-weight:600; color:#555;">Enter 6-Digit Code</label>
+            <input type="text" id="pos-forgot-code" class="form-control text-center" maxlength="6" placeholder="000000" required
+                   style="font-family:Consolas, Monaco, monospace; font-size:26px; font-weight:700; letter-spacing:8px; padding:10px; text-transform:uppercase;">
+          </div>
+
+          <div id="pos-forgot-dev-hint" style="display:none; margin-bottom:14px; font-size:11.5px; color:#0f5132; background:#d1e7dd; border:1px solid #badbcc; border-radius:8px; padding:7px 10px; text-align:center;">
+            💡 Dev Mode Token: <code id="pos-forgot-dev-code" style="font-weight:700;"></code> (auto-filled)
+          </div>
+
+          <div class="mb-3 text-start">
+            <label class="form-label mb-1" style="font-size:12.5px;">New Password *</label>
+            <input type="password" id="pos-forgot-new-pass" class="form-control" required minlength="8" placeholder="••••••••">
+            <div class="form-text" style="font-size:11px; color:#777; margin-top:4px;">
+              <i class="bi bi-shield-lock me-1"></i>Min. 8 characters with uppercase, lowercase & number.
+            </div>
+          </div>
+
+          <div class="mb-3 text-start">
+            <label class="form-label mb-1" style="font-size:12.5px;">Confirm New Password *</label>
+            <input type="password" id="pos-forgot-confirm-pass" class="form-control" required minlength="8" placeholder="••••••••">
+          </div>
+
+          <button type="submit" id="pos-forgot-submit-btn" class="btn-cafe-primary btn-lg w-100" style="font-size:15px; padding:11px;">
+            <i class="bi bi-check-circle-fill me-1"></i> Update Password
+          </button>
+        </form>
+
+        <div style="display:flex; justify-content:space-between; align-items:center; margin-top:14px; font-size:12px;">
+          <button type="button" onclick="handlePosResendForgotCode()" id="pos-forgot-resend-btn" style="background:none; border:none; color:var(--cafe-brown, #5c3d2e); cursor:pointer; padding:4px 0; font-size:12px; font-weight:600; display:inline-flex; align-items:center; gap:4px;">
+            <i class="bi bi-arrow-clockwise"></i> Resend Code
+          </button>
+          <button type="button" onclick="hidePosForgot()" style="background:none; border:none; color:#888; cursor:pointer; padding:4px 0; font-size:12px; display:inline-flex; align-items:center; gap:4px;">
+            <i class="bi bi-arrow-left"></i> Back to Login
+          </button>
+        </div>
+      </div>
+
       <div id="login-error"
         style="display:none; color:#842029; background:#f8d7da; padding:10px; border-radius:8px; font-size:13px; margin-top:12px;">
       </div>
-      <div class="mt-4 text-center"
-        style="font-size: 12px; color: #888; background: #f9f9f9; padding: 12px; border-radius: 8px; border: 1px solid var(--cafe-tan);">
-        <strong>Default Accounts</strong><br>
-        Admin: <code>admin</code> / <code>admin123</code><br>
-        Cashier: <code>cashier1</code> / <code>cashier123</code>
+      <div id="login-success"
+        style="display:none; color:#0f5132; background:#d1e7dd; padding:10px; border-radius:8px; font-size:13px; margin-top:12px;">
       </div>
-      <div class="mt-3 text-center">
-        <a href="#" onclick="showRegisterForm()"
-          style="font-size:13px; color:var(--cafe-brown); font-weight:500;">Register New Account</a>
-      </div>
-      <div class="mt-2 text-center">
-        <a href="superadmin-panel.php"
-          style="font-size:11px; color:#aaa; text-decoration:none; display:inline-flex; align-items:center; gap:4px;">
-          🛡️ Super Admin Panel
-        </a>
+      <div id="pos-login-footer">
+        <div class="mt-4 text-center"
+          style="font-size: 12px; color: #888; background: #f9f9f9; padding: 12px; border-radius: 8px; border: 1px solid var(--cafe-tan);">
+          <strong>Default Accounts</strong><br>
+          Admin: <code>admin</code> / <code>admin123</code><br>
+          Cashier: <code>cashier1</code> / <code>cashier123</code>
+        </div>
+        <div class="mt-3 text-center">
+          <a href="#" onclick="showRegisterForm()"
+            style="font-size:13px; color:var(--cafe-brown); font-weight:500;">Register New Account</a>
+        </div>
+        <div class="mt-2 text-center">
+          <a href="superadmin-panel.php"
+            style="font-size:11px; color:#aaa; text-decoration:none; display:inline-flex; align-items:center; gap:4px;">
+            🛡️ Super Admin Panel
+          </a>
+        </div>
       </div>
     </div>
   </div>
 
   <!-- REGISTER SCREEN -->
   <div id="register-wrapper" class="login-wrapper" style="display:none;">
-    <div class="login-card">
-      <div class="login-brand">
-        <div class="brand-icon mx-auto mb-3"
-          style="width:60px;height:60px;background:var(--cafe-amber);color:#fff;border-radius:14px;display:flex;align-items:center;justify-content:center;font-size:30px;">
+    <div class="login-card register-card">
+      <div class="login-brand" style="margin-bottom:18px;">
+        <div class="brand-icon mx-auto mb-2"
+          style="width:48px;height:48px;background:var(--cafe-amber);color:#fff;border-radius:12px;display:flex;align-items:center;justify-content:center;font-size:24px;">
           <i class="bi bi-person-plus-fill"></i>
         </div>
-        <h3>Register Account</h3>
-        <p>ChipiPie Cafe POS</p>
+        <h4 style="font-weight:700;color:var(--cafe-brown);margin-bottom:2px;">Register Account</h4>
+        <p style="color:#888;font-size:12px;margin:0;">ChipiPie Cafe POS</p>
       </div>
+
       <form onsubmit="handleRegister(event)">
-        <div class="mb-3">
-          <label class="form-label">Full Name</label>
-          <input type="text" id="reg-name" class="form-control" required>
+        <!-- Name Row: 4 fields on 1 line on desktop, clean wrapping on small screens -->
+        <div class="row g-2 mb-2">
+          <div class="col-md-4 col-7">
+            <label class="form-label mb-1" style="font-size:12px;font-weight:600;">First Name *</label>
+            <input type="text" id="reg-first-name" class="form-control" placeholder="Juan" required style="padding:7px 10px;font-size:13px;">
+          </div>
+          <div class="col-md-2 col-5">
+            <label class="form-label mb-1" style="font-size:12px;font-weight:600;">M.I.</label>
+            <input type="text" id="reg-middle-initial" class="form-control" placeholder="D." maxlength="5" style="padding:7px 10px;font-size:13px;">
+          </div>
+          <div class="col-md-4 col-8">
+            <label class="form-label mb-1" style="font-size:12px;font-weight:600;">Last Name *</label>
+            <input type="text" id="reg-last-name" class="form-control" placeholder="Dela Cruz" required style="padding:7px 10px;font-size:13px;">
+          </div>
+          <div class="col-md-2 col-4">
+            <label class="form-label mb-1" style="font-size:12px;font-weight:600;">Suffix</label>
+            <input type="text" id="reg-suffix" class="form-control" placeholder="Jr., III" maxlength="15" style="padding:7px 10px;font-size:13px;">
+          </div>
         </div>
-        <div class="mb-3">
-          <label class="form-label">Email</label>
-          <input type="email" id="reg-email" class="form-control" required>
+
+        <!-- Contact & Username Row -->
+        <div class="row g-2 mb-2">
+          <div class="col-md-6 col-12">
+            <label class="form-label mb-1" style="font-size:12px;font-weight:600;">Email *</label>
+            <input type="email" id="reg-email" class="form-control" placeholder="juan@example.com" required style="padding:7px 10px;font-size:13px;">
+          </div>
+          <div class="col-md-6 col-12">
+            <label class="form-label mb-1" style="font-size:12px;font-weight:600;">Username *</label>
+            <input type="text" id="reg-user" class="form-control" placeholder="juandc" required style="padding:7px 10px;font-size:13px;">
+          </div>
         </div>
-        <div class="mb-3">
-          <label class="form-label">Username</label>
-          <input type="text" id="reg-user" class="form-control" required>
+
+        <!-- Password Row -->
+        <div class="row g-2 mb-2">
+          <div class="col-md-6 col-12">
+            <label class="form-label mb-1" style="font-size:12px;font-weight:600;">Password *</label>
+            <input type="password" id="reg-pass" class="form-control" required minlength="8" placeholder="••••••••" style="padding:7px 10px;font-size:13px;">
+          </div>
+          <div class="col-md-6 col-12">
+            <label class="form-label mb-1" style="font-size:12px;font-weight:600;">Confirm Password *</label>
+            <input type="password" id="reg-pass-confirm" class="form-control" required minlength="8" placeholder="••••••••" style="padding:7px 10px;font-size:13px;">
+          </div>
+          <div class="col-12">
+            <div style="font-size:11px;color:#777;margin-top:1px;line-height:1.3;">
+              <i class="bi bi-shield-lock me-1"></i>Min. 8 characters with uppercase, lowercase & number.
+            </div>
+          </div>
         </div>
+
+        <!-- Role Row -->
         <div class="mb-3">
-          <label class="form-label">Password</label>
-          <input type="password" id="reg-pass" class="form-control" required minlength="6">
-        </div>
-        <div class="mb-3">
-          <label class="form-label">Confirm Password</label>
-          <input type="password" id="reg-pass-confirm" class="form-control" required minlength="6">
-        </div>
-        <div class="mb-4">
-          <label class="form-label">Role</label>
-          <select class="form-select" id="reg-role">
+          <label class="form-label mb-1" style="font-size:12px;font-weight:600;">Role *</label>
+          <select class="form-select" id="reg-role" style="padding:7px 10px;font-size:13px;">
             <option value="cashier">Cashier</option>
             <option value="admin">Admin (requires owner approval)</option>
           </select>
         </div>
-        <button type="submit" class="btn-cafe-primary btn-lg w-100" style="font-size:16px;padding:12px;"
+
+        <button type="submit" class="btn-cafe-primary w-100" style="font-size:15px;padding:10px 14px;font-weight:600;border-radius:10px;"
           id="reg-submit-btn">Register</button>
       </form>
+
       <div id="reg-error"
-        style="display:none; color:#842029; background:#f8d7da; padding:10px; border-radius:8px; font-size:13px; margin-top:12px;">
+        style="display:none; color:#842029; background:#f8d7da; padding:8px 12px; border-radius:8px; font-size:12.5px; margin-top:10px;">
       </div>
       <div id="reg-success"
-        style="display:none; color:#1a5c2e; background:#d4edda; padding:10px; border-radius:8px; font-size:13px; margin-top:12px;">
+        style="display:none; color:#1a5c2e; background:#d4edda; padding:8px 12px; border-radius:8px; font-size:12.5px; margin-top:10px;">
       </div>
-      <div class="mt-3 text-center">
-        <a href="#" onclick="showLoginForm()" style="font-size:13px; color:var(--cafe-brown); font-weight:500;">← Back
-          to Login</a>
+
+      <div class="mt-2 text-center">
+        <a href="#" onclick="showLoginForm()" style="font-size:12.5px; color:var(--cafe-brown); font-weight:500; text-decoration:none;">
+          <i class="bi bi-arrow-left"></i> Back to Login
+        </a>
       </div>
     </div>
   </div>
@@ -2989,41 +3162,73 @@
 
   <!-- REGISTER USER MODAL (from admin panel) -->
   <div class="modal fade" id="registerUserModal" tabindex="-1">
-    <div class="modal-dialog modal-dialog-centered">
+    <div class="modal-dialog modal-dialog-centered modal-lg">
       <div class="modal-content">
         <div class="modal-header" style="border-bottom:1px solid var(--cafe-tan);">
-          <h5 class="modal-title" style="color:var(--cafe-brown);font-size:16px;">Register New User</h5>
+          <h5 class="modal-title" style="color:var(--cafe-brown);font-size:16px;font-weight:700;">
+            <i class="bi bi-person-plus-fill me-2"></i>Register New User
+          </h5>
           <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
         </div>
         <div class="modal-body p-4">
-          <div class="mb-3">
-            <label class="form-label">Full Name</label>
-            <input type="text" class="form-control" id="modal-reg-name">
+          <!-- Name Row -->
+          <div class="row g-2 mb-2">
+            <div class="col-md-4 col-7">
+              <label class="form-label mb-1" style="font-size:12px;font-weight:600;">First Name *</label>
+              <input type="text" class="form-control" id="modal-reg-first-name" placeholder="Juan" style="padding:7px 10px;font-size:13px;">
+            </div>
+            <div class="col-md-2 col-5">
+              <label class="form-label mb-1" style="font-size:12px;font-weight:600;">M.I.</label>
+              <input type="text" class="form-control" id="modal-reg-middle-initial" placeholder="D." maxlength="5" style="padding:7px 10px;font-size:13px;">
+            </div>
+            <div class="col-md-4 col-8">
+              <label class="form-label mb-1" style="font-size:12px;font-weight:600;">Last Name *</label>
+              <input type="text" class="form-control" id="modal-reg-last-name" placeholder="Dela Cruz" style="padding:7px 10px;font-size:13px;">
+            </div>
+            <div class="col-md-2 col-4">
+              <label class="form-label mb-1" style="font-size:12px;font-weight:600;">Suffix</label>
+              <input type="text" class="form-control" id="modal-reg-suffix" placeholder="Jr., III" maxlength="15" style="padding:7px 10px;font-size:13px;">
+            </div>
           </div>
-          <div class="mb-3">
-            <label class="form-label">Email</label>
-            <input type="email" class="form-control" id="modal-reg-email">
+
+          <!-- Contact & Username Row -->
+          <div class="row g-2 mb-2">
+            <div class="col-md-6 col-12">
+              <label class="form-label mb-1" style="font-size:12px;font-weight:600;">Email *</label>
+              <input type="email" class="form-control" id="modal-reg-email" placeholder="juan@example.com" style="padding:7px 10px;font-size:13px;">
+            </div>
+            <div class="col-md-6 col-12">
+              <label class="form-label mb-1" style="font-size:12px;font-weight:600;">Username *</label>
+              <input type="text" class="form-control" id="modal-reg-user" placeholder="juandc" style="padding:7px 10px;font-size:13px;">
+            </div>
           </div>
-          <div class="mb-3">
-            <label class="form-label">Username</label>
-            <input type="text" class="form-control" id="modal-reg-user">
+
+          <!-- Password Row -->
+          <div class="row g-2 mb-2">
+            <div class="col-md-6 col-12">
+              <label class="form-label mb-1" style="font-size:12px;font-weight:600;">Password *</label>
+              <input type="password" class="form-control" id="modal-reg-pass" minlength="8" placeholder="••••••••" style="padding:7px 10px;font-size:13px;">
+            </div>
+            <div class="col-md-6 col-12">
+              <label class="form-label mb-1" style="font-size:12px;font-weight:600;">Confirm Password *</label>
+              <input type="password" class="form-control" id="modal-reg-pass-confirm" minlength="8" placeholder="••••••••" style="padding:7px 10px;font-size:13px;">
+            </div>
+            <div class="col-12">
+              <div style="font-size:11px;color:#777;margin-top:1px;line-height:1.3;">
+                <i class="bi bi-shield-lock me-1"></i>Min. 8 characters with uppercase, lowercase & number.
+              </div>
+            </div>
           </div>
-          <div class="mb-3">
-            <label class="form-label">Password</label>
-            <input type="password" class="form-control" id="modal-reg-pass" minlength="6">
-          </div>
-          <div class="mb-3">
-            <label class="form-label">Confirm Password</label>
-            <input type="password" class="form-control" id="modal-reg-pass-confirm" minlength="6">
-          </div>
-          <div class="mb-3">
-            <label class="form-label">Role</label>
-            <select class="form-select" id="modal-reg-role">
+
+          <!-- Role Row -->
+          <div class="mb-2">
+            <label class="form-label mb-1" style="font-size:12px;font-weight:600;">Role *</label>
+            <select class="form-select" id="modal-reg-role" style="padding:7px 10px;font-size:13px;">
               <option value="cashier">Cashier</option>
               <option value="admin">Admin (requires owner approval)</option>
             </select>
           </div>
-          <div id="modal-reg-result" style="display:none;"></div>
+          <div id="modal-reg-result" style="display:none;margin-top:8px;"></div>
         </div>
         <div class="modal-footer" style="border-top:1px solid var(--cafe-tan);gap:8px;">
           <button class="btn btn-outline-secondary btn-sm" data-bs-dismiss="modal">Cancel</button>
@@ -5333,10 +5538,49 @@
       const u = document.getElementById('login-user').value.trim();
       const p = document.getElementById('login-pass').value.trim();
       const errEl = document.getElementById('login-error');
-      errEl.style.display = 'none';
+      const succEl = document.getElementById('login-success');
+      const btn = document.getElementById('pos-login-btn');
+      if (errEl) errEl.style.display = 'none';
+      if (succEl) succEl.style.display = 'none';
+      if (btn) {
+        btn.disabled = true;
+        btn.innerHTML = '<span class="spinner-border spinner-border-sm me-2"></span>Signing in...';
+      }
 
       try {
         const res = await api('auth.php?action=login', { username: u, password: p });
+
+        if (res.requires_2fa) {
+          // If super admin logged in from POS, redirect them to the superadmin panel where their 2FA is ready
+          if (res.redirect && res.redirect.includes('superadmin')) {
+            window.location.href = res.redirect;
+            return;
+          }
+          // Admin 2FA in POS: show POS 2FA screen
+          document.getElementById('pos-step-credentials').style.display = 'none';
+          document.getElementById('pos-step-2fa').style.display = 'block';
+          document.getElementById('pos-2fa-email').textContent = res.masked_email || 'Manager Email';
+          const codeInput = document.getElementById('pos-2fa-code');
+          codeInput.value = '';
+          if (res.dev_code) {
+            document.getElementById('pos-dev-hint').style.display = 'block';
+            document.getElementById('pos-dev-code-val').textContent = res.dev_code;
+            codeInput.value = res.dev_code;
+          } else {
+            document.getElementById('pos-dev-hint').style.display = 'none';
+          }
+          if (succEl) {
+            succEl.textContent = res.message || 'Verification code sent to manager email.';
+            succEl.style.display = 'block';
+          }
+          setTimeout(() => codeInput.focus(), 100);
+          if (btn) {
+            btn.disabled = false;
+            btn.innerHTML = 'Sign In';
+          }
+          return;
+        }
+
         if (res.success) {
           // Super admin has a dedicated panel — redirect there
           if (res.redirect) {
@@ -5357,6 +5601,96 @@
         errEl.textContent = 'Connection error. Make sure the server is running.';
         errEl.style.display = 'block';
       }
+
+      if (btn) {
+        btn.disabled = false;
+        btn.innerHTML = 'Sign In';
+      }
+    }
+
+    async function handlePosVerify2FA(e) {
+      e.preventDefault();
+      const code = document.getElementById('pos-2fa-code').value.trim();
+      const errEl = document.getElementById('login-error');
+      const succEl = document.getElementById('login-success');
+      const btn = document.getElementById('pos-verify-btn');
+      if (errEl) errEl.style.display = 'none';
+      if (succEl) succEl.style.display = 'none';
+      if (!code) return;
+
+      btn.disabled = true;
+      btn.innerHTML = '<span class="spinner-border spinner-border-sm me-2"></span>Verifying...';
+
+      try {
+        const res = await api('auth.php?action=verify_2fa', { code: code });
+        if (res.success && res.user) {
+          currentUser = res.user;
+          document.getElementById('sidebar-name').textContent = res.user.full_name;
+          document.getElementById('sidebar-role').textContent = res.user.role === 'admin' ? 'Administrator' : 'Cashier';
+          document.getElementById('sidebar-avatar').textContent = res.user.full_name.charAt(0).toUpperCase();
+          document.getElementById('pos-step-2fa').style.display = 'none';
+          document.getElementById('pos-step-credentials').style.display = 'block';
+          await loadMenuFromDB();
+          activateApp(res.user.role === 'admin');
+        } else {
+          errEl.textContent = res.message || 'Invalid or expired verification code.';
+          errEl.style.display = 'block';
+        }
+      } catch (err) {
+        errEl.textContent = 'Verification error. Please try again.';
+        errEl.style.display = 'block';
+      }
+
+      btn.disabled = false;
+      btn.innerHTML = '<i class="bi bi-shield-check"></i> Verify & Sign In';
+    }
+
+    async function handlePosResend2FA() {
+      const btn = document.getElementById('pos-resend-btn');
+      const errEl = document.getElementById('login-error');
+      const succEl = document.getElementById('login-success');
+      if (errEl) errEl.style.display = 'none';
+      if (succEl) succEl.style.display = 'none';
+
+      btn.disabled = true;
+      btn.innerHTML = '<span class="spinner-border spinner-border-sm me-1"></span>Resending...';
+
+      try {
+        const res = await api('auth.php?action=resend_2fa', {});
+        if (res.success) {
+          succEl.textContent = res.message || 'A new code has been sent to the manager email.';
+          succEl.style.display = 'block';
+          if (res.dev_code) {
+            document.getElementById('pos-dev-hint').style.display = 'block';
+            document.getElementById('pos-dev-code-val').textContent = res.dev_code;
+            document.getElementById('pos-2fa-code').value = res.dev_code;
+          }
+        } else {
+          errEl.textContent = res.message || 'Could not resend verification code.';
+          errEl.style.display = 'block';
+        }
+      } catch (err) {
+        errEl.textContent = 'Server error. Please try again.';
+        errEl.style.display = 'block';
+      }
+
+      setTimeout(() => {
+        btn.disabled = false;
+        btn.innerHTML = '<i class="bi bi-arrow-clockwise"></i> Resend Code';
+      }, 5000);
+    }
+
+    async function handlePosCancel2FA() {
+      try {
+        await api('auth.php?action=cancel_2fa', {});
+      } catch (e) {}
+      document.getElementById('pos-step-2fa').style.display = 'none';
+      document.getElementById('pos-step-credentials').style.display = 'block';
+      const errEl = document.getElementById('login-error');
+      const succEl = document.getElementById('login-success');
+      if (errEl) errEl.style.display = 'none';
+      if (succEl) succEl.style.display = 'none';
+      document.getElementById('login-pass').value = '';
     }
 
     /* ========== LOAD MENU FROM DB ========== */
@@ -5429,6 +5763,10 @@
       currentUser = null;
       document.getElementById('login-user').value = '';
       document.getElementById('login-pass').value = '';
+      const step2fa = document.getElementById('pos-step-2fa');
+      const stepCreds = document.getElementById('pos-step-credentials');
+      if (step2fa) step2fa.style.display = 'none';
+      if (stepCreds) stepCreds.style.display = 'block';
       document.getElementById('app-wrapper').style.display = 'none';
       document.getElementById('login-wrapper').style.display = 'flex';
     }
@@ -5443,23 +5781,241 @@
       document.getElementById('login-wrapper').style.display = 'flex';
     }
 
+    /* ========== PASSWORD COMPLEXITY HELPER ========== */
+    function checkPasswordComplexity(p) {
+      if (!p || p.length < 8) return 'Password must be at least 8 characters long.';
+      if (!/[A-Z]/.test(p)) return 'Password must contain at least one uppercase letter (A-Z).';
+      if (!/[a-z]/.test(p)) return 'Password must contain at least one lowercase letter (a-z).';
+      if (!/[0-9]/.test(p)) return 'Password must contain at least one number (0-9).';
+      return '';
+    }
+
+    /* ========== FORGOT PASSWORD (POS Login) ========== */
+    let posForgotPendingUser = '';
+
+    function showPosForgotStep1() {
+      document.getElementById('pos-step-credentials').style.display = 'none';
+      document.getElementById('pos-step-2fa').style.display = 'none';
+      document.getElementById('pos-step-forgot-reset').style.display = 'none';
+      document.getElementById('pos-step-forgot-request').style.display = 'block';
+      const footer = document.getElementById('pos-login-footer');
+      if (footer) footer.style.display = 'none';
+      const errEl = document.getElementById('login-error');
+      const sucEl = document.getElementById('login-success');
+      if (errEl) errEl.style.display = 'none';
+      if (sucEl) sucEl.style.display = 'none';
+      setTimeout(() => {
+        const inp = document.getElementById('pos-forgot-user');
+        if (inp) inp.focus();
+      }, 100);
+    }
+
+    function hidePosForgot() {
+      document.getElementById('pos-step-forgot-request').style.display = 'none';
+      document.getElementById('pos-step-forgot-reset').style.display = 'none';
+      document.getElementById('pos-step-credentials').style.display = 'block';
+      const footer = document.getElementById('pos-login-footer');
+      if (footer) footer.style.display = 'block';
+      const errEl = document.getElementById('login-error');
+      const sucEl = document.getElementById('login-success');
+      if (errEl) errEl.style.display = 'none';
+      if (sucEl) sucEl.style.display = 'none';
+    }
+
+    async function handlePosSendForgotCode(e) {
+      e.preventDefault();
+      const errEl = document.getElementById('login-error');
+      const sucEl = document.getElementById('login-success');
+      errEl.style.display = 'none'; sucEl.style.display = 'none';
+      const identifier = document.getElementById('pos-forgot-user').value.trim();
+      if (!identifier) {
+        errEl.textContent = 'Please enter your username or email.';
+        errEl.style.display = 'block';
+        return;
+      }
+      const btn = document.getElementById('pos-forgot-send-btn');
+      btn.disabled = true;
+      btn.innerHTML = '<span class="spinner-border spinner-border-sm me-1"></span>Sending code...';
+      try {
+        const res = await api('auth.php?action=forgot_password', { identifier });
+        if (res.success) {
+          posForgotPendingUser = res.identifier || identifier;
+          document.getElementById('pos-forgot-email-display').textContent = res.masked_email || 'your email';
+          document.getElementById('pos-step-forgot-request').style.display = 'none';
+          document.getElementById('pos-step-forgot-reset').style.display = 'block';
+          document.getElementById('pos-forgot-code').value = '';
+          document.getElementById('pos-forgot-new-pass').value = '';
+          document.getElementById('pos-forgot-confirm-pass').value = '';
+          if (res.dev_code) {
+            document.getElementById('pos-forgot-dev-hint').style.display = 'block';
+            document.getElementById('pos-forgot-dev-code').textContent = res.dev_code;
+            document.getElementById('pos-forgot-code').value = res.dev_code;
+          } else {
+            document.getElementById('pos-forgot-dev-hint').style.display = 'none';
+          }
+          sucEl.textContent = res.message;
+          sucEl.style.display = 'block';
+          setTimeout(() => {
+            const inp = document.getElementById('pos-forgot-code');
+            if (inp) inp.focus();
+          }, 100);
+        } else {
+          errEl.textContent = res.message || 'Could not send recovery code.';
+          errEl.style.display = 'block';
+        }
+      } catch (err) {
+        errEl.textContent = 'Connection error. Please try again.';
+        errEl.style.display = 'block';
+      } finally {
+        btn.disabled = false;
+        btn.innerHTML = '<i class="bi bi-send-fill me-1"></i> Send Recovery Code';
+      }
+    }
+
+    async function handlePosResendForgotCode() {
+      const btn = document.getElementById('pos-forgot-resend-btn');
+      const errEl = document.getElementById('login-error');
+      const sucEl = document.getElementById('login-success');
+      errEl.style.display = 'none'; sucEl.style.display = 'none';
+      if (!posForgotPendingUser) {
+        showPosForgotStep1();
+        return;
+      }
+      btn.disabled = true;
+      btn.innerHTML = '<span class="spinner-border spinner-border-sm me-1"></span>Resending...';
+      try {
+        const res = await api('auth.php?action=forgot_password', { identifier: posForgotPendingUser });
+        if (res.success) {
+          sucEl.textContent = res.message || 'Recovery code resent.';
+          sucEl.style.display = 'block';
+          if (res.dev_code) {
+            document.getElementById('pos-forgot-dev-hint').style.display = 'block';
+            document.getElementById('pos-forgot-dev-code').textContent = res.dev_code;
+            document.getElementById('pos-forgot-code').value = res.dev_code;
+          }
+        } else {
+          errEl.textContent = res.message || 'Failed to resend code.';
+          errEl.style.display = 'block';
+        }
+      } catch (err) {
+        errEl.textContent = 'Server error. Please try again.';
+        errEl.style.display = 'block';
+      } finally {
+        setTimeout(() => {
+          btn.disabled = false;
+          btn.innerHTML = '<i class="bi bi-arrow-clockwise"></i> Resend Code';
+        }, 3000);
+      }
+    }
+
+    async function handlePosResetPassword(e) {
+      e.preventDefault();
+      const errEl = document.getElementById('login-error');
+      const sucEl = document.getElementById('login-success');
+      errEl.style.display = 'none'; sucEl.style.display = 'none';
+
+      const token = document.getElementById('pos-forgot-code').value.trim();
+      const newPass = document.getElementById('pos-forgot-new-pass').value.trim();
+      const confirmPass = document.getElementById('pos-forgot-confirm-pass').value.trim();
+
+      if (!token) {
+        errEl.textContent = 'Please enter the 6-digit recovery code.';
+        errEl.style.display = 'block'; return;
+      }
+      if (newPass !== confirmPass) {
+        errEl.textContent = 'Passwords do not match.';
+        errEl.style.display = 'block'; return;
+      }
+      const pwdErr = checkPasswordComplexity(newPass);
+      if (pwdErr) {
+        errEl.textContent = pwdErr;
+        errEl.style.display = 'block'; return;
+      }
+
+      const btn = document.getElementById('pos-forgot-submit-btn');
+      btn.disabled = true;
+      btn.innerHTML = '<span class="spinner-border spinner-border-sm me-1"></span>Updating password...';
+
+      try {
+        const res = await api('auth.php?action=reset_password_code', {
+          identifier: posForgotPendingUser,
+          token,
+          new_password: newPass
+        });
+        if (res.success) {
+          hidePosForgot();
+          sucEl.textContent = '🎉 ' + (res.message || 'Password reset successful! You can now log in.');
+          sucEl.style.display = 'block';
+          document.getElementById('login-pass').value = '';
+          document.getElementById('login-user').value = posForgotPendingUser;
+          posForgotPendingUser = '';
+        } else {
+          errEl.textContent = res.message || 'Could not reset password.';
+          errEl.style.display = 'block';
+        }
+      } catch (err) {
+        errEl.textContent = 'Connection error. Please try again.';
+        errEl.style.display = 'block';
+      } finally {
+        btn.disabled = false;
+        btn.innerHTML = '<i class="bi bi-check-circle-fill me-1"></i> Update Password';
+      }
+    }
+
+    /* ========== REGISTER (Login page) ========== */
+    function showRegisterForm() {
+      document.getElementById('login-wrapper').style.display = 'none';
+      document.getElementById('register-wrapper').style.display = 'flex';
+    }
+    function showLoginForm() {
+      document.getElementById('register-wrapper').style.display = 'none';
+      document.getElementById('login-wrapper').style.display = 'flex';
+      hidePosForgot();
+    }
+
     async function handleRegister(e) {
       e.preventDefault();
       const errEl = document.getElementById('reg-error');
       const sucEl = document.getElementById('reg-success');
       errEl.style.display = 'none'; sucEl.style.display = 'none';
-      const data = {
-        full_name: document.getElementById('reg-name').value.trim(),
-        email: document.getElementById('reg-email').value.trim(),
-        username: document.getElementById('reg-user').value.trim(),
-        password: document.getElementById('reg-pass').value.trim(),
-        role: document.getElementById('reg-role').value
-      };
+
+      const firstName = document.getElementById('reg-first-name').value.trim();
+      const middleInitial = document.getElementById('reg-middle-initial').value.trim();
+      const lastName = document.getElementById('reg-last-name').value.trim();
+      const suffix = document.getElementById('reg-suffix').value.trim();
+
+      const parts = [firstName, middleInitial ? middleInitial.replace(/\.*$/, '') + '.' : '', lastName, suffix].filter(Boolean);
+      const fullName = parts.join(' ');
+
+      const password = document.getElementById('reg-pass').value.trim();
       const confirmPass = document.getElementById('reg-pass-confirm').value.trim();
-      if (data.password !== confirmPass) {
+
+      if (!firstName || !lastName) {
+        errEl.textContent = 'First name and last name are required.';
+        errEl.style.display = 'block'; return;
+      }
+      if (password !== confirmPass) {
         errEl.textContent = 'Passwords do not match.';
         errEl.style.display = 'block'; return;
       }
+      const pwdErr = checkPasswordComplexity(password);
+      if (pwdErr) {
+        errEl.textContent = pwdErr;
+        errEl.style.display = 'block'; return;
+      }
+
+      const data = {
+        first_name: firstName,
+        middle_initial: middleInitial,
+        last_name: lastName,
+        suffix: suffix,
+        full_name: fullName,
+        email: document.getElementById('reg-email').value.trim(),
+        username: document.getElementById('reg-user').value.trim(),
+        password: password,
+        role: document.getElementById('reg-role').value
+      };
+
       try {
         const res = await api('auth.php?action=register', data);
         if (res.success) {
@@ -5490,13 +6046,9 @@
             <td><span class="badge-cat">${u.role}</span></td>
             <td><span class="${u.is_active == 1 ? 'badge-success' : 'badge-pending'}">${u.is_active == 1 ? 'Active' : 'Inactive'}</span></td>
             <td>
-              <div style="display:flex;gap:6px;flex-wrap:wrap;">
-                <button class="btn btn-sm" style="background:var(--cafe-tan);color:var(--cafe-brown);border:none;border-radius:6px;padding:4px 10px;font-size:12px;" onclick="requestUserToggle(${u.id}, '${u.full_name}', ${u.is_active})">
-                  ${u.is_active == 1 ? 'Req Deactivate' : 'Req Activate'}
-                </button>
-                <button class="btn btn-sm" style="background:#fee2e2;color:#b91c1c;border:none;border-radius:6px;padding:4px 10px;font-size:12px;" onclick="requestUserDelete(${u.id}, '${u.full_name}')">
-                  <i class="bi bi-trash-fill"></i> Req Delete
-                </button>
+              <div style="display:flex;gap:6px;align-items:center;">
+                <button class="btn btn-sm" style="background:var(--cafe-tan);color:var(--cafe-brown);border:none;border-radius:6px;padding:4px 10px;font-size:12px;line-height:1.4;min-width:110px;text-align:center;" onclick="requestUserToggle(${u.id}, '${u.full_name}', ${u.is_active})">${u.is_active == 1 ? 'Req Deactivate' : 'Req Activate'}</button>
+                <button class="btn btn-sm" style="background:#fee2e2;color:#b91c1c;border:none;border-radius:6px;padding:4px 10px;font-size:12px;line-height:1.4;min-width:95px;text-align:center;" onclick="requestUserDelete(${u.id}, '${u.full_name}')"><i class="bi bi-trash-fill"></i> Req Delete</button>
               </div>
             </td>
           </tr>
@@ -5617,22 +6169,44 @@
     async function submitRegisterUser() {
       const resEl = document.getElementById('modal-reg-result');
       resEl.style.display = 'none';
-      const data = {
-        full_name: document.getElementById('modal-reg-name').value.trim(),
-        email: document.getElementById('modal-reg-email').value.trim(),
-        username: document.getElementById('modal-reg-user').value.trim(),
-        password: document.getElementById('modal-reg-pass').value.trim(),
-        role: document.getElementById('modal-reg-role').value
-      };
-      if (!data.full_name || !data.email || !data.username || !data.password) {
-        resEl.style.display = 'block'; resEl.style.color = '#842029'; resEl.style.background = '#f8d7da';
-        resEl.textContent = 'All fields are required.'; return;
-      }
+
+      const firstName = document.getElementById('modal-reg-first-name').value.trim();
+      const middleInitial = document.getElementById('modal-reg-middle-initial').value.trim();
+      const lastName = document.getElementById('modal-reg-last-name').value.trim();
+      const suffix = document.getElementById('modal-reg-suffix').value.trim();
+
+      const parts = [firstName, middleInitial ? middleInitial.replace(/\.*$/, '') + '.' : '', lastName, suffix].filter(Boolean);
+      const fullName = parts.join(' ');
+
+      const email = document.getElementById('modal-reg-email').value.trim();
+      const username = document.getElementById('modal-reg-user').value.trim();
+      const password = document.getElementById('modal-reg-pass').value.trim();
       const confirmPass = document.getElementById('modal-reg-pass-confirm').value.trim();
-      if (data.password !== confirmPass) {
+      const role = document.getElementById('modal-reg-role').value;
+
+      if (!firstName || !lastName || !email || !username || !password) {
+        resEl.style.display = 'block'; resEl.style.color = '#842029'; resEl.style.background = '#f8d7da';
+        resEl.textContent = 'First name, last name, email, username and password are required.'; return;
+      }
+      if (password !== confirmPass) {
         resEl.style.display = 'block'; resEl.style.color = '#842029'; resEl.style.background = '#f8d7da';
         resEl.textContent = 'Passwords do not match.'; return;
       }
+      const pwdErr = checkPasswordComplexity(password);
+      if (pwdErr) {
+        resEl.style.display = 'block'; resEl.style.color = '#842029'; resEl.style.background = '#f8d7da';
+        resEl.textContent = pwdErr; return;
+      }
+
+      const data = {
+        first_name: firstName,
+        middle_initial: middleInitial,
+        last_name: lastName,
+        suffix: suffix,
+        full_name: fullName,
+        email, username, password, role
+      };
+
       const res = await api('auth.php?action=register', data);
       resEl.style.display = 'block';
       if (res.success) {
@@ -5737,6 +6311,17 @@
           document.getElementById('sidebar-role').textContent = res.user.role === 'admin' ? 'Administrator' : 'Cashier';
           document.getElementById('sidebar-avatar').textContent = res.user.full_name.charAt(0).toUpperCase();
           loadMenuFromDB().then(() => activateApp(res.user.role === 'admin'));
+        } else if (res.pending_2fa && res.role === 'admin') {
+          // Resume pending 2FA step if page was reloaded
+          document.getElementById('pos-step-credentials').style.display = 'none';
+          document.getElementById('pos-step-2fa').style.display = 'block';
+          document.getElementById('pos-2fa-email').textContent = res.masked_email || 'Manager Email';
+          const codeInput = document.getElementById('pos-2fa-code');
+          if (res.dev_code) {
+            document.getElementById('pos-dev-hint').style.display = 'block';
+            document.getElementById('pos-dev-code-val').textContent = res.dev_code;
+            codeInput.value = res.dev_code;
+          }
         }
       }).catch(() => { });
     });

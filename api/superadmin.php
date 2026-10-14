@@ -286,8 +286,17 @@ function handleSAApproveRequest() {
             jsonResponse(['success' => false, 'message' => 'Username already taken — request auto-rejected.'], 409);
         }
 
-        $db->prepare("INSERT INTO users (username,password,full_name,email,role,is_active) VALUES (?,?,?,?,'admin',1)")
-           ->execute([$req['username'], $req['password'], $req['full_name'], $req['email']]);
+        $db->prepare("INSERT INTO users (username,password,first_name,last_name,middle_initial,suffix,full_name,email,role,is_active) VALUES (?,?,?,?,?,?,?,?,'admin',1)")
+           ->execute([
+               $req['username'],
+               $req['password'],
+               $req['first_name'] ?? null,
+               $req['last_name'] ?? null,
+               $req['middle_initial'] ?? null,
+               $req['suffix'] ?? null,
+               $req['full_name'],
+               $req['email']
+           ]);
         $db->prepare("UPDATE admin_registration_requests SET status='approved', approved_at=NOW() WHERE id=?")
            ->execute([$id]);
 
@@ -460,14 +469,25 @@ function handleSACreateUser() {
     $email     = trim($input['email']     ?? '');
     $role      = trim($input['role']      ?? 'cashier');
 
+    $first_name     = trim($input['first_name'] ?? '');
+    $last_name      = trim($input['last_name'] ?? '');
+    $middle_initial = trim($input['middle_initial'] ?? '');
+    $suffix         = trim($input['suffix'] ?? '');
+
+    if (!$full_name && ($first_name || $last_name)) {
+        $parts = array_filter([$first_name, $middle_initial ? $middle_initial . '.' : '', $last_name, $suffix]);
+        $full_name = implode(' ', $parts);
+    }
+
     if (!$username || !$password || !$full_name || !$email) {
         jsonResponse(['success' => false, 'message' => 'All fields required.'], 400);
     }
     if (!in_array($role, ['admin','cashier'])) { // SA cannot create another SA via UI
         jsonResponse(['success' => false, 'message' => 'Invalid role.'], 400);
     }
-    if (strlen($password) < 6) {
-        jsonResponse(['success' => false, 'message' => 'Password must be at least 6 characters.'], 400);
+    $pwdErr = '';
+    if (!validatePasswordComplexity($password, $pwdErr)) {
+        jsonResponse(['success' => false, 'message' => $pwdErr], 400);
     }
 
     $db = getDB();
@@ -478,8 +498,8 @@ function handleSACreateUser() {
     }
 
     $hashed = password_hash($password, PASSWORD_BCRYPT);
-    $db->prepare("INSERT INTO users (username,password,full_name,email,role,is_active) VALUES (?,?,?,?,?,1)")
-       ->execute([$username, $hashed, $full_name, $email, $role]);
+    $db->prepare("INSERT INTO users (username,password,first_name,last_name,middle_initial,suffix,full_name,email,role,is_active) VALUES (?,?,?,?,?,?,?,?,1)")
+       ->execute([$username, $hashed, $first_name ?: null, $last_name ?: null, $middle_initial ?: null, $suffix ?: null, $full_name, $email, $role]);
 
     $newId = $db->lastInsertId();
     logAction('create_user', 'user', $newId, "Created $role: $full_name ($username)");
@@ -554,8 +574,9 @@ function handleSAResetPassword() {
     if (!$userId || !$newPass) {
         jsonResponse(['success' => false, 'message' => 'User ID and new password required.'], 400);
     }
-    if (strlen($newPass) < 6) {
-        jsonResponse(['success' => false, 'message' => 'Password must be at least 6 characters.'], 400);
+    $pwdErr = '';
+    if (!validatePasswordComplexity($newPass, $pwdErr)) {
+        jsonResponse(['success' => false, 'message' => $pwdErr], 400);
     }
 
     $db = getDB();
