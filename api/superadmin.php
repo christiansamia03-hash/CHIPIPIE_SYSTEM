@@ -34,6 +34,7 @@ switch ($action) {
     case 'toggle_user':    handleSAToggleUser(); break;
     case 'reset_password': handleSAResetPassword(); break;
     case 'delete_user':    handleSADeleteUser(); break;
+    case 'delete_admin_request': handleSADeleteAdminRequest(); break;
     case 'orders':         handleSAOrders(); break;
     case 'logs':           handleSALogs(); break;
     case 'settings':       handleSASettings(); break;
@@ -245,6 +246,9 @@ function handleSARequests() {
     $stmt->execute($params);
     $requests = $stmt->fetchAll();
 
+    // Clean up any approved admin requests where the admin was deleted from users
+    $db->exec("DELETE FROM admin_registration_requests WHERE status='approved' AND username NOT IN (SELECT username FROM users)");
+
     // Also get pending admin registration requests
     $adminReqs = $db->query("
         SELECT id, username, full_name, email, status, created_at, approved_at
@@ -396,8 +400,60 @@ function handleSAApproveRequest() {
             case 'user_delete':
                 $userId = $payload['user_id'] ?? 0;
                 if ($userId) {
+                    $uStmt = $db->prepare("SELECT username, email, full_name FROM users WHERE id=?");
+                    $uStmt->execute([$userId]);
+                    $targetUser = $uStmt->fetch();
+                    if ($targetUser) {
+                        // Remove from admin approvals (admin_registration_requests)
+                        $db->prepare("DELETE FROM admin_registration_requests WHERE username=? OR email=?")
+                           ->execute([$targetUser['username'], $targetUser['email']]);
+                    }
+                    // Clean up any remaining system_requests for this user
+                    $db->prepare("DELETE FROM system_requests WHERE id != ? AND (payload LIKE ? OR payload LIKE ?)")
+                       ->execute([$id, '%"user_id":' . $userId . '%', '%"user_id":"' . $userId . '"%']);
+
                     $db->prepare("DELETE FROM users WHERE id=? AND role != 'super_admin'")->execute([$userId]);
                     $message = "User account deleted.";
+                }
+                break;
+
+            case 'menu_change':
+                $act = $payload['action'] ?? ($payload['item_id'] ? 'delete' : 'add');
+                if ($act === 'add') {
+                    $name = trim($payload['name'] ?? '');
+                    $categoryId = intval($payload['category_id'] ?? 1);
+                    $price = floatval($payload['price'] ?? 0);
+                    $image = $payload['image'] ?? null;
+                    $stock = intval($payload['stock'] ?? 0);
+                    $minStock = intval($payload['min_stock'] ?? 5);
+                    $sizePrices = $payload['size_prices'] ?? null;
+                    $sizePricesJson = null;
+                    if ($sizePrices && is_array($sizePrices)) {
+                        $sizePricesJson = json_encode($sizePrices);
+                    } elseif ($sizePrices && is_string($sizePrices)) {
+                        $sizePricesJson = $sizePrices;
+                    }
+
+                    if ($name && $categoryId && $price > 0) {
+                        $stmt = $db->prepare("INSERT INTO menu_items (name, category_id, price, size_prices, image, stock, min_stock, is_available) VALUES (?, ?, ?, ?, ?, ?, ?, ?)");
+                        $stmt->execute([$name, $categoryId, $price, $sizePricesJson, $image, $stock, $minStock, $stock > 0 ? 1 : 0]);
+                        $message = "Menu item '{$name}' approved and added to menu.";
+                    } else {
+                        $message = "Failed to add menu item: invalid item data.";
+                    }
+                } elseif ($act === 'delete') {
+                    $itemId = intval($payload['item_id'] ?? $payload['id'] ?? 0);
+                    if ($itemId) {
+                        $stmt = $db->prepare("SELECT name FROM menu_items WHERE id = ?");
+                        $stmt->execute([$itemId]);
+                        $itemRow = $stmt->fetch();
+                        $itemName = $itemRow ? $itemRow['name'] : "#$itemId";
+
+                        $db->prepare("DELETE FROM menu_items WHERE id = ?")->execute([$itemId]);
+                        $message = "Menu item '{$itemName}' approved and removed from menu.";
+                    } else {
+                        $message = "Failed to remove menu item: invalid item ID.";
+                    }
                 }
                 break;
         }
@@ -495,6 +551,13 @@ function handleSACreateUser() {
     $exists->execute([$username]);
     if ($exists->fetch()) {
         jsonResponse(['success' => false, 'message' => 'Username already taken.'], 409);
+    }
+
+    // Check if email already registered
+    $emailCheck = $db->prepare("SELECT id FROM users WHERE email=?");
+    $emailCheck->execute([$email]);
+    if ($emailCheck->fetch()) {
+        jsonResponse(['success' => false, 'message' => 'This email address is already registered to an existing account.'], 409);
     }
 
     $hashed = password_hash($password, PASSWORD_BCRYPT);
@@ -607,15 +670,45 @@ function handleSADeleteUser() {
     }
 
     $db = getDB();
-    $user = $db->prepare("SELECT id, username, full_name, role FROM users WHERE id=?");
+    $user = $db->prepare("SELECT id, username, full_name, email, role FROM users WHERE id=?");
     $user->execute([$userId]);
     $user = $user->fetch();
     if (!$user) jsonResponse(['success' => false, 'message' => 'User not found.'], 404);
     if ($user['role'] === 'super_admin') jsonResponse(['success' => false, 'message' => 'Cannot delete super admin.'], 403);
 
+    // Delete from admin approvals (admin_registration_requests)
+    $db->prepare("DELETE FROM admin_registration_requests WHERE username=? OR email=?")
+       ->execute([$user['username'], $user['email']]);
+
+    // Clean up any pending system_requests for this user
+    $db->prepare("DELETE FROM system_requests WHERE payload LIKE ? OR payload LIKE ?")
+       ->execute(['%"user_id":' . $userId . '%', '%"user_id":"' . $userId . '"%']);
+
     $db->prepare("DELETE FROM users WHERE id=?")->execute([$userId]);
     logAction('delete_user', 'user', $userId, "Deleted: {$user['full_name']} ({$user['username']})");
     jsonResponse(['success' => true, 'message' => "User '{$user['full_name']}' permanently deleted."]);
+}
+
+function handleSADeleteAdminRequest() {
+    requireSuperAdmin();
+    $input = getJsonInput();
+    $id = intval($input['id'] ?? 0);
+
+    if (!$id) {
+        jsonResponse(['success' => false, 'message' => 'Request ID required.'], 400);
+    }
+
+    $db = getDB();
+    $stmt = $db->prepare("SELECT id, username, full_name FROM admin_registration_requests WHERE id=?");
+    $stmt->execute([$id]);
+    $req = $stmt->fetch();
+    if (!$req) {
+        jsonResponse(['success' => false, 'message' => 'Admin request not found.'], 404);
+    }
+
+    $db->prepare("DELETE FROM admin_registration_requests WHERE id=?")->execute([$id]);
+    logAction('delete_admin_registration_request', 'admin_registration_request', $id, "Deleted admin request: {$req['full_name']} ({$req['username']})");
+    jsonResponse(['success' => true, 'message' => "Admin request for '{$req['full_name']}' permanently removed."]);
 }
 
 // =====================================================
@@ -625,20 +718,64 @@ function handleSAOrders() {
     requireSuperAdmin();
     $db = getDB();
 
-    $date   = $_GET['date']   ?? '';
-    $status = $_GET['status'] ?? '';
-    $limit  = min(intval($_GET['limit'] ?? 100), 500);
+    $dateMode = trim($_GET['date_mode'] ?? '');
+    $dateVal  = trim($_GET['date_val']  ?? '');
+    $date     = trim($_GET['date']      ?? 'today');
+    $status   = trim($_GET['status']    ?? '');
+    $limit    = min(intval($_GET['limit'] ?? 100), 500);
 
     $where  = [];
     $params = [];
 
-    if ($date === 'today') { $where[] = 'DATE(o.created_at) = CURDATE()'; }
-    elseif ($date === 'week') { $where[] = 'YEARWEEK(o.created_at, 1) = YEARWEEK(CURDATE(), 1)'; }
-    elseif ($date === 'month') { $where[] = 'MONTH(o.created_at) = MONTH(CURDATE()) AND YEAR(o.created_at) = YEAR(CURDATE())'; }
-    elseif ($date === 'year') { $where[] = 'YEAR(o.created_at) = YEAR(CURDATE())'; }
-    elseif ($date && $date !== 'all') { $where[] = 'DATE(o.created_at) = ?'; $params[] = $date; }
+    if ($dateMode === 'date' && $dateVal) {
+        if (preg_match('/^\d{4}-\d{2}-\d{2}$/', $dateVal)) {
+            $where[]  = "DATE(o.created_at) = ?";
+            $params[] = $dateVal;
+        }
+    } elseif ($dateMode === 'week' && $dateVal) {
+        if (preg_match('/^(\d{4})-W(\d{1,2})$/', $dateVal, $m)) {
+            $dto = new DateTime();
+            $dto->setISODate(intval($m[1]), intval($m[2]));
+            $start = $dto->format('Y-m-d 00:00:00');
+            $dto->modify('+6 days');
+            $end = $dto->format('Y-m-d 23:59:59');
+            $where[]  = "o.created_at BETWEEN ? AND ?";
+            $params[] = $start;
+            $params[] = $end;
+        }
+    } elseif ($dateMode === 'month' && $dateVal) {
+        if (preg_match('/^(\d{4})-(\d{2})$/', $dateVal)) {
+            $start = $dateVal . "-01 00:00:00";
+            $end   = date("Y-m-t 23:59:59", strtotime($start));
+            $where[]  = "o.created_at BETWEEN ? AND ?";
+            $params[] = $start;
+            $params[] = $end;
+        }
+    } elseif ($dateMode === 'year' && $dateVal) {
+        $year = intval($dateVal);
+        if ($year >= 2000 && $year <= 2100) {
+            $where[]  = "YEAR(o.created_at) = ?";
+            $params[] = $year;
+        }
+    } elseif ($date === 'today') {
+        $where[] = 'DATE(o.created_at) = CURDATE()';
+    } elseif ($date === 'week') {
+        $where[] = 'YEARWEEK(o.created_at, 1) = YEARWEEK(CURDATE(), 1)';
+    } elseif ($date === 'month') {
+        $where[] = 'MONTH(o.created_at) = MONTH(CURDATE()) AND YEAR(o.created_at) = YEAR(CURDATE())';
+    } elseif ($date === 'year') {
+        $where[] = 'YEAR(o.created_at) = YEAR(CURDATE())';
+    } elseif ($date && $date !== 'all') {
+        if (preg_match('/^\d{4}-\d{2}-\d{2}$/', $date)) {
+            $where[] = 'DATE(o.created_at) = ?';
+            $params[] = $date;
+        }
+    }
 
-    if ($status) { $where[] = 'o.status = ?'; $params[] = $status; }
+    if ($status) {
+        $where[] = 'o.status = ?';
+        $params[] = $status;
+    }
 
     $whereClause = $where ? 'WHERE ' . implode(' AND ', $where) : '';
 
@@ -663,6 +800,7 @@ function handleSAOrders() {
         $items->execute([$order['id']]);
         $order['items'] = $items->fetchAll();
     }
+    unset($order);
 
     jsonResponse(['success' => true, 'orders' => $orders]);
 }
@@ -672,14 +810,90 @@ function handleSAOrders() {
 // =====================================================
 function handleSALogs() {
     requireSuperAdmin();
-    $db   = getDB();
-    $limit = min(intval($_GET['limit'] ?? 100), 1000);
+    $db    = getDB();
+    $limit = min(intval($_GET['limit'] ?? 200), 1000);
 
-    $logs = $db->query("
-        SELECT * FROM system_logs ORDER BY created_at DESC LIMIT $limit
-    ")->fetchAll();
+    $dateMode = trim($_GET['date_mode'] ?? 'all');
+    $dateVal  = trim($_GET['date_val']  ?? '');
 
-    jsonResponse(['success' => true, 'logs' => $logs]);
+    // Fallback support for standard date param (e.g. today, week, month, year)
+    $dateParam = trim($_GET['date'] ?? '');
+    if ($dateParam && $dateMode === 'all') {
+        if ($dateParam === 'today') {
+            $dateMode = 'date';
+            $dateVal  = date('Y-m-d');
+        } elseif ($dateParam === 'week') {
+            $dateMode = 'week';
+            $dateVal  = date('Y-\WW');
+        } elseif ($dateParam === 'month') {
+            $dateMode = 'month';
+            $dateVal  = date('Y-m');
+        } elseif ($dateParam === 'year') {
+            $dateMode = 'year';
+            $dateVal  = date('Y');
+        } elseif ($dateParam !== 'all') {
+            $dateMode = 'date';
+            $dateVal  = $dateParam;
+        }
+    }
+
+    $where  = [];
+    $params = [];
+
+    if ($dateMode === 'date' && $dateVal) {
+        if (preg_match('/^\d{4}-\d{2}-\d{2}$/', $dateVal)) {
+            $where[]  = "DATE(created_at) = ?";
+            $params[] = $dateVal;
+        }
+    } elseif ($dateMode === 'week' && $dateVal) {
+        // Format YYYY-Www, e.g. 2026-W42
+        if (preg_match('/^(\d{4})-W(\d{1,2})$/', $dateVal, $m)) {
+            $year = intval($m[1]);
+            $week = intval($m[2]);
+            $dto  = new DateTime();
+            $dto->setISODate($year, $week);
+            $start = $dto->format('Y-m-d 00:00:00');
+            $dto->modify('+6 days');
+            $end   = $dto->format('Y-m-d 23:59:59');
+            $where[]  = "created_at BETWEEN ? AND ?";
+            $params[] = $start;
+            $params[] = $end;
+        }
+    } elseif ($dateMode === 'month' && $dateVal) {
+        // Format YYYY-MM, e.g. 2026-10
+        if (preg_match('/^(\d{4})-(\d{2})$/', $dateVal)) {
+            $start = $dateVal . "-01 00:00:00";
+            $end   = date("Y-m-t 23:59:59", strtotime($start));
+            $where[]  = "created_at BETWEEN ? AND ?";
+            $params[] = $start;
+            $params[] = $end;
+        }
+    } elseif ($dateMode === 'year' && $dateVal) {
+        $year = intval($dateVal);
+        if ($year >= 2000 && $year <= 2100) {
+            $where[]  = "YEAR(created_at) = ?";
+            $params[] = $year;
+        }
+    }
+
+    $whereClause = !empty($where) ? 'WHERE ' . implode(' AND ', $where) : '';
+
+    $stmt = $db->prepare("
+        SELECT * FROM system_logs 
+        $whereClause 
+        ORDER BY created_at DESC 
+        LIMIT $limit
+    ");
+    $stmt->execute($params);
+    $logs = $stmt->fetchAll();
+
+    jsonResponse([
+        'success'   => true, 
+        'logs'      => $logs, 
+        'date_mode' => $dateMode, 
+        'date_val'  => $dateVal,
+        'count'     => count($logs)
+    ]);
 }
 
 // =====================================================

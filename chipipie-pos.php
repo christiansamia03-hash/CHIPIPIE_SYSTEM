@@ -2324,7 +2324,9 @@
           </div>
           <div class="col-md-2 col-5">
             <label class="form-label mb-1" style="font-size:12px;font-weight:600;">M.I.</label>
-            <input type="text" id="reg-middle-initial" class="form-control" placeholder="D." maxlength="5" style="padding:7px 10px;font-size:13px;">
+            <input type="text" id="reg-middle-initial" class="form-control" placeholder="D" maxlength="1"
+              style="padding:7px 10px;font-size:13px;text-transform:uppercase;"
+              oninput="this.value=this.value.replace(/[^a-zA-Z]/g,'').toUpperCase()">
           </div>
           <div class="col-md-4 col-8">
             <label class="form-label mb-1" style="font-size:12px;font-weight:600;">Last Name *</label>
@@ -2332,7 +2334,15 @@
           </div>
           <div class="col-md-2 col-4">
             <label class="form-label mb-1" style="font-size:12px;font-weight:600;">Suffix</label>
-            <input type="text" id="reg-suffix" class="form-control" placeholder="Jr., III" maxlength="15" style="padding:7px 10px;font-size:13px;">
+            <select id="reg-suffix" class="form-select" style="padding:7px 10px;font-size:13px;">
+              <option value="">None</option>
+              <option value="Jr.">Jr.</option>
+              <option value="Sr.">Sr.</option>
+              <option value="II">II</option>
+              <option value="III">III</option>
+              <option value="IV">IV</option>
+              <option value="V">V</option>
+            </select>
           </div>
         </div>
 
@@ -2340,11 +2350,16 @@
         <div class="row g-2 mb-2">
           <div class="col-md-6 col-12">
             <label class="form-label mb-1" style="font-size:12px;font-weight:600;">Email *</label>
-            <input type="email" id="reg-email" class="form-control" placeholder="juan@example.com" required style="padding:7px 10px;font-size:13px;">
+            <input type="email" id="reg-email" class="form-control" placeholder="juan@example.com" required
+              style="padding:7px 10px;font-size:13px;"
+              oninput="suggestUsernameFromEmail('reg-email','reg-user')">
           </div>
           <div class="col-md-6 col-12">
             <label class="form-label mb-1" style="font-size:12px;font-weight:600;">Username *</label>
-            <input type="text" id="reg-user" class="form-control" placeholder="juandc" required style="padding:7px 10px;font-size:13px;">
+            <div style="position:relative;">
+              <input type="text" id="reg-user" class="form-control" placeholder="juandc" required style="padding:7px 10px;font-size:13px;">
+              <span id="reg-user-hint" style="display:none;position:absolute;right:10px;top:50%;transform:translateY(-50%);font-size:10px;color:#888;pointer-events:none;">auto-filled</span>
+            </div>
           </div>
         </div>
 
@@ -2659,6 +2674,12 @@
             <button id="ofilter-week" class="cat-pill" onclick="setOrderFilter('week',  this)">This Week</button>
             <button id="ofilter-month" class="cat-pill" onclick="setOrderFilter('month', this)">This Month</button>
             <button id="ofilter-year" class="cat-pill" onclick="setOrderFilter('year',  this)">This Year</button>
+            <!-- Separator -->
+            <span style="width:1px;background:#ddd;margin:0 4px;align-self:stretch;"></span>
+            <button id="ofilter-pick-date"  class="cat-pill" onclick="setOrderPickerMode('date')"><i class="bi bi-calendar-event"></i> Date</button>
+            <button id="ofilter-pick-week"  class="cat-pill" onclick="setOrderPickerMode('week')"><i class="bi bi-calendar-range"></i> Week</button>
+            <button id="ofilter-pick-month" class="cat-pill" onclick="setOrderPickerMode('month')"><i class="bi bi-calendar-month"></i> Month</button>
+            <button id="ofilter-pick-year"  class="cat-pill" onclick="setOrderPickerMode('year')"><i class="bi bi-calendar"></i> Year</button>
           </div>
           <div class="d-flex align-items-center gap-2">
             <span class="badge-success" id="orders-count-badge">0 orders</span>
@@ -2666,6 +2687,59 @@
               style="background:var(--cafe-brown);color:#fff;border:none;border-radius:8px;padding:7px 16px;font-size:13px;font-weight:600;cursor:pointer;display:flex;align-items:center;gap:6px;">
               <i class="bi bi-printer-fill"></i> Print Report
             </button>
+          </div>
+        </div>
+
+        <!-- Orders Date Picker Card -->
+        <div id="order-picker-card" class="kpi-card mb-3" style="display:none;padding:12px 16px;">
+          <div style="display:flex;align-items:center;gap:8px;margin-bottom:10px;">
+            <i class="bi bi-calendar3" style="color:var(--cafe-brown);font-size:15px;"></i>
+            <span style="font-size:13px;font-weight:700;color:var(--cafe-brown);">Custom Date Filter</span>
+            <span id="order-picker-summary" style="font-size:12px;color:#888;margin-left:6px;"></span>
+          </div>
+          <!-- DATE -->
+          <div id="order-picker-date" class="order-picker-section" style="display:none;">
+            <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;">
+              <label style="font-size:12px;font-weight:600;color:#555;">Choose Date:</label>
+              <button type="button" onclick="shiftOrderDate(-1)" style="background:#f3f4f6;border:1px solid #e5e7eb;border-radius:6px;padding:4px 8px;cursor:pointer;font-size:13px;"><i class="bi bi-chevron-left"></i></button>
+              <input type="date" id="order-input-date" style="border:1px solid #e5e7eb;border-radius:6px;padding:5px 10px;font-size:13px;outline:none;" onchange="applyOrderPickerFilter()">
+              <button type="button" onclick="shiftOrderDate(1)"  style="background:#f3f4f6;border:1px solid #e5e7eb;border-radius:6px;padding:4px 8px;cursor:pointer;font-size:13px;"><i class="bi bi-chevron-right"></i></button>
+              <button type="button" onclick="setOrderPickerToday()" style="background:#f3f4f6;border:1px solid #e5e7eb;border-radius:6px;padding:4px 10px;font-size:12px;cursor:pointer;font-weight:600;">Today</button>
+              <span id="order-date-label" style="font-size:12px;font-weight:600;color:var(--cafe-brown);"></span>
+            </div>
+          </div>
+          <!-- WEEK -->
+          <div id="order-picker-week" class="order-picker-section" style="display:none;">
+            <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;">
+              <label style="font-size:12px;font-weight:600;color:#555;">Choose Week:</label>
+              <button type="button" onclick="shiftOrderWeek(-1)" style="background:#f3f4f6;border:1px solid #e5e7eb;border-radius:6px;padding:4px 8px;cursor:pointer;font-size:13px;"><i class="bi bi-chevron-left"></i></button>
+              <input type="week" id="order-input-week" style="border:1px solid #e5e7eb;border-radius:6px;padding:5px 10px;font-size:13px;outline:none;" onchange="applyOrderPickerFilter()">
+              <button type="button" onclick="shiftOrderWeek(1)"  style="background:#f3f4f6;border:1px solid #e5e7eb;border-radius:6px;padding:4px 8px;cursor:pointer;font-size:13px;"><i class="bi bi-chevron-right"></i></button>
+              <button type="button" onclick="setOrderPickerThisWeek()" style="background:#f3f4f6;border:1px solid #e5e7eb;border-radius:6px;padding:4px 10px;font-size:12px;cursor:pointer;font-weight:600;">This Week</button>
+              <span id="order-week-label" style="font-size:12px;font-weight:600;color:var(--cafe-brown);"></span>
+            </div>
+          </div>
+          <!-- MONTH -->
+          <div id="order-picker-month" class="order-picker-section" style="display:none;">
+            <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;">
+              <label style="font-size:12px;font-weight:600;color:#555;">Choose Month:</label>
+              <button type="button" onclick="shiftOrderMonth(-1)" style="background:#f3f4f6;border:1px solid #e5e7eb;border-radius:6px;padding:4px 8px;cursor:pointer;font-size:13px;"><i class="bi bi-chevron-left"></i></button>
+              <input type="month" id="order-input-month" style="border:1px solid #e5e7eb;border-radius:6px;padding:5px 10px;font-size:13px;outline:none;" onchange="applyOrderPickerFilter()">
+              <button type="button" onclick="shiftOrderMonth(1)"  style="background:#f3f4f6;border:1px solid #e5e7eb;border-radius:6px;padding:4px 8px;cursor:pointer;font-size:13px;"><i class="bi bi-chevron-right"></i></button>
+              <button type="button" onclick="setOrderPickerThisMonth()" style="background:#f3f4f6;border:1px solid #e5e7eb;border-radius:6px;padding:4px 10px;font-size:12px;cursor:pointer;font-weight:600;">This Month</button>
+              <span id="order-month-label" style="font-size:12px;font-weight:600;color:var(--cafe-brown);"></span>
+            </div>
+          </div>
+          <!-- YEAR -->
+          <div id="order-picker-year" class="order-picker-section" style="display:none;">
+            <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;">
+              <label style="font-size:12px;font-weight:600;color:#555;">Choose Year:</label>
+              <button type="button" onclick="shiftOrderYear(-1)" style="background:#f3f4f6;border:1px solid #e5e7eb;border-radius:6px;padding:4px 8px;cursor:pointer;font-size:13px;"><i class="bi bi-chevron-left"></i></button>
+              <select id="order-input-year" style="border:1px solid #e5e7eb;border-radius:6px;padding:5px 10px;font-size:13px;outline:none;" onchange="applyOrderPickerFilter()"></select>
+              <button type="button" onclick="shiftOrderYear(1)"  style="background:#f3f4f6;border:1px solid #e5e7eb;border-radius:6px;padding:4px 8px;cursor:pointer;font-size:13px;"><i class="bi bi-chevron-right"></i></button>
+              <button type="button" onclick="setOrderPickerThisYear()" style="background:#f3f4f6;border:1px solid #e5e7eb;border-radius:6px;padding:4px 10px;font-size:12px;cursor:pointer;font-weight:600;">This Year</button>
+              <span id="order-year-label" style="font-size:12px;font-weight:600;color:var(--cafe-brown);"></span>
+            </div>
           </div>
         </div>
 
@@ -2972,10 +3046,6 @@
             <button class="btn-cafe-primary" style="width:auto;padding:8px 18px;" onclick="showRegisterUserModal()">
               <i class="bi bi-person-plus me-1"></i>Add User
             </button>
-            <button class="btn-cafe-secondary" style="width:auto;padding:8px 18px;margin-top:0;margin-left:8px;"
-              onclick="requestBypassToken()">
-              <i class="bi bi-key me-1"></i>Request Bypass Token
-            </button>
           </div>
         </div>
 
@@ -3097,26 +3167,45 @@
     </div>
   </div>
 
-  <!-- DELETE CONFIRM MODAL (requires token) -->
-  <div class="modal fade" id="deleteTokenModal" tabindex="-1">
-    <div class="modal-dialog modal-dialog-centered modal-sm">
-      <div class="modal-content">
-        <div class="modal-header" style="border-bottom:1px solid var(--cafe-tan);">
-          <h5 class="modal-title" style="color:#842029;font-size:15px;"><i class="bi bi-shield-lock me-2"></i>Enter
-            Bypass Token</h5>
+  <!-- REMOVE MENU ITEM MODAL -->
+  <div class="modal fade" id="deleteItemModal" tabindex="-1">
+    <div class="modal-dialog modal-dialog-centered">
+      <div class="modal-content" style="border-radius:16px;overflow:hidden;border:1px solid var(--cafe-tan);">
+        <div class="modal-header" style="background:#fdf2f2;border-bottom:1px solid #fecaca;padding:16px 20px;">
+          <h5 class="modal-title" style="color:#991b1b;font-size:16px;font-weight:700;">
+            <i class="bi bi-trash3-fill me-2" style="color:#dc2626;"></i>Request Item Removal
+          </h5>
           <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
         </div>
         <div class="modal-body p-4">
-          <p style="font-size:12px;color:#666;margin-bottom:12px;">Enter the token sent to your email to confirm
-            deletion.</p>
-          <input type="text" class="form-control text-center" id="delete-token-input" placeholder="XXXXXXXX"
-            style="font-size:18px;letter-spacing:3px;font-weight:700;font-family:monospace;" maxlength="8">
-          <div id="delete-token-error" style="display:none;color:#842029;font-size:12px;margin-top:8px;"></div>
+          <div style="background:#faf8f5;border:1px solid var(--cafe-tan);border-radius:12px;padding:14px 16px;margin-bottom:16px;display:flex;align-items:center;gap:14px;">
+            <div id="del-modal-img-wrap" style="width:48px;height:48px;border-radius:10px;background:var(--cafe-cream);display:flex;align-items:center;justify-content:center;font-size:22px;border:1px solid var(--cafe-tan);flex-shrink:0;">
+              ☕
+            </div>
+            <div style="flex:1;min-width:0;">
+              <div id="del-modal-item-name" style="font-weight:700;font-size:15px;color:var(--cafe-brown);line-height:1.2;">Item Name</div>
+              <div style="font-size:12px;color:#78716c;margin-top:2px;">
+                <span id="del-modal-item-cat">Category</span> · <span id="del-modal-item-price" style="font-weight:600;color:var(--cafe-brown);">₱0.00</span> · <span id="del-modal-item-stock">0 in stock</span>
+              </div>
+            </div>
+          </div>
+
+          <div class="mb-3">
+            <label class="form-label" style="font-size:12.5px;font-weight:600;color:var(--cafe-brown);">Reason for Removal (optional)</label>
+            <input type="text" class="form-control" id="del-modal-reason" placeholder="e.g. Out of season, discontinued, shortage" style="font-size:13px;border-radius:8px;">
+          </div>
+
+          <div style="background:#fff8e6;border:1px solid #ffe08a;border-radius:10px;padding:10px 14px;font-size:12px;color:#856404;display:flex;align-items:flex-start;gap:10px;">
+            <i class="bi bi-info-circle-fill" style="font-size:15px;margin-top:1px;color:#d97706;flex-shrink:0;"></i>
+            <span>This request will be sent directly to the <strong>admin email</strong> for approval, or the <strong>Super Admin</strong> can approve it in the Control Center without using codes.</span>
+          </div>
+          <div id="del-modal-error" style="display:none;color:#dc2626;font-size:12.5px;margin-top:10px;text-align:center;font-weight:600;"></div>
         </div>
-        <div class="modal-footer" style="border-top:1px solid var(--cafe-tan);gap:8px;">
-          <button class="btn btn-outline-secondary btn-sm" data-bs-dismiss="modal">Cancel</button>
-          <button class="btn btn-sm" style="background:#842029;color:#fff;" onclick="confirmDeleteWithToken()"
-            id="delete-confirm-btn">Confirm Delete</button>
+        <div class="modal-footer" style="border-top:1px solid var(--cafe-tan);padding:12px 20px;gap:8px;">
+          <button type="button" class="btn btn-outline-secondary btn-sm" data-bs-dismiss="modal" style="padding:7px 16px;border-radius:8px;">Cancel</button>
+          <button type="button" class="btn btn-sm" id="del-modal-confirm-btn" onclick="submitRemoveMenuItem()" style="background:linear-gradient(135deg, #dc2626, #b91c1c);color:#fff;border:none;border-radius:8px;padding:7px 18px;font-weight:600;">
+            <i class="bi bi-send-fill me-1"></i> Submit Removal Request
+          </button>
         </div>
       </div>
     </div>
@@ -3179,7 +3268,9 @@
             </div>
             <div class="col-md-2 col-5">
               <label class="form-label mb-1" style="font-size:12px;font-weight:600;">M.I.</label>
-              <input type="text" class="form-control" id="modal-reg-middle-initial" placeholder="D." maxlength="5" style="padding:7px 10px;font-size:13px;">
+              <input type="text" class="form-control" id="modal-reg-middle-initial" placeholder="D" maxlength="1"
+                style="padding:7px 10px;font-size:13px;text-transform:uppercase;"
+                oninput="this.value=this.value.replace(/[^a-zA-Z]/g,'').toUpperCase()">
             </div>
             <div class="col-md-4 col-8">
               <label class="form-label mb-1" style="font-size:12px;font-weight:600;">Last Name *</label>
@@ -3187,7 +3278,15 @@
             </div>
             <div class="col-md-2 col-4">
               <label class="form-label mb-1" style="font-size:12px;font-weight:600;">Suffix</label>
-              <input type="text" class="form-control" id="modal-reg-suffix" placeholder="Jr., III" maxlength="15" style="padding:7px 10px;font-size:13px;">
+              <select class="form-select" id="modal-reg-suffix" style="padding:7px 10px;font-size:13px;">
+                <option value="">None</option>
+                <option value="Jr.">Jr.</option>
+                <option value="Sr.">Sr.</option>
+                <option value="II">II</option>
+                <option value="III">III</option>
+                <option value="IV">IV</option>
+                <option value="V">V</option>
+              </select>
             </div>
           </div>
 
@@ -3195,11 +3294,16 @@
           <div class="row g-2 mb-2">
             <div class="col-md-6 col-12">
               <label class="form-label mb-1" style="font-size:12px;font-weight:600;">Email *</label>
-              <input type="email" class="form-control" id="modal-reg-email" placeholder="juan@example.com" style="padding:7px 10px;font-size:13px;">
+              <input type="email" class="form-control" id="modal-reg-email" placeholder="juan@example.com"
+                style="padding:7px 10px;font-size:13px;"
+                oninput="suggestUsernameFromEmail('modal-reg-email','modal-reg-user')">
             </div>
             <div class="col-md-6 col-12">
               <label class="form-label mb-1" style="font-size:12px;font-weight:600;">Username *</label>
-              <input type="text" class="form-control" id="modal-reg-user" placeholder="juandc" style="padding:7px 10px;font-size:13px;">
+              <div style="position:relative;">
+                <input type="text" class="form-control" id="modal-reg-user" placeholder="juandc" style="padding:7px 10px;font-size:13px;">
+                <span id="modal-reg-user-hint" style="display:none;position:absolute;right:10px;top:50%;transform:translateY(-50%);font-size:10px;color:#888;pointer-events:none;">auto-filled</span>
+              </div>
             </div>
           </div>
 
@@ -3441,6 +3545,7 @@
 
     /* ========== DATA ========== */
     let menuItems = [];
+    let pendingDeleteIds = new Set();
 
     const _now = new Date();
     const dToday = _now.toDateString();
@@ -4409,12 +4514,180 @@
 
     /* ========== ORDERS ========== */
     let currentOrderFilter = 'today';
+    let _orderPickerMode   = '';  // '' | 'date' | 'week' | 'month' | 'year'
+    let _orderPickerVal    = '';
+
+    function _formatLocalDate(d) {
+      return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
+    }
+    function _getISOWeekString(date) {
+      const d = new Date(Date.UTC(date.getFullYear(), date.getMonth(), date.getDate()));
+      const dn = d.getUTCDay() || 7;
+      d.setUTCDate(d.getUTCDate() + 4 - dn);
+      const y  = new Date(Date.UTC(d.getUTCFullYear(), 0, 1));
+      const wn = Math.ceil((((d - y) / 86400000) + 1) / 7);
+      return `${d.getUTCFullYear()}-W${String(wn).padStart(2,'0')}`;
+    }
+    function _getISOWeekRange(weekStr) {
+      if (!weekStr) return '';
+      const parts = weekStr.split('-W');
+      if (parts.length !== 2) return '';
+      const year = parseInt(parts[0], 10), week = parseInt(parts[1], 10);
+      const simple = new Date(year, 0, 4);
+      const dow = simple.getDay() || 7;
+      const monday = new Date(simple);
+      monday.setDate(simple.getDate() - dow + 1 + (week - 1) * 7);
+      const sunday = new Date(monday);
+      sunday.setDate(monday.getDate() + 6);
+      const opt = { month: 'short', day: 'numeric' };
+      return `Week ${week} (${monday.toLocaleDateString('en-US', opt)} – ${sunday.toLocaleDateString('en-US', opt)}, ${year})`;
+    }
+    function _initOrderPickerControls() {
+      const now = new Date();
+      const di = document.getElementById('order-input-date');
+      if (di && !di.value) di.value = _formatLocalDate(now);
+      const wi = document.getElementById('order-input-week');
+      if (wi && !wi.value) wi.value = _getISOWeekString(now);
+      const mi = document.getElementById('order-input-month');
+      if (mi && !mi.value) mi.value = `${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,'0')}`;
+      const ys = document.getElementById('order-input-year');
+      if (ys && ys.options.length === 0) {
+        const cy = now.getFullYear();
+        for (let yr = cy + 1; yr >= 2022; yr--) {
+          const o = new Option(yr, yr);
+          if (yr === cy) o.selected = true;
+          ys.add(o);
+        }
+      }
+    }
 
     function setOrderFilter(filter, btn) {
+      // Clear picker mode when a quick tab is clicked
+      _orderPickerMode = '';
+      _orderPickerVal  = '';
+      const card = document.getElementById('order-picker-card');
+      if (card) card.style.display = 'none';
+      ['pick-date','pick-week','pick-month','pick-year'].forEach(id => {
+        const el = document.getElementById('ofilter-' + id);
+        if (el) el.classList.remove('active');
+      });
       currentOrderFilter = filter;
       document.querySelectorAll('#order-filter-tabs .cat-pill').forEach(b => b.classList.remove('active'));
       if (btn) btn.classList.add('active');
       renderOrders();
+    }
+
+    function setOrderPickerMode(mode) {
+      _orderPickerMode = mode;
+      _initOrderPickerControls();
+      // Deactivate quick tabs
+      document.querySelectorAll('#order-filter-tabs .cat-pill').forEach(b => b.classList.remove('active'));
+      const ab = document.getElementById('ofilter-pick-' + mode);
+      if (ab) ab.classList.add('active');
+      // Show picker card
+      const card = document.getElementById('order-picker-card');
+      if (card) card.style.display = 'block';
+      ['date','week','month','year'].forEach(m => {
+        const el = document.getElementById('order-picker-' + m);
+        if (el) el.style.display = m === mode ? 'block' : 'none';
+      });
+      applyOrderPickerFilter();
+    }
+
+    function applyOrderPickerFilter() {
+      _initOrderPickerControls();
+      const sumEl = document.getElementById('order-picker-summary');
+      if (_orderPickerMode === 'date') {
+        _orderPickerVal = document.getElementById('order-input-date')?.value || _formatLocalDate(new Date());
+        const parts = (_orderPickerVal || '').split('-');
+        let txt = _orderPickerVal;
+        if (parts.length === 3) {
+          const d = new Date(parseInt(parts[0],10), parseInt(parts[1],10)-1, parseInt(parts[2],10));
+          txt = d.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric', year: 'numeric' });
+        }
+        const lbl = document.getElementById('order-date-label');
+        if (lbl) lbl.textContent = txt;
+        if (sumEl) sumEl.textContent = `Showing: ${txt}`;
+      } else if (_orderPickerMode === 'week') {
+        _orderPickerVal = document.getElementById('order-input-week')?.value || _getISOWeekString(new Date());
+        const txt = _getISOWeekRange(_orderPickerVal) || _orderPickerVal;
+        const lbl = document.getElementById('order-week-label');
+        if (lbl) lbl.textContent = txt;
+        if (sumEl) sumEl.textContent = `Showing: ${txt}`;
+      } else if (_orderPickerMode === 'month') {
+        _orderPickerVal = document.getElementById('order-input-month')?.value || `${new Date().getFullYear()}-${String(new Date().getMonth()+1).padStart(2,'0')}`;
+        const parts = (_orderPickerVal || '').split('-');
+        let txt = _orderPickerVal;
+        if (parts.length === 2) {
+          const d = new Date(parseInt(parts[0],10), parseInt(parts[1],10)-1, 1);
+          txt = d.toLocaleDateString('en-US', { month: 'long', year: 'numeric' });
+        }
+        const lbl = document.getElementById('order-month-label');
+        if (lbl) lbl.textContent = txt;
+        if (sumEl) sumEl.textContent = `Showing: ${txt}`;
+      } else if (_orderPickerMode === 'year') {
+        _orderPickerVal = document.getElementById('order-input-year')?.value || String(new Date().getFullYear());
+        const lbl = document.getElementById('order-year-label');
+        if (lbl) lbl.textContent = `Year ${_orderPickerVal}`;
+        if (sumEl) sumEl.textContent = `Showing: Year ${_orderPickerVal}`;
+      }
+      renderOrders();
+    }
+
+    function shiftOrderDate(delta) {
+      const input = document.getElementById('order-input-date');
+      const val = input.value || _formatLocalDate(new Date());
+      const parts = val.split('-');
+      const d = new Date(parseInt(parts[0],10), parseInt(parts[1],10)-1, parseInt(parts[2],10));
+      d.setDate(d.getDate() + delta);
+      input.value = _formatLocalDate(d);
+      applyOrderPickerFilter();
+    }
+    function setOrderPickerToday() {
+      document.getElementById('order-input-date').value = _formatLocalDate(new Date());
+      applyOrderPickerFilter();
+    }
+    function shiftOrderWeek(delta) {
+      const input = document.getElementById('order-input-week');
+      const val = input.value || _getISOWeekString(new Date());
+      const parts = val.split('-W');
+      let y = parseInt(parts[0],10), w = parseInt(parts[1],10) + delta;
+      if (w < 1) { y--; w = 52; } else if (w > 52) { y++; w = 1; }
+      input.value = `${y}-W${String(w).padStart(2,'0')}`;
+      applyOrderPickerFilter();
+    }
+    function setOrderPickerThisWeek() {
+      document.getElementById('order-input-week').value = _getISOWeekString(new Date());
+      applyOrderPickerFilter();
+    }
+    function shiftOrderMonth(delta) {
+      const input = document.getElementById('order-input-month');
+      const val = input.value || `${new Date().getFullYear()}-${String(new Date().getMonth()+1).padStart(2,'0')}`;
+      const parts = val.split('-');
+      let y = parseInt(parts[0],10), m = parseInt(parts[1],10) - 1 + delta;
+      const d = new Date(y, m, 1);
+      input.value = `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}`;
+      applyOrderPickerFilter();
+    }
+    function setOrderPickerThisMonth() {
+      const now = new Date();
+      document.getElementById('order-input-month').value = `${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,'0')}`;
+      applyOrderPickerFilter();
+    }
+    function shiftOrderYear(delta) {
+      const select = document.getElementById('order-input-year');
+      const cur = parseInt(select.value || new Date().getFullYear(), 10);
+      const target = cur + delta;
+      let found = false;
+      for (let opt of select.options) {
+        if (parseInt(opt.value,10) === target) { select.value = target; found = true; break; }
+      }
+      if (!found) { const opt = new Option(target, target); select.add(opt); select.value = target; }
+      applyOrderPickerFilter();
+    }
+    function setOrderPickerThisYear() {
+      document.getElementById('order-input-year').value = new Date().getFullYear();
+      applyOrderPickerFilter();
     }
 
     async function renderOrders() {
@@ -4423,8 +4696,15 @@
       if (loadingEl) loadingEl.style.display = 'block';
       if (listEl)    listEl.style.display = 'none';
 
+      let apiUrl;
+      if (_orderPickerMode && _orderPickerVal) {
+        apiUrl = `orders.php?date_mode=${_orderPickerMode}&date_val=${encodeURIComponent(_orderPickerVal)}`;
+      } else {
+        apiUrl = `orders.php?date=${currentOrderFilter}`;
+      }
+
       try {
-        const res = await api(`orders.php?date=${currentOrderFilter}`);
+        const res = await api(apiUrl);
         if (!res.success) { if (loadingEl) loadingEl.style.display = 'none'; return; }
 
         // Store for void table reference
@@ -4435,12 +4715,19 @@
         const ordCount = res.total_orders || 0;
         const ordRev   = res.total_revenue || 0;
         const ordAvg   = ordCount > 0 ? (ordRev / ordCount) : 0;
+        // Determine period label for summary bar
+        let periodLabel;
+        if (_orderPickerMode && _orderPickerVal) {
+          periodLabel = document.getElementById('order-picker-summary')?.textContent?.replace('Showing: ','') || _orderPickerVal;
+        } else {
+          periodLabel = filterLabels[currentOrderFilter] || 'Today';
+        }
 
         document.getElementById('orders-count-badge').textContent = ordCount + ' order' + (ordCount !== 1 ? 's' : '');
         document.getElementById('osum-orders').textContent  = ordCount.toLocaleString();
         document.getElementById('osum-revenue').textContent = '₱' + ordRev.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
         document.getElementById('osum-avg').textContent     = '₱' + ordAvg.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
-        document.getElementById('osum-period').textContent  = filterLabels[currentOrderFilter] || 'Today';
+        document.getElementById('osum-period').textContent  = periodLabel;
 
         if (!res.orders.length) {
           listEl.innerHTML = '<div class="text-center text-muted py-4" style="font-size:13px;">No orders found for this period.</div>';
@@ -5154,9 +5441,14 @@
         <button class="btn btn-sm me-1" style="background:var(--cafe-tan); color:var(--cafe-brown); border:none; border-radius:6px; padding:4px 10px; font-size:12px;" onclick="toggleAvail(${item.id})">
           ${item.available ? 'Mark Unavail.' : 'Mark Avail.'}
         </button>
-        <button class="btn btn-sm" style="background:#f8d7da; color:#842029; border:none; border-radius:6px; padding:4px 10px; font-size:12px;" onclick="deleteMenuItem(${item.id})">
-          Remove
-        </button>
+        ${pendingDeleteIds.has(item.id)
+          ? `<button class="btn btn-sm" style="background:#fef3c7; color:#92400e; border:1px solid #fde68a; border-radius:6px; padding:4px 10px; font-size:11.5px; font-weight:600;" onclick="deleteMenuItem(${item.id})" title="Removal request already pending approval">
+               <i class="bi bi-hourglass-split me-1"></i>Pending Removal
+             </button>`
+          : `<button class="btn btn-sm" style="background:#f8d7da; color:#842029; border:none; border-radius:6px; padding:4px 10px; font-size:12px;" onclick="deleteMenuItem(${item.id})">
+               Remove
+             </button>`
+        }
       </td>
     </tr>`;
       }).join('');
@@ -5172,7 +5464,7 @@
       }
     }
 
-    // deleteMenuItem is now defined in the TOKEN-PROTECTED DELETE section above (uses modal + token)
+    // deleteMenuItem submits a removal request for admin/superadmin approval without requiring codes
 
     async function adjustStock(id, delta) {
       const res = await api('menu.php?action=adjust_stock', { id, delta });
@@ -5220,8 +5512,8 @@
         });
       }
 
-      const res = await api('menu.php?action=add', {
-        name, category_id: categoryId, price, stock, min_stock: minStock,
+      const res = await api('menu.php?action=request_add', {
+        name, category_id: categoryId, category_name: category, price, stock, min_stock: minStock,
         image: imageSrc
       });
 
@@ -5232,9 +5524,7 @@
         document.getElementById('new-price').value = '';
         document.getElementById('new-stock').value = '20';
         document.getElementById('new-min-stock').value = '5';
-        await loadMenuFromDB();
-        renderMenuTable();
-        showToast(`✓ "${name}" added to menu`);
+        showToast(`✓ Request to add "${name}" submitted for admin approval!`);
       } else {
         showToast('⚠ ' + res.message);
       }
@@ -5698,6 +5988,7 @@
       try {
         const res = await api('menu.php');
         if (res.success) {
+          pendingDeleteIds = new Set((res.pending_deletions || []).map(Number));
           menuItems = res.items.map(i => {
             let sp = null;
             if (i.size_prices) {
@@ -5962,6 +6253,39 @@
       }
     }
 
+    /* ========== USERNAME AUTO-SUGGEST FROM EMAIL ========== */
+    // Tracks which username fields were auto-filled (so manual edits aren't overwritten)
+    const _userAutoFilled = {};
+
+    function suggestUsernameFromEmail(emailId, userId) {
+      const emailEl    = document.getElementById(emailId);
+      const userEl     = document.getElementById(userId);
+      const hintId     = userId + '-hint';
+      const hintEl     = document.getElementById(hintId);
+      if (!emailEl || !userEl) return;
+
+      const email      = emailEl.value || '';
+      const atIdx      = email.indexOf('@');
+      const localPart  = atIdx > 0 ? email.substring(0, atIdx) : email;
+      // Sanitise: keep only letters, digits, underscores, dots, hyphens; lowercase
+      const suggested  = localPart.toLowerCase().replace(/[^a-z0-9._-]/g, '');
+
+      // Only auto-fill if the user hasn't manually edited the field
+      if (!_userAutoFilled[userId] || userEl.dataset.autoSuggested === 'true') {
+        userEl.value = suggested;
+        userEl.dataset.autoSuggested = 'true';
+        if (hintEl) hintEl.style.display = suggested ? 'inline' : 'none';
+      }
+
+      // Once user manually edits the username field, stop auto-filling
+      userEl.addEventListener('input', function onUserInput() {
+        userEl.dataset.autoSuggested = 'false';
+        _userAutoFilled[userId] = true;
+        if (hintEl) hintEl.style.display = 'none';
+        userEl.removeEventListener('input', onUserInput);
+      }, { once: true });
+    }
+
     /* ========== REGISTER (Login page) ========== */
     function showRegisterForm() {
       document.getElementById('login-wrapper').style.display = 'none';
@@ -6054,7 +6378,9 @@
           </tr>
         `).join('') || '<tr><td colspan="6" class="text-center text-muted py-3">No users found</td></tr>';
 
-        document.getElementById('pending-tbody').innerHTML = res.pending_admin_requests.map(r => `
+        document.getElementById('pending-tbody').innerHTML = res.pending_admin_requests.map(r => {
+          const safeName = (r.full_name || '').replace(/'/g, "\\'");
+          return `
           <tr>
             <td style="font-weight:500;">${r.full_name}</td>
             <td><code>${r.username}</code></td>
@@ -6062,15 +6388,32 @@
             <td><span class="badge-${r.status === 'approved' ? 'success' : (r.status === 'pending' ? 'pending' : 'danger')}">${r.status}</span></td>
             <td style="font-size:12px;color:#888;">${r.created_at}</td>
             <td>
-              ${r.status === 'pending' ? `
-                <button class="btn btn-sm" style="background:var(--cafe-brown);color:#fff;border:none;border-radius:6px;padding:4px 12px;font-size:12px;" onclick="resendApprovalEmail(${r.id})" title="Re-send the approval link to the owner's Gmail">
-                  <i class="bi bi-envelope"></i> Resend to Owner
+              <div style="display:flex;gap:6px;align-items:center;">
+                ${r.status === 'pending' ? `
+                  <button class="btn btn-sm" style="background:var(--cafe-brown);color:#fff;border:none;border-radius:6px;padding:4px 12px;font-size:12px;" onclick="resendApprovalEmail(${r.id})" title="Re-send the approval link to the owner's Gmail">
+                    <i class="bi bi-envelope"></i> Resend to Owner
+                  </button>
+                ` : ''}
+                <button class="btn btn-sm" style="background:#fee2e2;color:#b91c1c;border:none;border-radius:6px;padding:4px 10px;font-size:12px;line-height:1.4;" onclick="deleteAdminRequestPos(${r.id}, '${safeName}')" title="Remove request">
+                  <i class="bi bi-trash-fill"></i> Remove
                 </button>
-              ` : '<span style="font-size:11px;color:#999;">—</span>'}
+              </div>
             </td>
           </tr>
-        `).join('') || '<tr><td colspan="6" class="text-center text-muted py-3">No pending requests</td></tr>';
+        `;
+        }).join('') || '<tr><td colspan="6" class="text-center text-muted py-3">No pending requests</td></tr>';
       } catch (e) { console.error(e); }
+    }
+
+    async function deleteAdminRequestPos(requestId, name) {
+      if (!confirm(`Are you sure you want to remove the admin approval request for "${name}"?`)) return;
+      try {
+        const res = await api('auth.php?action=delete_admin_request', { request_id: requestId });
+        showToast(res.success ? '🗑 ' + res.message : '⚠ ' + res.message);
+        if (res.success) renderUsers();
+      } catch (e) {
+        showToast('⚠ Connection error');
+      }
     }
 
     let currentResendRequestId = null;
@@ -6266,34 +6609,76 @@
       btn.disabled = false; btn.textContent = 'Request Token';
     }
 
-    /* ========== TOKEN-PROTECTED DELETE ========== */
+    /* ========== MENU ITEM REMOVAL REQUEST ========== */
     let pendingDeleteItemId = null;
 
     function deleteMenuItem(id) {
+      const item = menuItems.find(m => m.id == id);
+      if (!item) {
+        showToast('⚠ Item not found.');
+        return;
+      }
+
+      if (pendingDeleteIds.has(id)) {
+        showToast(`⚠ A removal request for "${item.name}" is already pending approval.`);
+        return;
+      }
+
       pendingDeleteItemId = id;
-      document.getElementById('delete-token-input').value = '';
-      document.getElementById('delete-token-error').style.display = 'none';
-      new bootstrap.Modal(document.getElementById('deleteTokenModal')).show();
+
+      document.getElementById('del-modal-item-name').textContent = item.name;
+      document.getElementById('del-modal-item-cat').textContent = item.category || 'Category';
+      document.getElementById('del-modal-item-price').textContent = '₱' + parseFloat(item.price || 0).toFixed(2);
+      document.getElementById('del-modal-item-stock').textContent = (item.stock || 0) + ' in stock';
+      document.getElementById('del-modal-reason').value = '';
+      document.getElementById('del-modal-error').style.display = 'none';
+
+      const imgWrap = document.getElementById('del-modal-img-wrap');
+      if (item.image) {
+        imgWrap.innerHTML = `<img src="${item.image}" style="width:100%;height:100%;object-fit:cover;border-radius:8px;">`;
+      } else {
+        imgWrap.innerHTML = item.emoji || '☕';
+      }
+
+      const modalEl = document.getElementById('deleteItemModal');
+      const bsModal = bootstrap.Modal.getOrCreateInstance(modalEl);
+      bsModal.show();
     }
 
-    async function confirmDeleteWithToken() {
-      const token = document.getElementById('delete-token-input').value.trim();
-      const errEl = document.getElementById('delete-token-error');
-      if (!token) { errEl.textContent = 'Please enter a token.'; errEl.style.display = 'block'; return; }
-      const btn = document.getElementById('delete-confirm-btn');
+    async function submitRemoveMenuItem() {
+      if (!pendingDeleteItemId) return;
+      const item = menuItems.find(m => m.id == pendingDeleteItemId);
+      const name = item ? item.name : 'this item';
+      const reason = document.getElementById('del-modal-reason').value.trim() || 'Requested from POS';
+      const errEl = document.getElementById('del-modal-error');
+      const btn = document.getElementById('del-modal-confirm-btn');
+
+      errEl.style.display = 'none';
       btn.disabled = true;
-      const res = await api('menu.php?action=delete', { id: pendingDeleteItemId, token });
-      if (res.success) {
-        bootstrap.Modal.getInstance(document.getElementById('deleteTokenModal')).hide();
-        showToast('✓ ' + res.message);
-        await loadMenuFromDB();
-        renderMenuTable();
-        renderPOS();
-      } else {
-        errEl.textContent = res.message;
+      btn.innerHTML = '<span class="spinner-border spinner-border-sm me-1"></span> Submitting...';
+
+      try {
+        const res = await api('menu.php?action=request_delete', { id: pendingDeleteItemId, reason });
+        if (res.success) {
+          pendingDeleteIds.add(pendingDeleteItemId);
+          renderMenuTable();
+          bootstrap.Modal.getInstance(document.getElementById('deleteItemModal')).hide();
+          showToast(`✓ Removal request for "${name}" sent for admin approval!`);
+        } else {
+          errEl.textContent = res.message || 'Failed to submit removal request.';
+          errEl.style.display = 'block';
+          if (res.already_pending) {
+            pendingDeleteIds.add(pendingDeleteItemId);
+            renderMenuTable();
+          }
+        }
+      } catch (err) {
+        errEl.textContent = 'Connection error. Please try again.';
         errEl.style.display = 'block';
+      } finally {
+        btn.disabled = false;
+        btn.innerHTML = '<i class="bi bi-send-fill me-1"></i> Submit Removal Request';
       }
-      btn.disabled = false;
     }
 
     /* ========== INIT ========== */

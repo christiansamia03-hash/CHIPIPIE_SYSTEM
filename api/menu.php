@@ -15,14 +15,17 @@ $method = $_SERVER['REQUEST_METHOD'];
 $action = $_GET['action'] ?? '';
 
 if ($method === 'GET' && !$action) { handleFetchMenu(); }
+elseif ($action === 'decide_menu_change') { handleDecideMenuChange(); }
 else {
     switch ($action) {
-        case 'add':          handleAddItem(); break;
-        case 'update':       handleUpdateItem(); break;
-        case 'delete':       handleDeleteItem(); break;
-        case 'adjust_stock': handleAdjustStock(); break;
-        case 'set_stock':    handleSetStock(); break;
-        case 'toggle':       handleToggleAvail(); break;
+        case 'add':            handleAddItem(); break;
+        case 'request_add':    handleRequestAddMenu(); break;
+        case 'delete':         handleDeleteItem(); break;
+        case 'request_delete': handleRequestDeleteMenu(); break;
+        case 'update':         handleUpdateItem(); break;
+        case 'adjust_stock':   handleAdjustStock(); break;
+        case 'set_stock':      handleSetStock(); break;
+        case 'toggle':         handleToggleAvail(); break;
         default: jsonResponse(['success' => false, 'message' => 'Invalid action.'], 400);
     }
 }
@@ -40,7 +43,24 @@ function handleFetchMenu() {
 
     $cats = $db->query("SELECT id, name FROM categories ORDER BY id")->fetchAll();
 
-    jsonResponse(['success' => true, 'items' => $items, 'categories' => $cats]);
+    // Collect item IDs that have pending removal requests
+    $pendingDeletes = [];
+    try {
+        $pStmt = $db->query("SELECT payload FROM system_requests WHERE type = 'menu_change' AND status = 'pending'");
+        while ($pRow = $pStmt->fetch()) {
+            $pl = json_decode($pRow['payload'], true);
+            if ($pl && ($pl['action'] ?? '') === 'delete' && !empty($pl['item_id'])) {
+                $pendingDeletes[] = intval($pl['item_id']);
+            }
+        }
+    } catch (Exception $e) {}
+
+    jsonResponse([
+        'success'           => true,
+        'items'             => $items,
+        'categories'        => $cats,
+        'pending_deletions' => array_values(array_unique($pendingDeletes))
+    ]);
 }
 
 function handleAddItem() {
@@ -118,30 +138,36 @@ function handleDeleteItem() {
     $token = strtoupper(trim($input['token'] ?? ''));
 
     if (!$id) jsonResponse(['success' => false, 'message' => 'Item ID required.'], 400);
-    if (!$token) jsonResponse(['success' => false, 'message' => 'Admin bypass token required to delete items.'], 400);
 
-    // Validate token using PHP time (avoids MySQL timezone mismatch)
-    $db = getDB();
-    $now = date('Y-m-d H:i:s');
-    $stmt = $db->prepare("SELECT * FROM admin_tokens WHERE token = ? AND is_used = 0 AND expires_at > ?");
-    $stmt->execute([$token, $now]);
-    $tokenRow = $stmt->fetch();
+    $isSuperAdmin = isset($_SESSION['role']) && $_SESSION['role'] === 'super_admin';
+    if (!$isSuperAdmin) {
+        if (!$token) jsonResponse(['success' => false, 'message' => 'Admin bypass token required to delete items.'], 400);
 
-    if (!$tokenRow) {
-        // Check why it failed for better error message
-        $stmt2 = $db->prepare("SELECT * FROM admin_tokens WHERE token = ?");
-        $stmt2->execute([$token]);
-        $ex = $stmt2->fetch();
-        if ($ex) {
-            $msg = $ex['is_used'] ? 'This token was already used.' : 'Token expired (expired: ' . $ex['expires_at'] . '). Request a new one.';
-        } else {
-            $msg = 'Invalid token. Make sure you entered it correctly.';
+        // Validate token using PHP time (avoids MySQL timezone mismatch)
+        $db = getDB();
+        $now = date('Y-m-d H:i:s');
+        $stmt = $db->prepare("SELECT * FROM admin_tokens WHERE token = ? AND is_used = 0 AND expires_at > ?");
+        $stmt->execute([$token, $now]);
+        $tokenRow = $stmt->fetch();
+
+        if (!$tokenRow) {
+            // Check why it failed for better error message
+            $stmt2 = $db->prepare("SELECT * FROM admin_tokens WHERE token = ?");
+            $stmt2->execute([$token]);
+            $ex = $stmt2->fetch();
+            if ($ex) {
+                $msg = $ex['is_used'] ? 'This token was already used.' : 'Token expired (expired: ' . $ex['expires_at'] . '). Request a new one.';
+            } else {
+                $msg = 'Invalid token. Make sure you entered it correctly.';
+            }
+            jsonResponse(['success' => false, 'message' => $msg], 403);
         }
-        jsonResponse(['success' => false, 'message' => $msg], 403);
-    }
 
-    // Use the token
-    $db->prepare("UPDATE admin_tokens SET is_used = 1, used_at = ? WHERE id = ?")->execute([$now, $tokenRow['id']]);
+        // Use the token
+        $db->prepare("UPDATE admin_tokens SET is_used = 1, used_at = ? WHERE id = ?")->execute([$now, $tokenRow['id']]);
+    } else {
+        $db = getDB();
+    }
 
     // Delete the item
     $stmt = $db->prepare("SELECT name FROM menu_items WHERE id = ?");
@@ -151,6 +177,11 @@ function handleDeleteItem() {
     if (!$item) jsonResponse(['success' => false, 'message' => 'Item not found.'], 404);
 
     $db->prepare("DELETE FROM menu_items WHERE id = ?")->execute([$id]);
+
+    // Clean up any pending system_requests for this item
+    $now = date('Y-m-d H:i:s');
+    $db->prepare("UPDATE system_requests SET status = 'approved', reviewed_by = ?, reviewed_at = ?, review_note = 'Deleted from menu' WHERE type = 'menu_change' AND status = 'pending' AND (payload LIKE ? OR payload LIKE ?)")
+       ->execute([$_SESSION['user_id'] ?? 0, $now, '%"item_id":' . $id . '%', '%"item_id":"' . $id . '"%']);
 
     jsonResponse(['success' => true, 'message' => "'{$item['name']}' deleted from menu."]);
 }
@@ -208,4 +239,326 @@ function handleToggleAvail() {
 
     $status = $newVal ? 'available' : 'unavailable';
     jsonResponse(['success' => true, 'message' => "{$item['name']} marked $status.", 'is_available' => $newVal]);
+}
+
+function handleRequestAddMenu() {
+    requireLogin();
+    session_write_close();
+    $input = getJsonInput();
+    $name = trim($input['name'] ?? '');
+    $categoryId = intval($input['category_id'] ?? 1);
+    $categoryName = trim($input['category_name'] ?? '');
+    $price = floatval($input['price'] ?? 0);
+    $image = $input['image'] ?? null;
+    $stock = intval($input['stock'] ?? 0);
+    $minStock = intval($input['min_stock'] ?? 5);
+    $sizePrices = $input['size_prices'] ?? null;
+
+    if (!$name || !$categoryId || $price <= 0) {
+        jsonResponse(['success' => false, 'message' => 'Item name, category, and valid price are required.'], 400);
+    }
+
+    $db = getDB();
+
+    // Prevent duplicate: check if item already exists in menu
+    $checkMenu = $db->prepare("SELECT id FROM menu_items WHERE LOWER(name) = LOWER(?)");
+    $checkMenu->execute([$name]);
+    if ($checkMenu->fetch()) {
+        jsonResponse(['success' => false, 'message' => "A menu item named '{$name}' already exists in the menu."], 409);
+    }
+
+    // Prevent duplicate: check if an add request for this item is already pending
+    $checkAddPending = $db->prepare("
+        SELECT id, requester_name, created_at 
+        FROM system_requests 
+        WHERE type = 'menu_change' 
+          AND status = 'pending' 
+          AND (payload LIKE ? OR payload LIKE ?)
+        LIMIT 1
+    ");
+    $checkAddPending->execute([
+        '%"name":"' . $name . '"%',
+        '%"name": "' . $name . '"%'
+    ]);
+    $alreadyAdd = $checkAddPending->fetch();
+    if ($alreadyAdd) {
+        $dateStr = date('M j, Y g:i A', strtotime($alreadyAdd['created_at']));
+        jsonResponse([
+            'success'         => false,
+            'message'         => "An add request for '{$name}' is already pending approval (submitted on {$dateStr}). Duplicate requests are not allowed.",
+            'already_pending' => true
+        ], 409);
+    }
+
+    if (!$categoryName) {
+        $catStmt = $db->prepare("SELECT name FROM categories WHERE id = ?");
+        $catStmt->execute([$categoryId]);
+        $cat = $catStmt->fetch();
+        $categoryName = $cat ? $cat['name'] : 'Category #' . $categoryId;
+    }
+
+    $requester = $_SESSION['full_name'] ?? $_SESSION['username'] ?? 'Staff';
+    $userId = $_SESSION['user_id'] ?? null;
+
+    $approvalToken = bin2hex(random_bytes(32));
+
+    $payload = [
+        'action'        => 'add',
+        'name'          => $name,
+        'category_id'   => $categoryId,
+        'category_name' => $categoryName,
+        'price'         => $price,
+        'stock'         => $stock,
+        'min_stock'     => $minStock,
+        'image'         => $image,
+        'size_prices'   => $sizePrices,
+    ];
+
+    $title = "Add Menu Item: {$name}";
+    $desc = "Category: {$categoryName} | Price: ₱" . number_format($price, 2) . " | Initial Stock: {$stock}";
+
+    $stmt = $db->prepare("INSERT INTO system_requests (type, requested_by, requester_name, title, description, payload, approval_token, status) VALUES (?, ?, ?, ?, ?, ?, ?, 'pending')");
+    $stmt->execute(['menu_change', $userId, $requester, $title, $desc, json_encode($payload), $approvalToken]);
+
+    sendMenuRequestEmail('add', $payload, $requester, $approvalToken);
+
+    jsonResponse([
+        'success'        => true,
+        'message'        => "Request to add '{$name}' sent to admin email for approval.",
+        'approval_token' => $approvalToken
+    ]);
+}
+
+function handleRequestDeleteMenu() {
+    requireLogin();
+    session_write_close();
+    $input = getJsonInput();
+    $id = intval($input['id'] ?? 0);
+    $reason = trim($input['reason'] ?? 'Requested from POS');
+
+    if (!$id) {
+        jsonResponse(['success' => false, 'message' => 'Item ID is required.'], 400);
+    }
+
+    $db = getDB();
+    $stmt = $db->prepare("
+        SELECT m.id, m.name, c.name AS category, m.price, m.stock, m.image 
+        FROM menu_items m 
+        LEFT JOIN categories c ON m.category_id = c.id 
+        WHERE m.id = ?
+    ");
+    $stmt->execute([$id]);
+    $item = $stmt->fetch();
+    if (!$item) {
+        jsonResponse(['success' => false, 'message' => 'Menu item not found.'], 404);
+    }
+
+    // Prevent duplicate: check if a deletion request is already pending for this item
+    $checkDelPending = $db->prepare("
+        SELECT id, requester_name, created_at 
+        FROM system_requests 
+        WHERE type = 'menu_change' 
+          AND status = 'pending' 
+          AND (payload LIKE ? OR payload LIKE ?)
+        LIMIT 1
+    ");
+    $checkDelPending->execute([
+        '%"item_id":' . $id . '%',
+        '%"item_id":"' . $id . '"%'
+    ]);
+    $alreadyDel = $checkDelPending->fetch();
+    if ($alreadyDel) {
+        $dateStr = date('M j, Y g:i A', strtotime($alreadyDel['created_at']));
+        $byStr = $alreadyDel['requester_name'] ? " by {$alreadyDel['requester_name']}" : '';
+        jsonResponse([
+            'success'         => false,
+            'message'         => "A removal request for '{$item['name']}' has already been submitted{$byStr} on {$dateStr} and is currently pending approval. Duplicate requests are not allowed.",
+            'already_pending' => true,
+            'request_id'      => $alreadyDel['id']
+        ], 409);
+    }
+
+    $requester = $_SESSION['full_name'] ?? $_SESSION['username'] ?? 'Staff';
+    $userId = $_SESSION['user_id'] ?? null;
+
+    $approvalToken = bin2hex(random_bytes(32));
+
+    $payload = [
+        'action'   => 'delete',
+        'item_id'  => $id,
+        'name'     => $item['name'],
+        'category' => $item['category'] ?? 'General',
+        'price'    => $item['price'],
+        'stock'    => $item['stock'],
+        'reason'   => $reason
+    ];
+
+    $title = "Remove Menu Item: {$item['name']}";
+    $desc = "Category: {$item['category']} | Price: ₱" . number_format($item['price'], 2) . " | Stock: {$item['stock']}";
+
+    $stmt = $db->prepare("INSERT INTO system_requests (type, requested_by, requester_name, title, description, payload, approval_token, status) VALUES (?, ?, ?, ?, ?, ?, ?, 'pending')");
+    $stmt->execute(['menu_change', $userId, $requester, $title, $desc, json_encode($payload), $approvalToken]);
+
+    sendMenuRequestEmail('delete', $payload, $requester, $approvalToken);
+
+    jsonResponse([
+        'success'        => true,
+        'message'        => "Request to remove '{$item['name']}' sent to admin email for approval.",
+        'approval_token' => $approvalToken
+    ]);
+}
+
+function sendMenuRequestEmail($actionType, $payload, $requester, $approvalToken) {
+    $storeName = getSetting('store_name') ?: 'ChipiPie Cafe';
+    $ownerEmail = trim(getSetting('owner_email') ?? '');
+    $superAdminEmail = trim(getSetting('superadmin_email') ?? '');
+
+    $host = $_SERVER['HTTP_HOST'] ?? 'localhost';
+    $approveUrl = "http://" . $host . "/CHIPIPIE_SYSTEM/api/menu.php?action=decide_menu_change&token=" . $approvalToken . "&decision=approve";
+    $rejectUrl  = "http://" . $host . "/CHIPIPIE_SYSTEM/api/menu.php?action=decide_menu_change&token=" . $approvalToken . "&decision=reject";
+
+    $isAdd = ($actionType === 'add');
+    $actionTitle = $isAdd ? 'Add Menu Item Request' : 'Remove Menu Item Request';
+    $badgeColor = $isAdd ? '#16a34a' : '#dc2626';
+    $badgeText = $isAdd ? '+ ADD ITEM' : '✕ REMOVE ITEM';
+    $itemName = htmlspecialchars($payload['name'] ?? 'Item');
+    $categoryName = htmlspecialchars($payload['category_name'] ?? $payload['category'] ?? 'General');
+    $price = number_format(floatval($payload['price'] ?? 0), 2);
+    $stock = intval($payload['stock'] ?? 0);
+
+    $detailRows = "
+        <tr><td style='padding: 6px 0; font-weight: 600; color: #aaa;'>Action:</td><td><span style='background: {$badgeColor}22; color: {$badgeColor}; border: 1px solid {$badgeColor}44; padding: 2px 8px; border-radius: 6px; font-size: 11px; font-weight: 700;'>{$badgeText}</span></td></tr>
+        <tr><td style='padding: 6px 0; font-weight: 600; color: #aaa;'>Item Name:</td><td style='font-weight: 700; color: #fff;'>{$itemName}</td></tr>
+        <tr><td style='padding: 6px 0; font-weight: 600; color: #aaa;'>Category:</td><td style='color: #ddd;'>{$categoryName}</td></tr>
+        <tr><td style='padding: 6px 0; font-weight: 600; color: #aaa;'>Price:</td><td style='color: #fbbf24; font-weight: 700;'>₱{$price}</td></tr>
+        <tr><td style='padding: 6px 0; font-weight: 600; color: #aaa;'>Stock:</td><td style='color: #ddd;'>{$stock} units</td></tr>
+        <tr><td style='padding: 6px 0; font-weight: 600; color: #aaa;'>Requested By:</td><td style='color: #ddd;'>{$requester}</td></tr>";
+
+    $actionBody = "
+    <div style='font-family: Segoe UI, sans-serif; max-width: 500px; margin: 0 auto; padding: 30px; background: #1a1514; color: #f4f4f4; border-radius: 16px; border: 1px solid #332d2c;'>
+        <div style='text-align: center; margin-bottom: 20px;'>
+            <div style='display: inline-block; width: 50px; height: 50px; background: {$badgeColor}; color: #fff; border-radius: 12px; line-height: 50px; font-size: 24px;'>" . ($isAdd ? '☕' : '🗑️') . "</div>
+            <h2 style='color: #fff; margin: 10px 0 5px;'>{$storeName}</h2>
+            <p style='color: #aaa; font-size: 13px; margin: 0;'>{$actionTitle} &mdash; Action Required</p>
+        </div>
+        <div style='background: #2a2423; border-radius: 12px; padding: 24px; border: 1px solid #3d3533;'>
+            <table style='width: 100%; font-size: 14px; color: #ddd; margin: 0 0 16px 0;'>{$detailRows}</table>
+            <div style='display: flex; gap: 10px; margin-top: 20px; text-align: center;'>
+                <a href='{$approveUrl}' style='flex: 1; display: inline-block; background: #16a34a; color: #fff; padding: 12px 10px; border-radius: 8px; text-decoration: none; font-weight: 600; font-size: 14px;'>&#10003; " . ($isAdd ? 'Approve Add' : 'Approve Removal') . "</a>
+                <a href='{$rejectUrl}' style='flex: 1; display: inline-block; background: #3f3f46; color: #fff; padding: 12px 10px; border-radius: 8px; text-decoration: none; font-weight: 600; font-size: 14px;'>&#10007; Reject</a>
+            </div>
+            <p style='font-size: 11px; color: #888; text-align: center; margin-top: 16px; margin-bottom: 0;'>Super Admin can also approve or reject this request in the Super Admin Control Center.</p>
+        </div>
+    </div>";
+
+    $recipients = [];
+    if ($ownerEmail && filter_var($ownerEmail, FILTER_VALIDATE_EMAIL)) {
+        $recipients[strtolower($ownerEmail)] = $ownerEmail;
+    }
+    if ($superAdminEmail && filter_var($superAdminEmail, FILTER_VALIDATE_EMAIL)) {
+        $recipients[strtolower($superAdminEmail)] = $superAdminEmail;
+    }
+
+    try {
+        $db = getDB();
+        $adminStmt = $db->query("SELECT email FROM users WHERE role IN ('admin', 'super_admin') AND is_active = 1");
+        while ($row = $adminStmt->fetch()) {
+            $e = trim($row['email'] ?? '');
+            if ($e && filter_var($e, FILTER_VALIDATE_EMAIL)) {
+                $recipients[strtolower($e)] = $e;
+            }
+        }
+    } catch (Exception $e) {}
+
+    $subject = "{$storeName} — {$actionTitle}: {$itemName}";
+    foreach ($recipients as $email) {
+        sendEmail($email, $subject, $actionBody);
+    }
+}
+
+function handleDecideMenuChange() {
+    $token = $_GET['token'] ?? '';
+    $decision = $_GET['decision'] ?? '';
+
+    if (!$token || !in_array($decision, ['approve', 'reject'])) {
+        die("Invalid link.");
+    }
+
+    $db = getDB();
+    $stmt = $db->prepare("SELECT * FROM system_requests WHERE approval_token = ? AND status = 'pending'");
+    $stmt->execute([$token]);
+    $request = $stmt->fetch();
+
+    if (!$request) {
+        die("Request not found, already processed, or invalid token.");
+    }
+
+    $now = date('Y-m-d H:i:s');
+    $status = $decision === 'approve' ? 'approved' : 'rejected';
+    $payload = $request['payload'] ? json_decode($request['payload'], true) : [];
+    $actionType = $payload['action'] ?? ($payload['item_id'] ? 'delete' : 'add');
+    $itemName = htmlspecialchars($payload['name'] ?? 'Menu Item');
+
+    if ($decision === 'approve') {
+        if ($actionType === 'add') {
+            $name = trim($payload['name'] ?? '');
+            $categoryId = intval($payload['category_id'] ?? 1);
+            $price = floatval($payload['price'] ?? 0);
+            $image = $payload['image'] ?? null;
+            $stock = intval($payload['stock'] ?? 0);
+            $minStock = intval($payload['min_stock'] ?? 5);
+            $sizePrices = $payload['size_prices'] ?? null;
+            $sizePricesJson = null;
+            if ($sizePrices && is_array($sizePrices)) {
+                $sizePricesJson = json_encode($sizePrices);
+            } elseif ($sizePrices && is_string($sizePrices)) {
+                $sizePricesJson = $sizePrices;
+            }
+
+            if ($name && $categoryId && $price > 0) {
+                $insert = $db->prepare("INSERT INTO menu_items (name, category_id, price, size_prices, image, stock, min_stock, is_available) VALUES (?, ?, ?, ?, ?, ?, ?, ?)");
+                $insert->execute([$name, $categoryId, $price, $sizePricesJson, $image, $stock, $minStock, $stock > 0 ? 1 : 0]);
+            }
+        } elseif ($actionType === 'delete') {
+            $itemId = intval($payload['item_id'] ?? $payload['id'] ?? 0);
+            if ($itemId) {
+                $db->prepare("DELETE FROM menu_items WHERE id = ?")->execute([$itemId]);
+            }
+        }
+    }
+
+    $db->prepare("UPDATE system_requests SET status = ?, reviewed_at = ?, review_note = 'Processed via Email Link' WHERE id = ?")
+       ->execute([$status, $now, $request['id']]);
+
+    $actionText = $decision === 'approve' ? 'Approved' : 'Rejected';
+    $color = $decision === 'approve' ? '#16a34a' : '#ef4444';
+    $icon = $decision === 'approve' ? '✅' : '❌';
+    $verb = $actionType === 'add' ? ($decision === 'approve' ? 'added to' : 'not added to') : ($decision === 'approve' ? 'removed from' : 'kept on');
+
+    echo "<!DOCTYPE html>
+    <html lang='en'>
+    <head>
+        <meta charset='UTF-8'>
+        <meta name='viewport' content='width=device-width, initial-scale=1.0'>
+        <title>Menu Request {$actionText}</title>
+        <style>
+            body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background-color: #1a1514; color: #f4f4f4; display: flex; justify-content: center; align-items: center; min-height: 100vh; margin: 0; }
+            .container { text-align: center; background: #2a2423; padding: 40px; border-radius: 16px; border: 1px solid #3d3533; box-shadow: 0 10px 25px rgba(0,0,0,0.5); max-width: 440px; width: 90%; }
+            .icon { font-size: 64px; margin-bottom: 20px; }
+            h1 { color: {$color}; margin: 0 0 10px 0; font-size: 26px; }
+            p { color: #aaa; margin: 0; line-height: 1.5; font-size: 15px; }
+            .badge { display: inline-block; background: #332b29; padding: 8px 16px; border-radius: 8px; color: #fff; font-weight: 600; margin: 16px 0; border: 1px solid #4a3e3c; }
+        </style>
+    </head>
+    <body>
+        <div class='container'>
+            <div class='icon'>{$icon}</div>
+            <h1>Menu Request {$actionText}</h1>
+            <div class='badge'>{$itemName}</div>
+            <p>The request has been <strong>{$actionText}</strong>. The item has been {$verb} the menu.</p>
+            <p style='margin-top: 20px; font-size: 13px; color: #777;'>You can now close this tab.</p>
+        </div>
+    </body>
+    </html>";
+    exit;
 }

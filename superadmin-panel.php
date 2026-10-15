@@ -504,6 +504,19 @@
 
     .sa-select:focus { border-color: #7c3aed; }
 
+    /* ── DATE & CALENDAR INPUTS ── */
+    .sa-input[type="date"],
+    .sa-input[type="week"],
+    .sa-input[type="month"] {
+      color-scheme: dark;
+    }
+    .sa-input[type="date"]::-webkit-calendar-picker-indicator,
+    .sa-input[type="week"]::-webkit-calendar-picker-indicator,
+    .sa-input[type="month"]::-webkit-calendar-picker-indicator {
+      filter: invert(0.85) brightness(1.2);
+      cursor: pointer;
+    }
+
     /* ── MODAL ── */
     .sa-modal-overlay {
       position: fixed;
@@ -1067,6 +1080,9 @@
         <button class="sa-nav-btn" id="nav-btn-users" onclick="saShowView('users', this)">
           <i class="bi bi-people-fill"></i> All Users
         </button>
+        <button class="sa-nav-btn" id="nav-btn-menu" onclick="saShowView('menu', this)">
+          <i class="bi bi-cup-hot-fill"></i> Menu Items
+        </button>
         <button class="sa-nav-btn" id="nav-btn-orders" onclick="saShowView('orders', this)">
           <i class="bi bi-receipt-cutoff"></i> Orders
         </button>
@@ -1103,9 +1119,6 @@
         <div class="sa-topbar-title" id="sa-page-title">Dashboard</div>
         <div style="display:flex; align-items:center; gap:16px;">
           <div class="sa-topbar-time" id="sa-live-time"></div>
-          <button onclick="saLogout()" class="sa-btn" style="padding:6px 14px; font-size:12.5px; border:1px solid rgba(239,68,68,0.35); color:#f87171; background:rgba(239,68,68,0.1); border-radius:8px; display:inline-flex; align-items:center; gap:6px; cursor:pointer; font-weight:600;">
-            <i class="bi bi-box-arrow-right"></i> Sign Out
-          </button>
         </div>
       </div>
 
@@ -1270,19 +1283,56 @@
           </div>
         </div>
 
+        <!-- ── MENU ITEMS VIEW ── -->
+        <div id="sa-view-menu" class="sa-view">
+          <div class="sa-section-header">
+            <div class="sa-section-title">Menu & Inventory</div>
+            <div style="display:flex;gap:8px;">
+              <button class="sa-btn sa-btn-ghost" onclick="saLoadMenu()">
+                <i class="bi bi-arrow-clockwise"></i> Refresh
+              </button>
+              <button class="sa-btn sa-btn-primary" onclick="saOpenAddMenuModal()">
+                <i class="bi bi-plus-circle-fill"></i> Add Menu Item
+              </button>
+            </div>
+          </div>
+
+          <!-- Search & Category Filters -->
+          <div style="display:flex;gap:12px;margin-bottom:16px;flex-wrap:wrap;align-items:center;">
+            <div style="position:relative;flex:1;min-width:240px;">
+              <i class="bi bi-search" style="position:absolute;left:12px;top:50%;transform:translateY(-50%);color:var(--sa-muted);"></i>
+              <input type="text" id="sa-menu-search" class="sa-input" style="padding-left:36px;" placeholder="Search menu items..." oninput="saRenderMenuTable()">
+            </div>
+            <div id="sa-menu-cat-pills" style="display:flex;gap:6px;flex-wrap:wrap;"></div>
+          </div>
+
+          <div class="sa-card">
+            <div class="sa-table-wrap">
+              <table class="sa-table">
+                <thead>
+                  <tr>
+                    <th>#</th>
+                    <th>Item</th>
+                    <th>Category</th>
+                    <th>Price</th>
+                    <th>Stock</th>
+                    <th>Status</th>
+                    <th>Actions</th>
+                  </tr>
+                </thead>
+                <tbody id="sa-menu-tbody">
+                  <tr><td colspan="7"><div class="sa-empty"><i class="bi bi-cup-hot"></i><p>Loading menu items...</p></div></td></tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+
         <!-- ── ORDERS VIEW ── -->
         <div id="sa-view-orders" class="sa-view">
           <div class="sa-section-header">
             <div class="sa-section-title">Orders</div>
             <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;">
-              <div class="d-flex gap-2 flex-wrap" id="sa-order-filter-tabs">
-                <button id="sa-ofilter-today" class="sa-cat-pill active" onclick="setSAOrderFilter('today', this)">Today</button>
-                <button id="sa-ofilter-week" class="sa-cat-pill" onclick="setSAOrderFilter('week', this)">This Week</button>
-                <button id="sa-ofilter-month" class="sa-cat-pill" onclick="setSAOrderFilter('month', this)">This Month</button>
-                <button id="sa-ofilter-year" class="sa-cat-pill" onclick="setSAOrderFilter('year', this)">This Year</button>
-                <button id="sa-ofilter-all" class="sa-cat-pill" onclick="setSAOrderFilter('all', this)">All Time</button>
-              </div>
-              <input type="hidden" id="order-date-filter" value="today">
               <select class="sa-select" style="width:auto;font-size:12px;" id="order-status-filter" onchange="loadOrders()">
                 <option value="">All Status</option>
                 <option value="Completed">Completed</option>
@@ -1292,6 +1342,92 @@
               <button class="sa-btn sa-btn-ghost" onclick="loadOrders()">
                 <i class="bi bi-arrow-clockwise"></i> Refresh
               </button>
+            </div>
+          </div>
+
+          <!-- Orders Calendar & Period Filter Card -->
+          <div class="sa-card" style="margin-bottom:16px;">
+            <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:12px;margin-bottom:12px;">
+              <div style="display:flex;align-items:center;gap:10px;">
+                <div style="width:34px;height:34px;border-radius:8px;background:rgba(109,40,217,0.15);display:flex;align-items:center;justify-content:center;color:var(--sa-accent2);">
+                  <i class="bi bi-calendar3" style="font-size:16px;"></i>
+                </div>
+                <div>
+                  <div style="font-size:13px;font-weight:700;color:var(--sa-text);line-height:1.2;">Date Filter</div>
+                  <div id="sa-order-period-summary" style="font-size:11.5px;color:var(--sa-muted);margin-top:2px;">Showing today's orders</div>
+                </div>
+              </div>
+
+              <!-- Quick Period Tabs -->
+              <div class="d-flex gap-2 flex-wrap" id="sa-order-filter-tabs">
+                <button type="button" class="sa-cat-pill active" id="sa-ofilter-today" onclick="setSAOrderFilter('today', this)">Today</button>
+                <button type="button" class="sa-cat-pill" id="sa-ofilter-week"  onclick="setSAOrderFilter('week', this)">This Week</button>
+                <button type="button" class="sa-cat-pill" id="sa-ofilter-month" onclick="setSAOrderFilter('month', this)">This Month</button>
+                <button type="button" class="sa-cat-pill" id="sa-ofilter-year"  onclick="setSAOrderFilter('year', this)">This Year</button>
+                <button type="button" class="sa-cat-pill" id="sa-ofilter-all"   onclick="setSAOrderFilter('all', this)">All Time</button>
+                <!-- Separator -->
+                <span style="width:1px;background:var(--sa-border);margin:0 4px;align-self:stretch;"></span>
+                <button type="button" class="sa-cat-pill" id="sa-ofilter-pick-date"  onclick="setSAOrderPickerMode('date')"><i class="bi bi-calendar-event"></i> Date</button>
+                <button type="button" class="sa-cat-pill" id="sa-ofilter-pick-week"  onclick="setSAOrderPickerMode('week')"><i class="bi bi-calendar-range"></i> Week</button>
+                <button type="button" class="sa-cat-pill" id="sa-ofilter-pick-month" onclick="setSAOrderPickerMode('month')"><i class="bi bi-calendar-month"></i> Month</button>
+                <button type="button" class="sa-cat-pill" id="sa-ofilter-pick-year"  onclick="setSAOrderPickerMode('year')"><i class="bi bi-calendar"></i> Year</button>
+              </div>
+            </div>
+
+            <!-- Dynamic Picker Controls Box -->
+            <div id="sa-order-picker-box" style="display:none;background:var(--sa-surface);border:1px solid var(--sa-border);border-radius:10px;padding:12px 16px;margin-top:4px;">
+              <!-- DATE PICKER -->
+              <div id="sa-order-picker-date" class="sa-order-picker-section" style="display:none;">
+                <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;">
+                  <label class="sa-label" style="margin-bottom:0;display:flex;align-items:center;gap:6px;font-size:12px;">
+                    <i class="bi bi-calendar-date" style="color:var(--sa-accent2);"></i> Choose Date:
+                  </label>
+                  <button type="button" class="sa-btn sa-btn-ghost" style="padding:5px 9px;font-size:12px;" onclick="shiftSAOrderDate(-1)" title="Previous Day"><i class="bi bi-chevron-left"></i></button>
+                  <input type="date" id="sa-order-input-date" class="sa-input" style="width:auto;min-width:160px;padding:6px 12px;font-size:13px;" onchange="applySAOrderPickerFilter()">
+                  <button type="button" class="sa-btn sa-btn-ghost" style="padding:5px 9px;font-size:12px;" onclick="shiftSAOrderDate(1)" title="Next Day"><i class="bi bi-chevron-right"></i></button>
+                  <button type="button" class="sa-btn sa-btn-ghost" style="padding:5px 12px;font-size:12px;" onclick="setSAOrderPickerToday()">Today</button>
+                  <span id="sa-order-date-label" style="font-size:12.5px;font-weight:600;color:var(--sa-accent2);margin-left:6px;"></span>
+                </div>
+              </div>
+              <!-- WEEK PICKER -->
+              <div id="sa-order-picker-week" class="sa-order-picker-section" style="display:none;">
+                <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;">
+                  <label class="sa-label" style="margin-bottom:0;display:flex;align-items:center;gap:6px;font-size:12px;">
+                    <i class="bi bi-calendar-week" style="color:var(--sa-accent2);"></i> Choose Week:
+                  </label>
+                  <button type="button" class="sa-btn sa-btn-ghost" style="padding:5px 9px;font-size:12px;" onclick="shiftSAOrderWeek(-1)" title="Previous Week"><i class="bi bi-chevron-left"></i></button>
+                  <input type="week" id="sa-order-input-week" class="sa-input" style="width:auto;min-width:180px;padding:6px 12px;font-size:13px;" onchange="applySAOrderPickerFilter()">
+                  <button type="button" class="sa-btn sa-btn-ghost" style="padding:5px 9px;font-size:12px;" onclick="shiftSAOrderWeek(1)" title="Next Week"><i class="bi bi-chevron-right"></i></button>
+                  <button type="button" class="sa-btn sa-btn-ghost" style="padding:5px 12px;font-size:12px;" onclick="setSAOrderThisWeek()">This Week</button>
+                  <span id="sa-order-week-label" style="font-size:12.5px;font-weight:600;color:var(--sa-accent2);margin-left:6px;"></span>
+                </div>
+              </div>
+              <!-- MONTH PICKER -->
+              <div id="sa-order-picker-month" class="sa-order-picker-section" style="display:none;">
+                <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;">
+                  <label class="sa-label" style="margin-bottom:0;display:flex;align-items:center;gap:6px;font-size:12px;">
+                    <i class="bi bi-calendar-month" style="color:var(--sa-accent2);"></i> Choose Month:
+                  </label>
+                  <button type="button" class="sa-btn sa-btn-ghost" style="padding:5px 9px;font-size:12px;" onclick="shiftSAOrderMonth(-1)" title="Previous Month"><i class="bi bi-chevron-left"></i></button>
+                  <input type="month" id="sa-order-input-month" class="sa-input" style="width:auto;min-width:160px;padding:6px 12px;font-size:13px;" onchange="applySAOrderPickerFilter()">
+                  <button type="button" class="sa-btn sa-btn-ghost" style="padding:5px 9px;font-size:12px;" onclick="shiftSAOrderMonth(1)" title="Next Month"><i class="bi bi-chevron-right"></i></button>
+                  <button type="button" class="sa-btn sa-btn-ghost" style="padding:5px 12px;font-size:12px;" onclick="setSAOrderThisMonth()">This Month</button>
+                  <span id="sa-order-month-label" style="font-size:12.5px;font-weight:600;color:var(--sa-accent2);margin-left:6px;"></span>
+                </div>
+              </div>
+              <!-- YEAR PICKER -->
+              <div id="sa-order-picker-year" class="sa-order-picker-section" style="display:none;">
+                <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;">
+                  <label class="sa-label" style="margin-bottom:0;display:flex;align-items:center;gap:6px;font-size:12px;">
+                    <i class="bi bi-calendar" style="color:var(--sa-accent2);"></i> Choose Year:
+                  </label>
+                  <button type="button" class="sa-btn sa-btn-ghost" style="padding:5px 9px;font-size:12px;" onclick="shiftSAOrderYear(-1)" title="Previous Year"><i class="bi bi-chevron-left"></i></button>
+                  <select id="sa-order-input-year" class="sa-select" style="width:auto;min-width:130px;padding:6px 12px;font-size:13px;" onchange="applySAOrderPickerFilter()"></select>
+                  <button type="button" class="sa-btn sa-btn-ghost" style="padding:5px 9px;font-size:12px;" onclick="shiftSAOrderYear(1)" title="Next Year"><i class="bi bi-chevron-right"></i></button>
+                  <button type="button" class="sa-btn sa-btn-ghost" style="padding:5px 12px;font-size:12px;" onclick="setSAOrderThisYear()">This Year</button>
+                  <span id="sa-order-year-label" style="font-size:12.5px;font-weight:600;color:var(--sa-accent2);margin-left:6px;"></span>
+                </div>
+              </div>
             </div>
           </div>
 
@@ -1387,6 +1523,100 @@
             <button class="sa-btn sa-btn-ghost" onclick="loadLogs()">
               <i class="bi bi-arrow-clockwise"></i> Refresh
             </button>
+          </div>
+
+          <!-- Calendar & Period Filter Card -->
+          <div class="sa-card" style="margin-bottom:16px;">
+            <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:12px;margin-bottom:12px;">
+              <div style="display:flex;align-items:center;gap:10px;">
+                <div style="width:34px;height:34px;border-radius:8px;background:rgba(109,40,217,0.15);display:flex;align-items:center;justify-content:center;color:var(--sa-accent2);">
+                  <i class="bi bi-calendar3" style="font-size:16px;"></i>
+                </div>
+                <div>
+                  <div style="font-size:13px;font-weight:700;color:var(--sa-text);line-height:1.2;">Calendar & Period Filter</div>
+                  <div id="log-period-summary" style="font-size:11.5px;color:var(--sa-muted);margin-top:2px;">Showing all logs (All Time)</div>
+                </div>
+              </div>
+
+              <!-- Period Mode Switcher Tabs -->
+              <div class="d-flex gap-2 flex-wrap" id="log-period-tabs">
+                <button type="button" class="sa-cat-pill" id="log-tab-date" onclick="setLogPeriodMode('date')">
+                  <i class="bi bi-calendar-event"></i> Specific Date
+                </button>
+                <button type="button" class="sa-cat-pill" id="log-tab-week" onclick="setLogPeriodMode('week')">
+                  <i class="bi bi-calendar-range"></i> Specific Week
+                </button>
+                <button type="button" class="sa-cat-pill" id="log-tab-month" onclick="setLogPeriodMode('month')">
+                  <i class="bi bi-calendar-month"></i> Specific Month
+                </button>
+                <button type="button" class="sa-cat-pill" id="log-tab-year" onclick="setLogPeriodMode('year')">
+                  <i class="bi bi-calendar"></i> Specific Year
+                </button>
+                <button type="button" class="sa-cat-pill active" id="log-tab-all" onclick="setLogPeriodMode('all')">
+                  <i class="bi bi-infinity"></i> All Time
+                </button>
+              </div>
+            </div>
+
+            <!-- Dynamic Picker Controls Box -->
+            <div id="log-picker-box" style="display:none;background:var(--sa-surface);border:1px solid var(--sa-border);border-radius:10px;padding:12px 16px;margin-top:10px;">
+              <!-- DATE PICKER -->
+              <div id="log-picker-date" class="log-picker-section" style="display:none;">
+                <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;">
+                  <label class="sa-label" style="margin-bottom:0;display:flex;align-items:center;gap:6px;font-size:12px;">
+                    <i class="bi bi-calendar-date" style="color:var(--sa-accent2);"></i> Choose Date:
+                  </label>
+                  <button type="button" class="sa-btn sa-btn-ghost" style="padding:5px 9px;font-size:12px;" onclick="shiftLogDate(-1)" title="Previous Day"><i class="bi bi-chevron-left"></i></button>
+                  <input type="date" id="log-input-date" class="sa-input" style="width:auto;min-width:160px;padding:6px 12px;font-size:13px;" onchange="applyLogDateFilter()">
+                  <button type="button" class="sa-btn sa-btn-ghost" style="padding:5px 9px;font-size:12px;" onclick="shiftLogDate(1)" title="Next Day"><i class="bi bi-chevron-right"></i></button>
+                  <button type="button" class="sa-btn sa-btn-ghost" style="padding:5px 12px;font-size:12px;" onclick="setLogToday()">Today</button>
+                  <span id="log-date-display-label" style="font-size:12.5px;font-weight:600;color:var(--sa-accent2);margin-left:6px;"></span>
+                </div>
+              </div>
+
+              <!-- WEEK PICKER -->
+              <div id="log-picker-week" class="log-picker-section" style="display:none;">
+                <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;">
+                  <label class="sa-label" style="margin-bottom:0;display:flex;align-items:center;gap:6px;font-size:12px;">
+                    <i class="bi bi-calendar-week" style="color:var(--sa-accent2);"></i> Choose Week:
+                  </label>
+                  <button type="button" class="sa-btn sa-btn-ghost" style="padding:5px 9px;font-size:12px;" onclick="shiftLogWeek(-1)" title="Previous Week"><i class="bi bi-chevron-left"></i></button>
+                  <input type="week" id="log-input-week" class="sa-input" style="width:auto;min-width:180px;padding:6px 12px;font-size:13px;" onchange="applyLogDateFilter()">
+                  <button type="button" class="sa-btn sa-btn-ghost" style="padding:5px 9px;font-size:12px;" onclick="shiftLogWeek(1)" title="Next Week"><i class="bi bi-chevron-right"></i></button>
+                  <button type="button" class="sa-btn sa-btn-ghost" style="padding:5px 12px;font-size:12px;" onclick="setLogThisWeek()">This Week</button>
+                  <span id="log-week-display-label" style="font-size:12.5px;font-weight:600;color:var(--sa-accent2);margin-left:6px;"></span>
+                </div>
+              </div>
+
+              <!-- MONTH PICKER -->
+              <div id="log-picker-month" class="log-picker-section" style="display:none;">
+                <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;">
+                  <label class="sa-label" style="margin-bottom:0;display:flex;align-items:center;gap:6px;font-size:12px;">
+                    <i class="bi bi-calendar-month" style="color:var(--sa-accent2);"></i> Choose Month:
+                  </label>
+                  <button type="button" class="sa-btn sa-btn-ghost" style="padding:5px 9px;font-size:12px;" onclick="shiftLogMonth(-1)" title="Previous Month"><i class="bi bi-chevron-left"></i></button>
+                  <input type="month" id="log-input-month" class="sa-input" style="width:auto;min-width:160px;padding:6px 12px;font-size:13px;" onchange="applyLogDateFilter()">
+                  <button type="button" class="sa-btn sa-btn-ghost" style="padding:5px 9px;font-size:12px;" onclick="shiftLogMonth(1)" title="Next Month"><i class="bi bi-chevron-right"></i></button>
+                  <button type="button" class="sa-btn sa-btn-ghost" style="padding:5px 12px;font-size:12px;" onclick="setLogThisMonth()">This Month</button>
+                  <span id="log-month-display-label" style="font-size:12.5px;font-weight:600;color:var(--sa-accent2);margin-left:6px;"></span>
+                </div>
+              </div>
+
+              <!-- YEAR PICKER -->
+              <div id="log-picker-year" class="log-picker-section" style="display:none;">
+                <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;">
+                  <label class="sa-label" style="margin-bottom:0;display:flex;align-items:center;gap:6px;font-size:12px;">
+                    <i class="bi bi-calendar" style="color:var(--sa-accent2);"></i> Choose Year:
+                  </label>
+                  <button type="button" class="sa-btn sa-btn-ghost" style="padding:5px 9px;font-size:12px;" onclick="shiftLogYear(-1)" title="Previous Year"><i class="bi bi-chevron-left"></i></button>
+                  <select id="log-input-year" class="sa-select" style="width:auto;min-width:130px;padding:6px 12px;font-size:13px;" onchange="applyLogDateFilter()">
+                  </select>
+                  <button type="button" class="sa-btn sa-btn-ghost" style="padding:5px 9px;font-size:12px;" onclick="shiftLogYear(1)" title="Next Year"><i class="bi bi-chevron-right"></i></button>
+                  <button type="button" class="sa-btn sa-btn-ghost" style="padding:5px 12px;font-size:12px;" onclick="setLogThisYear()">This Year</button>
+                  <span id="log-year-display-label" style="font-size:12.5px;font-weight:600;color:var(--sa-accent2);margin-left:6px;"></span>
+                </div>
+              </div>
+            </div>
           </div>
 
           <!-- Category Breakdown -->
@@ -1597,6 +1827,60 @@
           <i class="bi bi-floppy-fill"></i> Save Changes
         </button>
       </div>
+    </div>
+  <!-- ── ADD MENU ITEM MODAL (Super Admin) ── -->
+  <div class="sa-modal-overlay" id="sa-add-item-modal">
+    <div class="sa-modal" style="max-width:480px;">
+      <div class="sa-modal-header">
+        <h3><i class="bi bi-cup-hot-fill me-2" style="color:var(--sa-accent2);"></i>Add Menu Item</h3>
+        <button class="sa-modal-close" onclick="closeModal('sa-add-item-modal')"><i class="bi bi-x-lg"></i></button>
+      </div>
+      <form onsubmit="saSubmitAddMenu(event)">
+        <div class="sa-modal-body">
+          <div class="sa-form-row">
+            <label class="sa-label">Item Name</label>
+            <input type="text" id="sa-new-menu-name" class="sa-input" placeholder="e.g. Spanish Latte" required>
+          </div>
+          <div class="sa-form-row">
+            <label class="sa-label">Category</label>
+            <select id="sa-new-menu-category" class="sa-select" required>
+              <option value="1">Hot Coffee</option>
+              <option value="2">Iced Coffee</option>
+              <option value="3">Classic Milktea</option>
+              <option value="4">Virgin Mojito</option>
+              <option value="5">Citrus Popping Boba</option>
+              <option value="6">Soda Float</option>
+              <option value="7">Matcha Series</option>
+              <option value="8">Frappé</option>
+              <option value="9">Fork and Fun</option>
+            </select>
+          </div>
+          <div class="sa-form-row">
+            <label class="sa-label">Base Price (₱)</label>
+            <input type="number" id="sa-new-menu-price" class="sa-input" placeholder="e.g. 120" min="1" step="0.5" required>
+          </div>
+          <div class="sa-form-grid">
+            <div class="sa-form-row">
+              <label class="sa-label">Initial Stock</label>
+              <input type="number" id="sa-new-menu-stock" class="sa-input" value="20" min="0">
+            </div>
+            <div class="sa-form-row">
+              <label class="sa-label">Min Stock Alert</label>
+              <input type="number" id="sa-new-menu-min-stock" class="sa-input" value="5" min="1">
+            </div>
+          </div>
+          <div class="sa-form-row">
+            <label class="sa-label">Photo (optional)</label>
+            <input type="file" id="sa-new-menu-image" class="sa-input" accept="image/*">
+          </div>
+        </div>
+        <div class="sa-modal-footer">
+          <button type="button" class="sa-btn sa-btn-ghost" onclick="closeModal('sa-add-item-modal')">Cancel</button>
+          <button type="submit" class="sa-btn sa-btn-primary" id="sa-add-item-submit-btn">
+            <i class="bi bi-plus-circle-fill"></i> Add to Menu
+          </button>
+        </div>
+      </form>
     </div>
   </div>
 
@@ -2031,6 +2315,7 @@
       requests: 'System Requests',
       'admin-reqs': 'Admin Approval Requests',
       users: 'All Users',
+      menu: 'Menu & Inventory',
       orders: 'Orders',
       logs: 'Audit Log',
       analytics: 'Analytics',
@@ -2042,6 +2327,7 @@
       requests:    loadRequests,
       'admin-reqs':loadAdminRequests,
       users:       loadUsers,
+      menu:        saLoadMenu,
       orders:      loadOrders,
       analytics:   loadAnalytics,
       logs:        loadLogs,
@@ -2277,7 +2563,11 @@
           return;
         }
 
-        tbody.innerHTML = res.admin_requests.map((r, index) => `
+        tbody.innerHTML = res.admin_requests.map((r, index) => {
+          const safeName = (r.full_name || '').replace(/'/g, "\\'");
+          const safeUser = (r.username || '').replace(/'/g, "\\'");
+          const safeEmail = (r.email || '').replace(/'/g, "\\'");
+          return `
           <tr>
             <td style="color:var(--sa-muted);font-size:12px;">${index + 1}</td>
             <td style="font-weight:600;">${r.full_name}</td>
@@ -2286,19 +2576,23 @@
             <td><span class="badge-sa badge-${r.status === 'approved' ? 'approved' : r.status === 'pending' ? 'pending' : 'rejected'}">${r.status}</span></td>
             <td style="color:var(--sa-muted);font-size:12px;">${new Date(r.created_at).toLocaleString('en-PH', {month:'short',day:'numeric',hour:'2-digit',minute:'2-digit'})}</td>
             <td>
-              ${r.status === 'pending' ? `
-                <div style="display:flex;gap:6px;">
-                  <button class="sa-btn sa-btn-approve" style="padding:5px 10px;font-size:11px;" onclick="openReviewModal('admin_reg', ${r.id}, {full_name:'${r.full_name}',username:'${r.username}',email:'${r.email}'})">
+              <div style="display:flex;gap:6px;align-items:center;">
+                ${r.status === 'pending' ? `
+                  <button class="sa-btn sa-btn-approve" style="padding:5px 10px;font-size:11px;" onclick="openReviewModal('admin_reg', ${r.id}, {full_name:'${safeName}',username:'${safeUser}',email:'${safeEmail}'})">
                     <i class="bi bi-check-circle-fill"></i> Approve
                   </button>
                   <button class="sa-btn sa-btn-reject" style="padding:5px 10px;font-size:11px;" onclick="quickReject('admin_reg', ${r.id})">
                     <i class="bi bi-x-circle"></i> Reject
                   </button>
-                </div>
-              ` : '<span style="font-size:11px;color:var(--sa-muted);">—</span>'}
+                ` : ''}
+                <button class="sa-btn sa-btn-reject" style="padding:5px 10px;font-size:11px;background:rgba(239,68,68,0.1);color:#ef4444;border-color:rgba(239,68,68,0.3);" onclick="deleteAdminRequest(${r.id}, '${safeName}')" title="Delete request">
+                  <i class="bi bi-trash-fill"></i> Delete
+                </button>
+              </div>
             </td>
           </tr>
-        `).join('');
+        `;
+        }).join('');
       } catch (e) { console.error(e); }
     }
 
@@ -2349,6 +2643,50 @@
           <div style="margin-top:10px;padding:8px 12px;border-radius:8px;background:${color}11;border:1px solid ${color}33;font-size:12px;color:${color};">
             <i class="bi bi-exclamation-triangle-fill"></i> 
             ${isVoid ? 'Approving this will mark the order as Voided and restore all stock.' : 'Approving this will mark the order as Refunded and restore all stock.'}
+          </div>`;
+      } else if (data.type === 'menu_change') {
+        const pl = typeof data.payload === 'string' ? JSON.parse(data.payload||'{}') : (data.payload||{});
+        const isAdd = (pl.action === 'add');
+        const color = isAdd ? '#10b981' : '#dc2626';
+        const icon  = isAdd ? 'bi-plus-circle-fill' : 'bi-trash-fill';
+        const actionLabel = isAdd ? 'Add Menu Item' : 'Remove Menu Item';
+        document.getElementById('review-modal-title').textContent = `Review: ${actionLabel}`;
+        document.getElementById('review-approve-btn').innerHTML  = `<i class="bi bi-check-circle-fill"></i> ${isAdd ? 'Approve Addition' : 'Approve Removal'}`;
+        document.getElementById('review-reject-btn').innerHTML   = `<i class="bi bi-x-circle-fill"></i> Reject`;
+        details = `
+          <div style="display:flex;align-items:center;gap:10px;margin-bottom:14px;">
+            <div style="width:38px;height:38px;border-radius:10px;background:${color}22;display:flex;align-items:center;justify-content:center;flex-shrink:0;">
+              <i class="bi ${icon}" style="color:${color};font-size:18px;"></i>
+            </div>
+            <div>
+              <div style="font-weight:700;font-size:15px;color:var(--sa-text);">${actionLabel}</div>
+              <div style="font-size:12px;color:var(--sa-muted);">Requested by <strong>${data.requester_name || 'Staff'}</strong></div>
+            </div>
+          </div>
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:10px;">
+            <div style="background:var(--sa-bg);border-radius:8px;padding:10px;">
+              <div style="font-size:10px;color:var(--sa-muted);text-transform:uppercase;letter-spacing:0.5px;margin-bottom:3px;">Item Name</div>
+              <div style="font-weight:700;font-size:14px;color:var(--sa-text);">${pl.name || '—'}</div>
+            </div>
+            <div style="background:var(--sa-bg);border-radius:8px;padding:10px;">
+              <div style="font-size:10px;color:var(--sa-muted);text-transform:uppercase;letter-spacing:0.5px;margin-bottom:3px;">Price</div>
+              <div style="font-weight:700;font-size:14px;color:var(--sa-gold);">₱${pl.price ? parseFloat(pl.price).toFixed(2) : '0.00'}</div>
+            </div>
+          </div>
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:10px;">
+            <div style="background:var(--sa-bg);border-radius:8px;padding:10px;">
+              <div style="font-size:10px;color:var(--sa-muted);text-transform:uppercase;letter-spacing:0.5px;margin-bottom:3px;">Category</div>
+              <div style="font-size:13px;color:var(--sa-text);">${pl.category_name || pl.category || 'General'}</div>
+            </div>
+            <div style="background:var(--sa-bg);border-radius:8px;padding:10px;">
+              <div style="font-size:10px;color:var(--sa-muted);text-transform:uppercase;letter-spacing:0.5px;margin-bottom:3px;">Stock</div>
+              <div style="font-size:13px;color:var(--sa-text);">${pl.stock !== undefined ? pl.stock + ' units' : '—'}</div>
+            </div>
+          </div>
+          ${pl.reason ? `<div style="background:var(--sa-bg);border-radius:8px;padding:10px;margin-bottom:10px;"><div style="font-size:10px;color:var(--sa-muted);text-transform:uppercase;letter-spacing:0.5px;margin-bottom:3px;">Reason</div><div style="font-size:13px;color:var(--sa-text);">${pl.reason}</div></div>` : ''}
+          <div style="padding:8px 12px;border-radius:8px;background:${color}11;border:1px solid ${color}33;font-size:12px;color:${color};">
+            <i class="bi bi-info-circle-fill"></i> 
+            ${isAdd ? 'Approving this will immediately insert the new item into the menu.' : 'Approving this will permanently remove the item from the active menu.'}
           </div>`;
       } else {
         document.getElementById('review-modal-title').textContent = 'Review System Request';
@@ -2576,7 +2914,20 @@
         async () => {
           const res = await saApi('superadmin.php?action=delete_user', { user_id: id });
           saToast(res.message, res.success ? 'success' : 'error');
-          if (res.success) { loadUsers(); loadDashboard(); }
+          if (res.success) { loadUsers(); loadAdminRequests(); loadDashboard(); }
+        },
+        'var(--sa-danger)'
+      );
+    }
+
+    async function deleteAdminRequest(id, name) {
+      openConfirmModal(
+        'Delete Admin Request',
+        `Are you sure you want to remove the admin approval request for "<b>${name}</b>"?<br><br><span style="color:var(--sa-danger);font-size:12px;">⚠ This record will be permanently deleted from admin approvals.</span>`,
+        async () => {
+          const res = await saApi('superadmin.php?action=delete_admin_request', { id: id });
+          saToast(res.message, res.success ? 'success' : 'error');
+          if (res.success) { loadAdminRequests(); loadDashboard(); }
         },
         'var(--sa-danger)'
       );
@@ -2599,21 +2950,387 @@
     }
 
     /* =============================================
+       MENU MANAGEMENT (Super Admin)
+    ============================================= */
+    let saMenuItems = [];
+    let saMenuCategories = [];
+    let saSelectedCategory = 'All';
+    let saPendingDeleteIds = new Set();
+
+    async function saLoadMenu() {
+      try {
+        const res = await saApi('menu.php');
+        if (!res.success) return;
+        saMenuItems = res.items || [];
+        saMenuCategories = res.categories || [];
+        saPendingDeleteIds = new Set((res.pending_deletions || []).map(Number));
+        saRenderCategoryPills();
+        saRenderMenuTable();
+      } catch (err) {
+        console.error(err);
+      }
+    }
+
+    function saRenderCategoryPills() {
+      const pillBox = document.getElementById('sa-menu-cat-pills');
+      if (!pillBox) return;
+      const cats = ['All', ...saMenuCategories.map(c => c.name)];
+      pillBox.innerHTML = cats.map(cat => `
+        <button type="button" class="sa-cat-pill ${saSelectedCategory === cat ? 'active' : ''}" onclick="saFilterCat('${cat}', this)">
+          ${cat}
+        </button>
+      `).join('');
+    }
+
+    function saFilterCat(cat, btn) {
+      saSelectedCategory = cat;
+      document.querySelectorAll('#sa-menu-cat-pills .sa-cat-pill').forEach(b => b.classList.remove('active'));
+      if (btn) btn.classList.add('active');
+      saRenderMenuTable();
+    }
+
+    function saRenderMenuTable() {
+      const tbody = document.getElementById('sa-menu-tbody');
+      if (!tbody) return;
+      const q = (document.getElementById('sa-menu-search')?.value || '').toLowerCase().trim();
+
+      let filtered = saMenuItems.filter(item => {
+        const matchCat = (saSelectedCategory === 'All' || item.category === saSelectedCategory);
+        const matchQ = !q || item.name.toLowerCase().includes(q) || (item.category || '').toLowerCase().includes(q);
+        return matchCat && matchQ;
+      });
+
+      if (!filtered.length) {
+        tbody.innerHTML = `<tr><td colspan="7"><div class="sa-empty"><i class="bi bi-cup-hot"></i><p>No menu items found</p></div></td></tr>`;
+        return;
+      }
+
+      tbody.innerHTML = filtered.map((item, index) => {
+        const isAvail = !!item.is_available;
+        const isLow = item.stock <= item.min_stock && item.stock > 0;
+        const isOut = item.stock <= 0;
+        const isPendingDel = saPendingDeleteIds.has(item.id);
+        const stockBadge = isOut 
+          ? `<span class="badge-sa badge-voided">Out of Stock</span>`
+          : isLow 
+            ? `<span class="badge-sa badge-pending">Low: ${item.stock}</span>`
+            : `<span style="font-weight:600;color:var(--sa-text);">${item.stock}</span>`;
+
+        return `
+          <tr>
+            <td style="color:var(--sa-muted);font-size:12px;">${index + 1}</td>
+            <td>
+              <div style="display:flex;align-items:center;gap:10px;">
+                ${item.image 
+                  ? `<img src="${item.image}" style="width:34px;height:34px;border-radius:8px;object-fit:cover;border:1px solid var(--sa-border);">`
+                  : `<div style="width:34px;height:34px;border-radius:8px;background:rgba(109,40,217,0.15);display:flex;align-items:center;justify-content:center;font-size:16px;">☕</div>`}
+                <div>
+                  <span style="font-weight:600;color:var(--sa-text);">${item.name}</span>
+                  ${isPendingDel ? `<div style="font-size:10px;color:#f59e0b;font-weight:700;"><i class="bi bi-hourglass-split me-1"></i>Pending Removal Req.</div>` : ''}
+                </div>
+              </div>
+            </td>
+            <td><span style="font-size:12px;color:var(--sa-muted);">${item.category || '—'}</span></td>
+            <td style="font-weight:700;color:var(--sa-gold);">₱${parseFloat(item.price).toFixed(2)}</td>
+            <td>
+              <div style="display:flex;align-items:center;gap:6px;">
+                <button class="sa-btn sa-btn-ghost" style="padding:2px 7px;font-size:11px;" onclick="saAdjustStock(${item.id}, -1)">−</button>
+                ${stockBadge}
+                <button class="sa-btn sa-btn-ghost" style="padding:2px 7px;font-size:11px;" onclick="saAdjustStock(${item.id}, 1)">+</button>
+              </div>
+            </td>
+            <td>
+              <span class="badge-sa ${isAvail ? 'badge-active' : 'badge-inactive'}">${isAvail ? 'Available' : 'Unavailable'}</span>
+            </td>
+            <td>
+              <div style="display:flex;gap:6px;align-items:center;">
+                <button class="sa-btn sa-btn-ghost" style="padding:5px 9px;font-size:11.5px;" onclick="saToggleMenuAvail(${item.id})">
+                  ${isAvail ? '<i class="bi bi-eye-slash"></i> Disable' : '<i class="bi bi-eye"></i> Enable'}
+                </button>
+                <button class="sa-btn sa-btn-danger" style="padding:5px 9px;font-size:11.5px;" onclick="saDeleteMenuItem(${item.id}, '${item.name.replace(/'/g, "\\'")}')" title="Delete permanently">
+                  <i class="bi bi-trash-fill"></i>
+                </button>
+              </div>
+            </td>
+          </tr>
+        `;
+      }).join('');
+    }
+
+    async function saToggleMenuAvail(id) {
+      try {
+        const res = await saApi('menu.php?action=toggle', { id });
+        if (res.success) {
+          saToast(res.message, 'success');
+          saLoadMenu();
+        } else {
+          saToast(res.message, 'error');
+        }
+      } catch (e) {
+        saToast('Failed to toggle availability', 'error');
+      }
+    }
+
+    async function saAdjustStock(id, delta) {
+      try {
+        const res = await saApi('menu.php?action=adjust_stock', { id, delta });
+        if (res.success) {
+          const item = saMenuItems.find(m => m.id == id);
+          if (item) { item.stock = res.stock; item.is_available = res.is_available; }
+          saRenderMenuTable();
+        } else {
+          saToast(res.message, 'error');
+        }
+      } catch (e) {
+        saToast('Failed to adjust stock', 'error');
+      }
+    }
+
+    async function saDeleteMenuItem(id, name) {
+      if (!confirm(`Are you sure you want to permanently delete "${name}" from the menu?\n\nThis will take effect immediately without requiring codes.`)) return;
+      try {
+        const res = await saApi('menu.php?action=delete', { id });
+        if (res.success) {
+          saToast(res.message, 'success');
+          saLoadMenu();
+        } else {
+          saToast(res.message, 'error');
+        }
+      } catch (e) {
+        saToast('Failed to delete item', 'error');
+      }
+    }
+
+    function saOpenAddMenuModal() {
+      document.getElementById('sa-new-menu-name').value = '';
+      document.getElementById('sa-new-menu-price').value = '';
+      document.getElementById('sa-new-menu-stock').value = '20';
+      document.getElementById('sa-new-menu-min-stock').value = '5';
+      document.getElementById('sa-new-menu-image').value = '';
+      openModal('sa-add-item-modal');
+    }
+
+    async function saSubmitAddMenu(e) {
+      e.preventDefault();
+      const name = document.getElementById('sa-new-menu-name').value.trim();
+      const categoryId = parseInt(document.getElementById('sa-new-menu-category').value) || 1;
+      const price = parseFloat(document.getElementById('sa-new-menu-price').value) || 0;
+      const stock = parseInt(document.getElementById('sa-new-menu-stock').value) || 0;
+      const minStock = parseInt(document.getElementById('sa-new-menu-min-stock').value) || 5;
+      const imageInput = document.getElementById('sa-new-menu-image');
+
+      if (!name || price <= 0) {
+        saToast('Please enter a valid item name and price.', 'error');
+        return;
+      }
+
+      let imageSrc = null;
+      if (imageInput.files && imageInput.files[0]) {
+        imageSrc = await new Promise(resolve => {
+          const reader = new FileReader();
+          reader.onload = ev => resolve(ev.target.result);
+          reader.readAsDataURL(imageInput.files[0]);
+        });
+      }
+
+      const btn = document.getElementById('sa-add-item-submit-btn');
+      btn.disabled = true;
+
+      try {
+        const res = await saApi('menu.php?action=add', {
+          name, category_id: categoryId, price, stock, min_stock: minStock, image: imageSrc
+        });
+        if (res.success) {
+          closeModal('sa-add-item-modal');
+          saToast(res.message, 'success');
+          saLoadMenu();
+        } else {
+          saToast(res.message, 'error');
+        }
+      } catch (err) {
+        saToast('Failed to add menu item', 'error');
+      } finally {
+        btn.disabled = false;
+      }
+    }
+
+    /* =============================================
        ORDERS
     ============================================= */
+    /* ── SA Order picker state ── */
+    let _saOrderPickerMode = ''; // '' | 'date' | 'week' | 'month' | 'year'
+    let _saOrderPickerVal  = '';
+
+    function initSAOrderPickerControls() {
+      const now = new Date();
+      const todayStr = formatLocalDate(now);
+      const dateInput = document.getElementById('sa-order-input-date');
+      if (dateInput && !dateInput.value) dateInput.value = todayStr;
+      const weekInput = document.getElementById('sa-order-input-week');
+      if (weekInput && !weekInput.value) weekInput.value = getISOWeekString(now);
+      const monthInput = document.getElementById('sa-order-input-month');
+      if (monthInput && !monthInput.value) {
+        monthInput.value = `${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,'0')}`;
+      }
+      const yearSelect = document.getElementById('sa-order-input-year');
+      if (yearSelect && yearSelect.options.length === 0) {
+        const curYear = now.getFullYear();
+        for (let yr = curYear + 1; yr >= 2022; yr--) {
+          const opt = new Option(yr, yr);
+          if (yr === curYear) opt.selected = true;
+          yearSelect.add(opt);
+        }
+      }
+    }
+
     function setSAOrderFilter(val, btn) {
+      // Clear picker mode when a quick tab is clicked
+      _saOrderPickerMode = '';
+      _saOrderPickerVal  = '';
+      const box = document.getElementById('sa-order-picker-box');
+      if (box) box.style.display = 'none';
+      // Deactivate picker buttons
+      ['pick-date','pick-week','pick-month','pick-year'].forEach(id => {
+        const el = document.getElementById('sa-ofilter-' + id);
+        if (el) el.classList.remove('active');
+      });
       document.querySelectorAll('#sa-order-filter-tabs .sa-cat-pill').forEach(b => b.classList.remove('active'));
-      btn.classList.add('active');
-      document.getElementById('order-date-filter').value = val;
+      if (btn) btn.classList.add('active');
+      // Update summary
+      const summaryLabels = { today: 'Showing today\'s orders', week: 'Showing this week\'s orders', month: 'Showing this month\'s orders', year: 'Showing this year\'s orders', all: 'Showing all orders (All Time)' };
+      const sumEl = document.getElementById('sa-order-period-summary');
+      if (sumEl) sumEl.textContent = summaryLabels[val] || 'Showing orders';
+      loadOrders(val);
+    }
+
+    function setSAOrderPickerMode(mode) {
+      _saOrderPickerMode = mode;
+      initSAOrderPickerControls();
+      // Deactivate quick tabs
+      document.querySelectorAll('#sa-order-filter-tabs .sa-cat-pill').forEach(b => b.classList.remove('active'));
+      const activeBtn = document.getElementById('sa-ofilter-pick-' + mode);
+      if (activeBtn) activeBtn.classList.add('active');
+      const box = document.getElementById('sa-order-picker-box');
+      if (box) box.style.display = 'block';
+      ['date','week','month','year'].forEach(m => {
+        const el = document.getElementById('sa-order-picker-' + m);
+        if (el) el.style.display = m === mode ? 'block' : 'none';
+      });
+      applySAOrderPickerFilter();
+    }
+
+    function applySAOrderPickerFilter() {
+      initSAOrderPickerControls();
+      if (_saOrderPickerMode === 'date') {
+        _saOrderPickerVal = document.getElementById('sa-order-input-date')?.value || formatLocalDate(new Date());
+        const parts = (_saOrderPickerVal || '').split('-');
+        let txt = _saOrderPickerVal;
+        if (parts.length === 3) {
+          const d = new Date(parseInt(parts[0],10), parseInt(parts[1],10)-1, parseInt(parts[2],10));
+          txt = d.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric', year: 'numeric' });
+        }
+        const lbl = document.getElementById('sa-order-date-label');
+        if (lbl) lbl.textContent = txt;
+        const sumEl = document.getElementById('sa-order-period-summary');
+        if (sumEl) sumEl.textContent = `📅 Filtered by Date: ${txt}`;
+      } else if (_saOrderPickerMode === 'week') {
+        _saOrderPickerVal = document.getElementById('sa-order-input-week')?.value || getISOWeekString(new Date());
+        const txt = getISOWeekRange(_saOrderPickerVal) || _saOrderPickerVal;
+        const lbl = document.getElementById('sa-order-week-label');
+        if (lbl) lbl.textContent = txt;
+        const sumEl = document.getElementById('sa-order-period-summary');
+        if (sumEl) sumEl.textContent = `📆 Filtered by: ${txt}`;
+      } else if (_saOrderPickerMode === 'month') {
+        _saOrderPickerVal = document.getElementById('sa-order-input-month')?.value || `${new Date().getFullYear()}-${String(new Date().getMonth()+1).padStart(2,'0')}`;
+        const parts = (_saOrderPickerVal || '').split('-');
+        let txt = _saOrderPickerVal;
+        if (parts.length === 2) {
+          const d = new Date(parseInt(parts[0],10), parseInt(parts[1],10)-1, 1);
+          txt = d.toLocaleDateString('en-US', { month: 'long', year: 'numeric' });
+        }
+        const lbl = document.getElementById('sa-order-month-label');
+        if (lbl) lbl.textContent = txt;
+        const sumEl = document.getElementById('sa-order-period-summary');
+        if (sumEl) sumEl.textContent = `🗓️ Filtered by Month: ${txt}`;
+      } else if (_saOrderPickerMode === 'year') {
+        _saOrderPickerVal = document.getElementById('sa-order-input-year')?.value || String(new Date().getFullYear());
+        const lbl = document.getElementById('sa-order-year-label');
+        if (lbl) lbl.textContent = `Year ${_saOrderPickerVal}`;
+        const sumEl = document.getElementById('sa-order-period-summary');
+        if (sumEl) sumEl.textContent = `📅 Filtered by Year: ${_saOrderPickerVal}`;
+      }
       loadOrders();
     }
 
-    async function loadOrders() {
-      const date   = document.getElementById('order-date-filter')?.value || 'today';
+    /* Shift helpers */
+    function shiftSAOrderDate(delta) {
+      const input = document.getElementById('sa-order-input-date');
+      const val = input.value || formatLocalDate(new Date());
+      const parts = val.split('-');
+      const d = new Date(parseInt(parts[0],10), parseInt(parts[1],10)-1, parseInt(parts[2],10));
+      d.setDate(d.getDate() + delta);
+      input.value = formatLocalDate(d);
+      applySAOrderPickerFilter();
+    }
+    function setSAOrderPickerToday() {
+      document.getElementById('sa-order-input-date').value = formatLocalDate(new Date());
+      applySAOrderPickerFilter();
+    }
+    function shiftSAOrderWeek(delta) {
+      const input = document.getElementById('sa-order-input-week');
+      const val = input.value || getISOWeekString(new Date());
+      const parts = val.split('-W');
+      let y = parseInt(parts[0], 10), w = parseInt(parts[1], 10) + delta;
+      if (w < 1) { y--; w = 52; } else if (w > 52) { y++; w = 1; }
+      input.value = `${y}-W${String(w).padStart(2, '0')}`;
+      applySAOrderPickerFilter();
+    }
+    function setSAOrderThisWeek() {
+      document.getElementById('sa-order-input-week').value = getISOWeekString(new Date());
+      applySAOrderPickerFilter();
+    }
+    function shiftSAOrderMonth(delta) {
+      const input = document.getElementById('sa-order-input-month');
+      const val = input.value || `${new Date().getFullYear()}-${String(new Date().getMonth()+1).padStart(2,'0')}`;
+      const parts = val.split('-');
+      let y = parseInt(parts[0], 10), m = parseInt(parts[1], 10) - 1 + delta;
+      const d = new Date(y, m, 1);
+      input.value = `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2, '0')}`;
+      applySAOrderPickerFilter();
+    }
+    function setSAOrderThisMonth() {
+      const now = new Date();
+      document.getElementById('sa-order-input-month').value = `${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,'0')}`;
+      applySAOrderPickerFilter();
+    }
+    function shiftSAOrderYear(delta) {
+      const select = document.getElementById('sa-order-input-year');
+      const cur = parseInt(select.value || new Date().getFullYear(), 10);
+      const target = cur + delta;
+      let found = false;
+      for (let opt of select.options) {
+        if (parseInt(opt.value, 10) === target) { select.value = target; found = true; break; }
+      }
+      if (!found) { const opt = new Option(target, target); select.add(opt); select.value = target; }
+      applySAOrderPickerFilter();
+    }
+    function setSAOrderThisYear() {
+      document.getElementById('sa-order-input-year').value = new Date().getFullYear();
+      applySAOrderPickerFilter();
+    }
+
+    async function loadOrders(quickFilter) {
       const status = document.getElementById('order-status-filter')?.value || '';
+      let url;
+      if (_saOrderPickerMode && _saOrderPickerVal) {
+        url = `superadmin.php?action=orders&date_mode=${_saOrderPickerMode}&date_val=${encodeURIComponent(_saOrderPickerVal)}&status=${status}&limit=200`;
+      } else {
+        const date = quickFilter || (document.querySelector('#sa-order-filter-tabs .sa-cat-pill.active')?.id?.replace('sa-ofilter-','') || 'today');
+        url = `superadmin.php?action=orders&date=${date}&status=${status}&limit=200`;
+      }
 
       try {
-        const res = await saApi(`superadmin.php?action=orders&date=${date}&status=${status}&limit=100`);
+        const res = await saApi(url);
         if (!res.success) return;
 
         const tbody = document.getElementById('sa-orders-tbody');
@@ -2626,7 +3343,7 @@
           const statusBadge = o.status === 'Completed' ? 'badge-completed'
             : o.status === 'Voided'    ? 'badge-voided'
             : 'badge-pending';
-          const items = (o.items || []).map(i => `${i.quantity}x ${i.name}`).join(', ');
+          const items = Array.isArray(o.items) ? o.items.map(i => `${i.quantity}x ${i.name}`).join(', ') : (o.items || '—');
           const dt = new Date(o.created_at).toLocaleString('en-PH', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' });
           return `<tr>
             <td style="font-weight:700;color:#a855f7;">${o.order_number}</td>
@@ -2749,12 +3466,15 @@
     /* ── Audit log state ── */
     let _allLogs        = [];
     let _activeLogCat   = 'all';
+    let _logPeriodMode  = 'all'; // 'all' | 'date' | 'week' | 'month' | 'year'
+    let _logPeriodVal   = '';
 
     /* Category meta — maps action key → display label + color */
     const LOG_CATEGORIES = {
       all:                        { label: 'All',                 color: '#64748b', icon: 'bi-list-ul' },
       approve_admin_registration: { label: 'Approved',            color: '#10b981', icon: 'bi-check-circle-fill' },
       reject_admin_registration:  { label: 'Rejected',            color: '#ef4444', icon: 'bi-x-circle-fill' },
+      delete_admin_registration_request: { label: 'Deleted Req',  color: '#dc2626', icon: 'bi-trash-fill' },
       approve_system_request:     { label: 'Req Approved',        color: '#059669', icon: 'bi-check2-all' },
       reject_system_request:      { label: 'Req Rejected',        color: '#dc2626', icon: 'bi-slash-circle-fill' },
       save_system_settings:       { label: 'Save Settings',       color: '#a855f7', icon: 'bi-gear-fill' },
@@ -2767,9 +3487,246 @@
       admin_login:                { label: 'Admin Login (2FA)',   color: '#059669', icon: 'bi-shield-lock-fill' },
     };
 
+    function getISOWeekString(date) {
+      const d = new Date(Date.UTC(date.getFullYear(), date.getMonth(), date.getDate()));
+      const dayNum = d.getUTCDay() || 7;
+      d.setUTCDate(d.getUTCDate() + 4 - dayNum);
+      const yearStart = new Date(Date.UTC(d.getUTCFullYear(), 0, 1));
+      const weekNo = Math.ceil((((d - yearStart) / 86400000) + 1) / 7);
+      const weekStr = String(weekNo).padStart(2, '0');
+      return `${d.getUTCFullYear()}-W${weekStr}`;
+    }
+
+    function getISOWeekRange(weekStr) {
+      if (!weekStr) return '';
+      const parts = weekStr.split('-W');
+      if (parts.length !== 2) return '';
+      const year = parseInt(parts[0], 10);
+      const week = parseInt(parts[1], 10);
+      const simple = new Date(year, 0, 4);
+      const dayOfWeek = simple.getDay() || 7;
+      const monday = new Date(simple);
+      monday.setDate(simple.getDate() - dayOfWeek + 1 + (week - 1) * 7);
+      const sunday = new Date(monday);
+      sunday.setDate(monday.getDate() + 6);
+      const opt = { month: 'short', day: 'numeric' };
+      return `Week ${week} (${monday.toLocaleDateString('en-US', opt)} – ${sunday.toLocaleDateString('en-US', opt)}, ${year})`;
+    }
+
+    function formatLocalDate(d) {
+      const y = d.getFullYear();
+      const m = String(d.getMonth() + 1).padStart(2, '0');
+      const day = String(d.getDate()).padStart(2, '0');
+      return `${y}-${m}-${day}`;
+    }
+
+    function initLogCalendarControls() {
+      const now = new Date();
+      const todayStr = formatLocalDate(now);
+      const dateInput = document.getElementById('log-input-date');
+      if (dateInput && !dateInput.value) dateInput.value = todayStr;
+
+      const weekInput = document.getElementById('log-input-week');
+      if (weekInput && !weekInput.value) weekInput.value = getISOWeekString(now);
+
+      const monthInput = document.getElementById('log-input-month');
+      if (monthInput && !monthInput.value) {
+        const y = now.getFullYear();
+        const m = String(now.getMonth() + 1).padStart(2, '0');
+        monthInput.value = `${y}-${m}`;
+      }
+
+      const yearSelect = document.getElementById('log-input-year');
+      if (yearSelect && yearSelect.options.length === 0) {
+        const curYear = now.getFullYear();
+        for (let yr = curYear + 1; yr >= 2022; yr--) {
+          const opt = new Option(yr, yr);
+          if (yr === curYear) opt.selected = true;
+          yearSelect.add(opt);
+        }
+      }
+    }
+
+    function setLogPeriodMode(mode) {
+      _logPeriodMode = mode;
+      initLogCalendarControls();
+
+      // Update pill active classes
+      document.querySelectorAll('#log-period-tabs .sa-cat-pill').forEach(b => b.classList.remove('active'));
+      const activeTab = document.getElementById(`log-tab-${mode}`);
+      if (activeTab) activeTab.classList.add('active');
+
+      const box = document.getElementById('log-picker-box');
+      if (mode === 'all') {
+        if (box) box.style.display = 'none';
+        _logPeriodVal = '';
+        updateLogPeriodSummary();
+        loadLogs();
+        return;
+      }
+
+      if (box) box.style.display = 'block';
+
+      // Show/hide picker sections
+      ['date', 'week', 'month', 'year'].forEach(m => {
+        const el = document.getElementById(`log-picker-${m}`);
+        if (el) el.style.display = m === mode ? 'block' : 'none';
+      });
+
+      applyLogDateFilter();
+    }
+
+    function applyLogDateFilter() {
+      initLogCalendarControls();
+      if (_logPeriodMode === 'date') {
+        _logPeriodVal = document.getElementById('log-input-date')?.value || formatLocalDate(new Date());
+      } else if (_logPeriodMode === 'week') {
+        _logPeriodVal = document.getElementById('log-input-week')?.value || getISOWeekString(new Date());
+      } else if (_logPeriodMode === 'month') {
+        _logPeriodVal = document.getElementById('log-input-month')?.value || `${new Date().getFullYear()}-${String(new Date().getMonth()+1).padStart(2,'0')}`;
+      } else if (_logPeriodMode === 'year') {
+        _logPeriodVal = document.getElementById('log-input-year')?.value || String(new Date().getFullYear());
+      } else {
+        _logPeriodVal = '';
+      }
+
+      updateLogPeriodSummary();
+      loadLogs();
+    }
+
+    function updateLogPeriodSummary() {
+      const summaryEl = document.getElementById('log-period-summary');
+      if (!summaryEl) return;
+
+      if (_logPeriodMode === 'all') {
+        summaryEl.textContent = 'Showing all logs (All Time)';
+        return;
+      }
+
+      if (_logPeriodMode === 'date') {
+        const parts = (_logPeriodVal || '').split('-');
+        let txt = _logPeriodVal;
+        if (parts.length === 3) {
+          const d = new Date(parseInt(parts[0],10), parseInt(parts[1],10)-1, parseInt(parts[2],10));
+          txt = d.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric', year: 'numeric' });
+        }
+        summaryEl.textContent = `📅 Filtered by Date: ${txt}`;
+        const lbl = document.getElementById('log-date-display-label');
+        if (lbl) lbl.textContent = txt;
+      } else if (_logPeriodMode === 'week') {
+        const txt = getISOWeekRange(_logPeriodVal) || _logPeriodVal;
+        summaryEl.textContent = `📆 Filtered by: ${txt}`;
+        const lbl = document.getElementById('log-week-display-label');
+        if (lbl) lbl.textContent = txt;
+      } else if (_logPeriodMode === 'month') {
+        const parts = (_logPeriodVal || '').split('-');
+        let txt = _logPeriodVal;
+        if (parts.length === 2) {
+          const d = new Date(parseInt(parts[0],10), parseInt(parts[1],10)-1, 1);
+          txt = d.toLocaleDateString('en-US', { month: 'long', year: 'numeric' });
+        }
+        summaryEl.textContent = `🗓️ Filtered by Month: ${txt}`;
+        const lbl = document.getElementById('log-month-display-label');
+        if (lbl) lbl.textContent = txt;
+      } else if (_logPeriodMode === 'year') {
+        summaryEl.textContent = `📅 Filtered by Year: ${_logPeriodVal}`;
+        const lbl = document.getElementById('log-year-display-label');
+        if (lbl) lbl.textContent = `Year ${_logPeriodVal}`;
+      }
+    }
+
+    function shiftLogDate(delta) {
+      const input = document.getElementById('log-input-date');
+      const val = input.value || formatLocalDate(new Date());
+      const parts = val.split('-');
+      const d = new Date(parseInt(parts[0],10), parseInt(parts[1],10)-1, parseInt(parts[2],10));
+      d.setDate(d.getDate() + delta);
+      input.value = formatLocalDate(d);
+      applyLogDateFilter();
+    }
+
+    function setLogToday() {
+      const input = document.getElementById('log-input-date');
+      input.value = formatLocalDate(new Date());
+      applyLogDateFilter();
+    }
+
+    function shiftLogWeek(delta) {
+      const input = document.getElementById('log-input-week');
+      const val = input.value || getISOWeekString(new Date());
+      const parts = val.split('-W');
+      let y = parseInt(parts[0], 10);
+      let w = parseInt(parts[1], 10) + delta;
+      if (w < 1) {
+        y--;
+        w = 52;
+      } else if (w > 52) {
+        y++;
+        w = 1;
+      }
+      input.value = `${y}-W${String(w).padStart(2, '0')}`;
+      applyLogDateFilter();
+    }
+
+    function setLogThisWeek() {
+      const input = document.getElementById('log-input-week');
+      input.value = getISOWeekString(new Date());
+      applyLogDateFilter();
+    }
+
+    function shiftLogMonth(delta) {
+      const input = document.getElementById('log-input-month');
+      const val = input.value || `${new Date().getFullYear()}-${String(new Date().getMonth()+1).padStart(2,'0')}`;
+      const parts = val.split('-');
+      let y = parseInt(parts[0], 10);
+      let m = parseInt(parts[1], 10) - 1 + delta;
+      const d = new Date(y, m, 1);
+      input.value = `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2, '0')}`;
+      applyLogDateFilter();
+    }
+
+    function setLogThisMonth() {
+      const input = document.getElementById('log-input-month');
+      const now = new Date();
+      input.value = `${now.getFullYear()}-${String(now.getMonth()+1).padStart(2, '0')}`;
+      applyLogDateFilter();
+    }
+
+    function shiftLogYear(delta) {
+      const select = document.getElementById('log-input-year');
+      const cur = parseInt(select.value || new Date().getFullYear(), 10);
+      const target = cur + delta;
+      let found = false;
+      for (let opt of select.options) {
+        if (parseInt(opt.value, 10) === target) {
+          select.value = target;
+          found = true;
+          break;
+        }
+      }
+      if (!found) {
+        const opt = new Option(target, target);
+        select.add(opt);
+        select.value = target;
+      }
+      applyLogDateFilter();
+    }
+
+    function setLogThisYear() {
+      const select = document.getElementById('log-input-year');
+      const nowY = new Date().getFullYear();
+      select.value = nowY;
+      applyLogDateFilter();
+    }
+
     async function loadLogs() {
       try {
-        const res = await saApi('superadmin.php?action=logs&limit=200');
+        initLogCalendarControls();
+        let url = `superadmin.php?action=logs&limit=500&date_mode=${_logPeriodMode}`;
+        if (_logPeriodMode !== 'all' && _logPeriodVal) {
+          url += `&date_val=${encodeURIComponent(_logPeriodVal)}`;
+        }
+        const res = await saApi(url);
         if (!res.success) return;
 
         _allLogs = res.logs || [];
@@ -2849,7 +3806,7 @@
       });
 
       if (!filtered.length) {
-        el.innerHTML = '<div class="sa-empty"><i class="bi bi-journal"></i><p>No logs match this filter</p></div>';
+        el.innerHTML = '<div class="sa-empty"><i class="bi bi-calendar-x"></i><p style="font-weight:600;margin-bottom:4px;">No logs match this filter</p><p style="font-size:12px;color:var(--sa-muted);">Try selecting a different date, week, month, year, or switch to All Time.</p></div>';
         return;
       }
       el.innerHTML = filtered.map(renderLogEntry).join('');

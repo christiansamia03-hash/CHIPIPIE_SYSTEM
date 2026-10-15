@@ -376,8 +376,42 @@ function handleFetchOrders() {
     $db = getDB();
 
     $dateFilter = $_GET['date'] ?? 'today';
+    $dateMode   = trim($_GET['date_mode'] ?? '');
+    $dateVal    = trim($_GET['date_val']  ?? '');
     $where = '';
-    if ($dateFilter === 'today') {
+    $params = [];
+
+    if ($dateMode === 'date' && $dateVal) {
+        if (preg_match('/^\d{4}-\d{2}-\d{2}$/', $dateVal)) {
+            $where    = "WHERE DATE(o.created_at) = ?";
+            $params[] = $dateVal;
+        }
+    } elseif ($dateMode === 'week' && $dateVal) {
+        if (preg_match('/^(\d{4})-W(\d{1,2})$/', $dateVal, $m)) {
+            $dto = new DateTime();
+            $dto->setISODate(intval($m[1]), intval($m[2]));
+            $start    = $dto->format('Y-m-d 00:00:00');
+            $dto->modify('+6 days');
+            $end      = $dto->format('Y-m-d 23:59:59');
+            $where    = "WHERE o.created_at BETWEEN ? AND ?";
+            $params[] = $start;
+            $params[] = $end;
+        }
+    } elseif ($dateMode === 'month' && $dateVal) {
+        if (preg_match('/^(\d{4})-(\d{2})$/', $dateVal)) {
+            $start    = $dateVal . "-01 00:00:00";
+            $end      = date("Y-m-t 23:59:59", strtotime($start));
+            $where    = "WHERE o.created_at BETWEEN ? AND ?";
+            $params[] = $start;
+            $params[] = $end;
+        }
+    } elseif ($dateMode === 'year' && $dateVal) {
+        $year = intval($dateVal);
+        if ($year >= 2000 && $year <= 2100) {
+            $where    = "WHERE YEAR(o.created_at) = ?";
+            $params[] = $year;
+        }
+    } elseif ($dateFilter === 'today') {
         $where = "WHERE DATE(o.created_at) = CURDATE()";
     } elseif ($dateFilter === 'week') {
         $where = "WHERE YEARWEEK(o.created_at, 1) = YEARWEEK(CURDATE(), 1)";
@@ -387,7 +421,7 @@ function handleFetchOrders() {
         $where = "WHERE YEAR(o.created_at) = YEAR(CURDATE())";
     }
 
-    $stmt = $db->query("
+    $sql = "
         SELECT o.id, o.order_number, o.total, o.payment_method, o.status,
                o.created_at, u.full_name AS cashier,
                GROUP_CONCAT(
@@ -404,7 +438,13 @@ function handleFetchOrders() {
         GROUP BY o.id
         ORDER BY o.created_at DESC
         LIMIT 500
-    ");
+    ";
+    if ($params) {
+        $stmt = $db->prepare($sql);
+        $stmt->execute($params);
+    } else {
+        $stmt = $db->query($sql);
+    }
     $orders = $stmt->fetchAll();
 
     // Format time/date and compute summary (exclude Voided/Refunded from revenue)

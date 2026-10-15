@@ -54,6 +54,9 @@ switch ($action) {
     case 'resend_approval':
         handleResendApproval();
         break;
+    case 'delete_admin_request':
+        handleDeleteAdminRequest();
+        break;
     default:
         jsonResponse(['success' => false, 'message' => 'Invalid action.'], 400);
 }
@@ -377,6 +380,13 @@ function handleRegister() {
         jsonResponse(['success' => false, 'message' => 'Username already taken.'], 409);
     }
 
+    // Check if email already exists in users table
+    $stmt = $db->prepare("SELECT id FROM users WHERE email = ?");
+    $stmt->execute([$email]);
+    if ($stmt->fetch()) {
+        jsonResponse(['success' => false, 'message' => 'This email address is already registered to an existing account.'], 409);
+    }
+
     $hashedPassword = password_hash($password, PASSWORD_BCRYPT);
 
     if ($role === 'admin') {
@@ -385,6 +395,13 @@ function handleRegister() {
         $stmt->execute([$username]);
         if ($stmt->fetch()) {
             jsonResponse(['success' => false, 'message' => 'A pending admin registration for this username already exists.'], 409);
+        }
+
+        // Check if email already used in pending requests
+        $stmt = $db->prepare("SELECT id FROM admin_registration_requests WHERE email = ? AND status = 'pending'");
+        $stmt->execute([$email]);
+        if ($stmt->fetch()) {
+            jsonResponse(['success' => false, 'message' => 'This email address already has a pending admin registration request.'], 409);
         }
 
         $approvalToken = generateToken(32);
@@ -593,6 +610,9 @@ function handleListUsers() {
     $stmt = $db->query("SELECT id, username, full_name, email, role, is_active, created_at FROM users ORDER BY created_at DESC");
     $users = $stmt->fetchAll();
 
+    // Clean up any approved admin requests where the admin no longer exists in users
+    $db->exec("DELETE FROM admin_registration_requests WHERE status='approved' AND username NOT IN (SELECT username FROM users)");
+
     // Also get pending admin requests
     $stmt2 = $db->query("SELECT id, username, full_name, email, status, approval_token, created_at FROM admin_registration_requests ORDER BY created_at DESC");
     $pendingRequests = $stmt2->fetchAll();
@@ -698,6 +718,35 @@ function handleRejectAdminUI() {
     jsonResponse([
         'success' => true,
         'message' => "Admin request from '{$request['full_name']}' has been rejected."
+    ]);
+}
+
+// =====================================================
+// DELETE ADMIN REQUEST (Admin only)
+// =====================================================
+function handleDeleteAdminRequest() {
+    requireAdmin();
+    $input = getJsonInput();
+    $requestId = intval($input['request_id'] ?? $input['id'] ?? 0);
+
+    if (!$requestId) {
+        jsonResponse(['success' => false, 'message' => 'Request ID is required.'], 400);
+    }
+
+    $db = getDB();
+    $stmt = $db->prepare("SELECT id, username, full_name FROM admin_registration_requests WHERE id = ?");
+    $stmt->execute([$requestId]);
+    $request = $stmt->fetch();
+
+    if (!$request) {
+        jsonResponse(['success' => false, 'message' => 'Request not found.'], 404);
+    }
+
+    $db->prepare("DELETE FROM admin_registration_requests WHERE id = ?")->execute([$requestId]);
+
+    jsonResponse([
+        'success' => true,
+        'message' => "Admin request for '{$request['full_name']}' permanently removed."
     ]);
 }
 
