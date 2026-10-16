@@ -40,6 +40,9 @@ switch ($action) {
     case 'settings':       handleSASettings(); break;
     case 'save_settings':  handleSASaveSettings(); break;
     case 'submit_request': handleSubmitRequest(); break;
+    case 'forgot_info':        handleSAForgotInfo(); break;
+    case 'forgot_password':     handleSAForgotPassword(); break;
+    case 'reset_password_link': handleSAResetPasswordLink(); break;
     default:
         jsonResponse(['success' => false, 'message' => 'Invalid action.'], 400);
 }
@@ -59,6 +62,111 @@ function logAction($action, $targetType = null, $targetId = null, $details = nul
         $db->prepare("INSERT INTO system_logs (actor_id, actor_username, action, target_type, target_id, details, ip_address) VALUES (?,?,?,?,?,?,?)")
            ->execute([$actorId, $actorUsername, $action, $targetType, $targetId, $details, $ip]);
     } catch (Exception $e) { /* silent */ }
+}
+
+// =====================================================
+// FORGOT PASSWORD — Super Admin (No Email Input)
+// =====================================================
+
+function maskEmail($email) {
+    if (!$email || strpos($email, '@') === false) return '***@***.***';
+    [$local, $domain] = explode('@', $email, 2);
+    $visible = min(3, strlen($local));
+    return substr($local, 0, $visible) . str_repeat('*', max(0, strlen($local) - $visible)) . '@' . $domain;
+}
+
+/** GET ?action=forgot_info — Returns masked superadmin email (no auth required) */
+function handleSAForgotInfo() {
+    $email = getSetting('superadmin_email');
+    if (!$email) {
+        // Fallback: look up super_admin user
+        try {
+            $db = getDB();
+            $email = $db->query("SELECT email FROM users WHERE role='super_admin' AND email!='' LIMIT 1")->fetchColumn();
+        } catch (Exception $e) { $email = ''; }
+    }
+    jsonResponse([
+        'success'      => true,
+        'masked_email' => maskEmail($email ?: '')
+    ]);
+}
+
+/** POST ?action=forgot_password — Sends a secure reset LINK to the superadmin email */
+function handleSAForgotPassword() {
+    $db     = getDB();
+    // Determine destination: prefer settings superadmin_email, else super_admin user email
+    $email  = getSetting('superadmin_email');
+    $saUser = $db->query("SELECT id, email FROM users WHERE role='super_admin' LIMIT 1")->fetch();
+    if (!$email && $saUser) $email = $saUser['email'] ?? '';
+
+    if (!$email || !filter_var($email, FILTER_VALIDATE_EMAIL)) {
+        jsonResponse(['success' => false, 'message' => 'No valid Super Admin email is configured in settings.'], 400);
+    }
+
+    // Generate a secure random token (not a 6-digit code)
+    $token     = bin2hex(random_bytes(32)); // 64-char hex
+    $expiresAt = date('Y-m-d H:i:s', strtotime('+30 minutes'));
+    $userId    = $saUser['id'] ?? null;
+
+    $db->prepare("INSERT INTO admin_tokens (token, user_id, purpose, expires_at) VALUES (?,?,?,?)")
+       ->execute([$token, $userId, 'sa_reset_link', $expiresAt]);
+
+    $storeName = getSetting('store_name') ?: 'ChipiPie Cafe';
+    $host      = ($_SERVER['HTTP_HOST'] ?? 'localhost');
+    $resetUrl  = "http://{$host}/CHIPIPIE_SYSTEM/superadmin-panel.php?reset_token={$token}";
+
+    $body = "
+    <div style='font-family:Segoe UI,sans-serif;max-width:480px;margin:0 auto;padding:30px;background:#1a1514;color:#f4f4f4;border-radius:16px;border:1px solid #332d2c;'>
+      <div style='text-align:center;margin-bottom:24px;'>
+        <div style='display:inline-block;width:56px;height:56px;background:#6d28d9;color:#fff;border-radius:14px;line-height:56px;font-size:26px;box-shadow:0 6px 20px rgba(109,40,217,0.4);'>&#128272;</div>
+        <h2 style='color:#fff;margin:12px 0 4px;'>$storeName</h2>
+        <p style='color:#aaa;font-size:13px;margin:0;'>Super Admin Password Reset</p>
+      </div>
+      <div style='background:#2a2423;border-radius:12px;padding:24px;border:1px solid #3d3533;text-align:center;'>
+        <p style='color:#ddd;font-size:14px;margin:0 0 20px;line-height:1.6;'>Click the button below to set a new password for your Super Admin account. This link expires in <strong style='color:#f59e0b;'>30 minutes</strong>.</p>
+        <a href='$resetUrl' style='display:inline-block;background:linear-gradient(135deg,#6d28d9,#a855f7);color:#fff;padding:14px 28px;border-radius:10px;font-size:15px;font-weight:700;text-decoration:none;letter-spacing:0.02em;'>&#128274; Reset My Password</a>
+        <p style='font-size:11px;color:#666;margin-top:16px;'>If you did not request this, you can safely ignore this email.</p>
+      </div>
+    </div>";
+
+    sendEmail($email, "$storeName — Super Admin Password Reset Link", $body);
+
+    jsonResponse(['success' => true, 'message' => 'A password reset link has been sent to your email.']);
+}
+
+/** POST ?action=reset_password_link — Validates the link token and resets the SA password */
+function handleSAResetPasswordLink() {
+    $input   = getJsonInput();
+    $token   = trim($input['token']        ?? '');
+    $newPass = trim($input['new_password'] ?? '');
+
+    if (!$token || !$newPass) {
+        jsonResponse(['success' => false, 'message' => 'Token and new password are required.'], 400);
+    }
+
+    $db  = getDB();
+    $now = date('Y-m-d H:i:s');
+    $stmt = $db->prepare("SELECT * FROM admin_tokens WHERE token = ? AND purpose = 'sa_reset_link' AND is_used = 0 AND expires_at > ?");
+    $stmt->execute([$token, $now]);
+    $row = $stmt->fetch();
+
+    if (!$row) {
+        jsonResponse(['success' => false, 'message' => 'This reset link is invalid or has expired. Please request a new one.'], 400);
+    }
+
+    // Validate password complexity
+    if (strlen($newPass) < 8 || !preg_match('/[A-Z]/', $newPass) || !preg_match('/[a-z]/', $newPass) || !preg_match('/[0-9]/', $newPass)) {
+        jsonResponse(['success' => false, 'message' => 'Password must be at least 8 characters with uppercase, lowercase, and a number.'], 400);
+    }
+
+    // Mark token used
+    $db->prepare("UPDATE admin_tokens SET is_used = 1, used_at = ? WHERE id = ?")->execute([$now, $row['id']]);
+
+    // Update super_admin password
+    $hash = password_hash($newPass, PASSWORD_DEFAULT);
+    $db->prepare("UPDATE users SET password = ? WHERE role = 'super_admin'")->execute([$hash]);
+
+    jsonResponse(['success' => true, 'message' => 'Password reset successfully. You can now sign in.']);
 }
 
 // =====================================================
@@ -903,7 +1011,8 @@ function handleSASettings() {
     requireSuperAdmin();
     $db = getDB();
     $settings = $db->query("SELECT setting_key, setting_value, updated_at FROM system_settings")->fetchAll();
-    jsonResponse(['success' => true, 'settings' => $settings]);
+    $admins = $db->query("SELECT id, username, full_name, email, role, is_active FROM users WHERE role IN ('admin', 'super_admin') ORDER BY is_active DESC, role DESC, full_name ASC")->fetchAll();
+    jsonResponse(['success' => true, 'settings' => $settings, 'admins' => $admins]);
 }
 
 function handleSASaveSettings() {
@@ -916,7 +1025,33 @@ function handleSASaveSettings() {
     }
 
     $db = getDB();
-    $allowed = ['store_name','owner_email','token_expiry_minutes','superadmin_email','require_superadmin_approval','void_refund_manager_email'];
+    $allowed = ['store_name','owner_email','token_expiry_minutes','superadmin_email','require_superadmin_approval','void_refund_manager_email','void_refund_admin_ids'];
+
+    // Inactive accounts in POS cannot be added to receive a token
+    if (isset($settings['void_refund_admin_ids'])) {
+        $rawIds = array_filter(array_map('intval', explode(',', $settings['void_refund_admin_ids'])));
+        if (!empty($rawIds)) {
+            $inClause = implode(',', $rawIds);
+            $activeIds = $db->query("SELECT id FROM users WHERE id IN ($inClause) AND is_active = 1")->fetchAll(PDO::FETCH_COLUMN);
+            $settings['void_refund_admin_ids'] = implode(',', $activeIds);
+        } else {
+            $settings['void_refund_admin_ids'] = '';
+        }
+    }
+
+    if (isset($settings['void_refund_manager_email'])) {
+        $inactiveEmails = $db->query("SELECT LOWER(email) FROM users WHERE is_active = 0 AND email != ''")->fetchAll(PDO::FETCH_COLUMN);
+        $inactiveSet = array_flip($inactiveEmails);
+        $rawEmails = array_filter(array_map('trim', explode(',', $settings['void_refund_manager_email'])));
+        $cleanEmails = [];
+        foreach ($rawEmails as $em) {
+            $low = strtolower($em);
+            if (!isset($inactiveSet[$low]) && filter_var($em, FILTER_VALIDATE_EMAIL)) {
+                $cleanEmails[] = $em;
+            }
+        }
+        $settings['void_refund_manager_email'] = implode(', ', $cleanEmails);
+    }
 
     foreach ($settings as $key => $value) {
         if (!in_array($key, $allowed)) continue;

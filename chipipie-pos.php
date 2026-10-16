@@ -2199,25 +2199,31 @@
         </div>
       </div>
 
-      <!-- STEP 3: FORGOT PASSWORD - REQUEST CODE -->
+      <!-- STEP 3: FORGOT PASSWORD - REQUEST RESET LINK -->
       <div id="pos-step-forgot-request" style="display:none;">
         <div style="background:#fdf8f4; border:1px solid #ebd9cc; border-radius:12px; padding:14px; margin-bottom:16px; text-align:center;">
           <div style="font-size:26px; margin-bottom:4px;">🔑</div>
           <div style="font-size:14px; font-weight:700; color:var(--cafe-dark, #2b1f1d); margin-bottom:3px;">Forgot Password</div>
-          <div style="font-size:12px; color:#777; line-height:1.4;">
-            Enter your username or email address and we'll send a 6-digit recovery code to your inbox.
+          <div style="font-size:12px; color:#777; line-height:1.4;" id="pos-forgot-instruction">
+            Enter your username or email address and we'll send a password reset link to your email.
           </div>
         </div>
 
-        <form onsubmit="handlePosSendForgotCode(event)">
-          <div class="mb-3">
+        <form id="pos-forgot-form" onsubmit="handlePosSendForgotLink(event)">
+          <div class="mb-3 text-start">
             <label class="form-label" style="font-size:12.5px;">Username or Email</label>
             <input type="text" id="pos-forgot-user" class="form-control" placeholder="Enter username or email" required>
           </div>
           <button type="submit" id="pos-forgot-send-btn" class="btn-cafe-primary btn-lg w-100" style="font-size:15px; padding:11px;">
-            <i class="bi bi-send-fill me-1"></i> Send Recovery Code
+            <i class="bi bi-send-fill me-1"></i> Send Recovery Link
           </button>
         </form>
+
+        <div id="pos-forgot-sent-msg" style="display:none; background:#d1e7dd; border:1px solid #badbcc; border-radius:12px; padding:18px; text-align:center; color:#0f5132;">
+          <div style="font-size:30px; margin-bottom:6px;">📬</div>
+          <div style="font-size:15px; font-weight:700; margin-bottom:4px;">The email has been sent.</div>
+          <div style="font-size:12px; color:#555; line-height:1.4;">If this account is registered, a password reset link has been sent to the associated email. Please check your inbox or spam folder.</div>
+        </div>
 
         <div class="mt-3 text-center">
           <a href="#" onclick="hidePosForgot(); return false;" style="font-size:12px; color:var(--cafe-brown); text-decoration:none;">
@@ -2226,31 +2232,20 @@
         </div>
       </div>
 
-      <!-- STEP 4: FORGOT PASSWORD - VERIFY & RESET -->
+      <!-- STEP 4: FORGOT PASSWORD - SET NEW PASSWORD VIA LINK -->
       <div id="pos-step-forgot-reset" style="display:none;">
         <div style="background:#fdf8f4; border:1px solid #ebd9cc; border-radius:12px; padding:14px; margin-bottom:16px; text-align:center;">
-          <div style="font-size:26px; margin-bottom:4px;">📬</div>
-          <div style="font-size:14px; font-weight:700; color:var(--cafe-dark, #2b1f1d); margin-bottom:3px;">Reset Your Password</div>
+          <div style="font-size:26px; margin-bottom:4px;">🔒</div>
+          <div style="font-size:14px; font-weight:700; color:var(--cafe-dark, #2b1f1d); margin-bottom:3px;">Set New Password</div>
           <div style="font-size:12px; color:#777; line-height:1.4;">
-            A 6-digit recovery code was sent to:<br>
-            <strong id="pos-forgot-email-display" style="color:var(--cafe-brown, #5c3d2e); word-break:break-all;"></strong>
+            Enter and confirm your new account password.
           </div>
         </div>
 
-        <form onsubmit="handlePosResetPassword(event)">
-          <div class="mb-3 text-center">
-            <label class="form-label" style="font-size:12px; font-weight:600; color:#555;">Enter 6-Digit Code</label>
-            <input type="text" id="pos-forgot-code" class="form-control text-center" maxlength="6" placeholder="000000" required
-                   style="font-family:Consolas, Monaco, monospace; font-size:26px; font-weight:700; letter-spacing:8px; padding:10px; text-transform:uppercase;">
-          </div>
-
-          <div id="pos-forgot-dev-hint" style="display:none; margin-bottom:14px; font-size:11.5px; color:#0f5132; background:#d1e7dd; border:1px solid #badbcc; border-radius:8px; padding:7px 10px; text-align:center;">
-            💡 Dev Mode Token: <code id="pos-forgot-dev-code" style="font-weight:700;"></code> (auto-filled)
-          </div>
-
+        <form onsubmit="handlePosResetPasswordViaLink(event)">
           <div class="mb-3 text-start">
             <label class="form-label mb-1" style="font-size:12.5px;">New Password *</label>
-            <input type="password" id="pos-forgot-new-pass" class="form-control" required minlength="8" placeholder="••••••••">
+            <input type="password" id="pos-reset-new-pass" class="form-control" required minlength="8" placeholder="••••••••">
             <div class="form-text" style="font-size:11px; color:#777; margin-top:4px;">
               <i class="bi bi-shield-lock me-1"></i>Min. 8 characters with uppercase, lowercase & number.
             </div>
@@ -2258,21 +2253,18 @@
 
           <div class="mb-3 text-start">
             <label class="form-label mb-1" style="font-size:12.5px;">Confirm New Password *</label>
-            <input type="password" id="pos-forgot-confirm-pass" class="form-control" required minlength="8" placeholder="••••••••">
+            <input type="password" id="pos-reset-confirm-pass" class="form-control" required minlength="8" placeholder="••••••••">
           </div>
 
-          <button type="submit" id="pos-forgot-submit-btn" class="btn-cafe-primary btn-lg w-100" style="font-size:15px; padding:11px;">
-            <i class="bi bi-check-circle-fill me-1"></i> Update Password
+          <button type="submit" id="pos-reset-submit-btn" class="btn-cafe-primary btn-lg w-100" style="font-size:15px; padding:11px;">
+            <i class="bi bi-check-circle-fill me-1"></i> Save New Password
           </button>
         </form>
 
-        <div style="display:flex; justify-content:space-between; align-items:center; margin-top:14px; font-size:12px;">
-          <button type="button" onclick="handlePosResendForgotCode()" id="pos-forgot-resend-btn" style="background:none; border:none; color:var(--cafe-brown, #5c3d2e); cursor:pointer; padding:4px 0; font-size:12px; font-weight:600; display:inline-flex; align-items:center; gap:4px;">
-            <i class="bi bi-arrow-clockwise"></i> Resend Code
-          </button>
-          <button type="button" onclick="hidePosForgot()" style="background:none; border:none; color:#888; cursor:pointer; padding:4px 0; font-size:12px; display:inline-flex; align-items:center; gap:4px;">
-            <i class="bi bi-arrow-left"></i> Back to Login
-          </button>
+        <div class="mt-3 text-center">
+          <a href="#" onclick="hidePosForgot(); return false;" style="font-size:12px; color:var(--cafe-brown); text-decoration:none;">
+            <i class="bi bi-arrow-left"></i> Cancel & Back to Sign In
+          </a>
         </div>
       </div>
 
@@ -2431,6 +2423,7 @@
         <button class="nav-item-btn" onclick="showView('orders', this)">
           <i class="bi bi-receipt"></i> Orders
         </button>
+
 
         <div class="nav-section-label" id="nav-mgmt-label">Management</div>
         <button class="nav-item-btn" id="nav-menu-btn" onclick="showView('menu', this)">
@@ -2772,7 +2765,7 @@
           </div>
         </div>
 
-        <!-- VOID / REFUND SECTION (admin only) -->
+        <!-- VOID / REFUND SECTION -->
         <div class="kpi-card mb-3" id="void-refund-section" style="display:none;">
 
           <!-- Header row -->
@@ -2792,12 +2785,12 @@
                 <div id="adj-sel-summary" style="font-size:12px;color:#555;line-height:1.5;"></div>
                 <div id="adj-sel-total" style="font-size:20px;font-weight:900;color:#b91c1c;margin-top:2px;"></div>
               </div>
-              <!-- Manager name -->
+              <!-- Staff / Requester name -->
               <div style="flex:1;min-width:180px;">
                 <label style="font-size:11px;font-weight:700;color:#6b7280;text-transform:uppercase;display:block;margin-bottom:3px;">
-                  <i class="bi bi-person-badge me-1"></i>Manager Name <span style="color:#dc2626;">*</span>
+                  <i class="bi bi-person-badge me-1"></i>Staff / Requester Name <span style="color:#dc2626;">*</span>
                 </label>
-                <input type="text" id="adj-manager-name" placeholder="Your full name" maxlength="80"
+                <input type="text" id="adj-manager-name" placeholder="Cashier or Manager name" maxlength="80"
                   style="width:100%;padding:8px 10px;border:1.5px solid #e5e7eb;border-radius:7px;font-size:13px;font-family:inherit;box-sizing:border-box;"
                   onfocus="this.style.borderColor='#374151'" onblur="this.style.borderColor='#e5e7eb'">
                 <div id="adj-manager-error" style="display:none;color:#dc2626;font-size:11px;margin-top:2px;">Name is required.</div>
@@ -3107,18 +3100,22 @@
         <button onclick="closeVoidAuthModal()" style="background:rgba(255,255,255,0.15);border:none;color:#fff;border-radius:8px;width:30px;height:30px;cursor:pointer;font-size:16px;display:flex;align-items:center;justify-content:center;">&#x2715;</button>
       </div>
       <div class="void-modal-body">
-        <div style="font-size:12px;color:#6b7280;margin-bottom:14px;">
-          <i class="bi bi-info-circle me-1"></i>Check <strong>christiansamia03@gmail.com</strong> (owner's inbox) for the 8-character code, then enter it below.
+        <div id="void-modal-info" style="font-size:12px;color:#6b7280;margin-bottom:14px;">
+          <i class="bi bi-info-circle me-1"></i>An authorization code has been sent to the manager / admin email. Enter the 6-digit code below, or wait for approval.
         </div>
         <!-- Dev mode token display -->
         <div id="void-dev-token-box" style="display:none;background:#fef9c3;border:1px solid #fde047;border-radius:8px;padding:12px;margin-bottom:12px;text-align:center;">
           <div style="font-size:11px;color:#92400e;font-weight:600;margin-bottom:4px;">DEV MODE — Token (not emailed):</div>
           <div id="void-dev-token-val" style="font-size:22px;font-weight:800;letter-spacing:4px;font-family:monospace;color:#b45309;"></div>
         </div>
-        <input type="text" id="void-token-input" placeholder="XXXXXXXX" maxlength="8"
+        <input type="text" id="void-token-input" placeholder="XXXXXX" maxlength="8"
           style="width:100%;padding:14px;font-size:22px;letter-spacing:4px;font-weight:800;font-family:monospace;text-align:center;border:2px solid #e5e7eb;border-radius:10px;margin-bottom:6px;text-transform:uppercase;box-sizing:border-box;"
           oninput="this.value=this.value.toUpperCase()">
         <div id="void-token-error" style="display:none;color:#dc2626;font-size:12px;text-align:center;margin-bottom:10px;"></div>
+        <div id="void-modal-polling" style="font-size:11px;color:#6b7280;margin-bottom:10px;text-align:center;">
+          <span class="spinner-border spinner-border-sm me-1" style="width:12px;height:12px;border-width:2px;color:var(--cafe-amber);vertical-align:middle;"></span>
+          Waiting for authorization... Auto-approves once accepted by manager/admin.
+        </div>
         <button onclick="confirmVoidWithCode()" id="void-confirm-btn"
           style="width:100%;padding:12px;background:linear-gradient(135deg,#dc2626,#b91c1c);color:#fff;border:none;border-radius:10px;font-size:14px;font-weight:700;cursor:pointer;margin-top:6px;">
           <i class="bi bi-check-circle-fill me-1"></i> Confirm
@@ -3441,8 +3438,10 @@
         <div id="pay-cash-panel">
           <div class="pay-section">
             <label for="pay-tendered">Cash Tendered (₱)</label>
-            <input type="number" id="pay-tendered" class="pay-input" placeholder="0.00" min="0" step="0.01"
-              oninput="updateChange()" onkeydown="if(event.key==='Enter') confirmPayment()">
+            <input type="text" inputmode="numeric" pattern="[0-9]*" id="pay-tendered" class="pay-input" placeholder="0" autocomplete="off"
+              onkeydown="handleTenderedKeydown(event, this);"
+              oninput="handleTenderedInput(this);"
+              onblur="if(this.value==='0'){this.value='';updateChange();}">
           </div>
           <div class="pay-change-row" id="pay-change-row">
             <span class="pcr-label">Change</span>
@@ -4357,22 +4356,90 @@
     }
 
 
+    function sanitizeTendered(val) {
+      if (!val) return '';
+      let digits = String(val).replace(/[^0-9]/g, '');
+      if (!digits) return '';
+      // If all zeros (e.g. 0, 00, 00000000), collapse to a single '0'
+      if (/^0+$/.test(digits)) return '0';
+      // Strip leading zeros for numbers (e.g. 050 -> 50)
+      return digits.replace(/^0+/, '');
+    }
+
+    function handleTenderedKeydown(e, el) {
+      // Disallow non-integer characters: ., e, +, -, E, commas, spaces
+      if (['.', 'e', '+', '-', 'E', ',', ' '].includes(e.key)) {
+        e.preventDefault();
+        return;
+      }
+      if (e.key === 'Enter') {
+        confirmPayment();
+        return;
+      }
+      // Prevent zeros from accumulating / adding up
+      if (e.key === '0') {
+        // If already '0', don't allow typing another zero (prevents 00, 000, 00000000)
+        if (el.value === '0') {
+          e.preventDefault();
+          return;
+        }
+        // If cursor is at start of an existing number, don't allow typing leading zero (e.g. 0 before 50)
+        if (el.selectionStart === 0 && el.selectionEnd === 0 && el.value.length > 0) {
+          e.preventDefault();
+          return;
+        }
+      }
+      // If current value is '0' and user types 1-9, replace the '0' with the new digit (e.g. '5' instead of '05')
+      if (e.key >= '1' && e.key <= '9') {
+        if (el.value === '0' && (el.selectionStart === null || el.selectionStart === 0 || el.selectionStart === 1)) {
+          el.value = e.key;
+          e.preventDefault();
+          updateChange();
+          return;
+        }
+      }
+    }
+
+    function handleTenderedInput(el) {
+      const orig = el.value;
+      const clean = sanitizeTendered(orig);
+      if (orig !== clean) {
+        el.value = clean;
+      }
+      updateChange();
+    }
+
     function updateChange() {
-      const tendered = parseFloat(document.getElementById('pay-tendered').value) || 0;
-      const due = _pendingCartTotal;
-      const change = tendered - due;
+      const inputEl = document.getElementById('pay-tendered');
+      if (!inputEl) return;
+      const clean = sanitizeTendered(inputEl.value);
+      if (inputEl.value !== clean) {
+        inputEl.value = clean;
+      }
       const changeRow  = document.getElementById('pay-change-row');
       const changeDisp = document.getElementById('pay-change-display');
       const confirmBtn = document.getElementById('pay-cash-confirm-btn');
 
+      if (!clean) {
+        // Empty state: neutral ₱0.00, button disabled
+        if (changeRow) changeRow.classList.remove('insufficient');
+        if (changeDisp) changeDisp.textContent = '₱0.00';
+        if (confirmBtn) confirmBtn.disabled = true;
+        return;
+      }
+
+      const tendered = parseInt(clean, 10) || 0;
+      const due = _pendingCartTotal;
+      const change = tendered - due;
+
       if (change < 0) {
-        changeRow.classList.add('insufficient');
-        changeDisp.textContent = '-₱' + Math.abs(change).toFixed(2);
-        confirmBtn.disabled = true;
+        if (changeRow) changeRow.classList.add('insufficient');
+        if (changeDisp) changeDisp.textContent = '-₱' + Math.abs(change).toFixed(2);
+        if (confirmBtn) confirmBtn.disabled = true;
       } else {
-        changeRow.classList.remove('insufficient');
-        changeDisp.textContent = '₱' + change.toFixed(2);
-        confirmBtn.disabled = false;
+        if (changeRow) changeRow.classList.remove('insufficient');
+        if (changeDisp) changeDisp.textContent = '₱' + change.toFixed(2);
+        if (confirmBtn) confirmBtn.disabled = false;
       }
     }
 
@@ -4383,9 +4450,10 @@
 
     async function confirmPayment() {
       // Validate GCash: amount must be exact (enforced by UI — confirm button always available)
-      // Validate Cash: tendered must be >= total
+      // Validate Cash: tendered must be >= total (whole numbers only)
       if (_paymentMethod === 'Cash') {
-        const tendered = parseFloat(document.getElementById('pay-tendered').value) || 0;
+        const inputEl = document.getElementById('pay-tendered');
+        const tendered = parseInt(sanitizeTendered(inputEl.value), 10) || 0;
         if (tendered < _pendingCartTotal) {
           showToast('⚠ Cash tendered is less than the total amount!');
           return;
@@ -4739,16 +4807,23 @@
               <div class="order-item-line">
                 <span><i class="bi bi-dot me-1" style="color:var(--cafe-amber);"></i>${it}</span>
               </div>`).join('');
-            const isVoided  = o.status === 'Voided';
-            const pmColor   = o.payment_method === 'GCash' ? '#0070f3' : '#059669';
+            const isVoided    = o.status === 'Voided';
+            const isRefunded  = o.status === 'Refunded';
+            const isCompleted = o.status === 'Completed';
+            const pmColor     = o.payment_method === 'GCash' ? '#0070f3' : '#059669';
             const statusBadge = isVoided
               ? `<span style="background:#fee2e2;color:#b91c1c;border-radius:20px;padding:2px 10px;font-size:10px;font-weight:700;">Voided</span>`
+              : isRefunded
+              ? `<span style="background:#ffedd5;color:#ea580c;border-radius:20px;padding:2px 10px;font-size:10px;font-weight:700;">Refunded</span>`
               : `<span class="badge-success" style="font-size:10px;">Completed</span>`;
-            const voidBtn = (!isVoided && currentUser?.role === 'admin')
-              ? `<button onclick="voidOrder(${o.id},'${o.order_number}')" style="margin-top:10px;background:#fee2e2;color:#b91c1c;border:none;border-radius:8px;padding:6px 14px;font-size:12px;font-weight:700;cursor:pointer;"><i class="bi bi-x-circle me-1"></i>Void Order</button>`
+            const actionBtns = (isCompleted && currentUser)
+              ? `<div style="display:flex;gap:8px;margin-top:10px;flex-wrap:wrap;">
+                  <button type="button" onclick="requestSingleVoid('${o.id}','${o.order_number}',${o.total})" style="background:#fee2e2;color:#b91c1c;border:1px solid #fecaca;border-radius:8px;padding:6px 14px;font-size:12px;font-weight:700;cursor:pointer;"><i class="bi bi-slash-circle me-1"></i>Void Order</button>
+                  <button type="button" onclick="requestSingleRefund('${o.id}','${o.order_number}',${o.total})" style="background:#ffedd5;color:#ea580c;border:1px solid #fed7aa;border-radius:8px;padding:6px 14px;font-size:12px;font-weight:700;cursor:pointer;"><i class="bi bi-arrow-counterclockwise me-1"></i>Refund Order</button>
+                 </div>`
               : '';
             return `
-            <div class="order-card${isVoided ? '" style="opacity:0.65;' : ''}" id="${cardId}">
+            <div class="order-card${(isVoided || isRefunded) ? '" style="opacity:0.65;' : ''}" id="${cardId}">
               <div class="order-card-header" onclick="toggleOrderCard('${cardId}')">
                 <div class="order-card-num">${o.order_number}</div>
                 <div class="order-card-meta">
@@ -4759,7 +4834,7 @@
                 ${statusBadge}
                 <i class="bi bi-chevron-down order-card-chevron ms-2"></i>
               </div>
-              <div class="order-card-body">${itemLines || '<span style="color:#aaa;font-size:12px;">No items</span>'}${voidBtn}</div>
+              <div class="order-card-body">${itemLines || '<span style="color:#aaa;font-size:12px;">No items</span>'}${actionBtns}</div>
             </div>`;
           }).join('');
         }
@@ -4784,18 +4859,58 @@
       if (card) card.classList.toggle('open');
     }
 
-    async function voidOrder(orderId, orderNum) {
-      if (!confirm(`Submit a request to void order ${orderNum}?\nAn email notification will be sent to the manager.`)) return;
+    async function requestSingleVoid(orderId, orderNum, total) {
+      const reason = prompt(`Submit request to VOID Order ${orderNum} (₱${parseFloat(total).toFixed(2)})?\n\nEnter reason:`, 'Order cancelled before fulfillment');
+      if (reason === null) return;
       try {
-        const res = await api('orders.php?action=void_order', { order_id: orderId });
+        const staffName = document.getElementById('adj-manager-name')?.value || currentUser?.full_name || '';
+        const fullReason = staffName ? `${reason.trim() || 'Order cancelled'} — Requested by: ${staffName}` : (reason.trim() || 'Order cancelled');
+        const res = await api('orders.php?action=void_order', { order_id: orderId, reason: fullReason });
         if (res.success) {
-          showToast('✅ ' + orderNum + ' void requested for approval.');
-          renderOrders();
-          updateDashboard();
+          _adjSelections = {};
+          _adjSelections[orderId] = { type: 'void', orderNum, total: parseFloat(total), reason: fullReason };
+          _batchApprovalToken = res.batch_token || null;
+          const devBox = document.getElementById('void-dev-token-box');
+          const devVal = document.getElementById('void-dev-token-val');
+          if (res.dev_token) { devBox.style.display = ''; devVal.textContent = res.dev_token; }
+          else               { devBox.style.display = 'none'; }
+          openVoidCodeModal();
+          showToast('✅ ' + orderNum + ' void requested! Waiting for manager/admin approval…');
         } else {
           showToast('⚠ ' + res.message);
         }
       } catch(e) { showToast('⚠ Failed to void order.'); }
+    }
+
+    async function requestSingleRefund(orderId, orderNum, total) {
+      const reason = prompt(`Submit request to REFUND Order ${orderNum} (₱${parseFloat(total).toFixed(2)})?\n\nEnter reason:`, 'Customer refund request');
+      if (reason === null) return;
+      try {
+        const staffName = document.getElementById('adj-manager-name')?.value || currentUser?.full_name || '';
+        const fullReason = staffName ? `${reason.trim() || 'Customer refund'} — Requested by: ${staffName}` : (reason.trim() || 'Customer refund');
+        const res = await api('orders.php?action=refund_order', { order_id: orderId, reason: fullReason });
+        if (res.success) {
+          _adjSelections = {};
+          _adjSelections[orderId] = { type: 'refund', orderNum, total: parseFloat(total), reason: fullReason };
+          _batchApprovalToken = res.batch_token || null;
+          const devBox = document.getElementById('void-dev-token-box');
+          const devVal = document.getElementById('void-dev-token-val');
+          if (res.dev_token) { devBox.style.display = ''; devVal.textContent = res.dev_token; }
+          else               { devBox.style.display = 'none'; }
+          openVoidCodeModal();
+          showToast('✅ ' + orderNum + ' refund requested! Waiting for manager/admin approval…');
+        } else {
+          showToast('⚠ ' + res.message);
+        }
+      } catch(e) { showToast('⚠ Failed to refund order.'); }
+    }
+
+    async function voidOrder(orderId, orderNum, total) {
+      return requestSingleVoid(orderId, orderNum, total || 0);
+    }
+
+    async function refundOrder(orderId, orderNum, total) {
+      return requestSingleRefund(orderId, orderNum, total || 0);
     }
 
     /* ========== VOID / REFUND TABLE ========== */
@@ -4806,7 +4921,7 @@
       const section    = document.getElementById('void-refund-section');
       const adjSection = document.getElementById('adj-history-section');
       if (!section) return;
-      if (!currentUser || currentUser.role !== 'admin') {
+      if (!currentUser) {
         section.style.display = 'none';
         if (adjSection) adjSection.style.display = 'none';
         return;
@@ -5143,7 +5258,8 @@
           // Store the batch approval token for polling
           _batchApprovalToken = res.batch_token || null;
           openVoidCodeModal();
-          showToast('✅ Request sent! Waiting for approval…');
+          const countMsg = res.recipients_count ? `sent to ${res.recipients_count} admin/manager email(s)` : 'sent';
+          showToast(`✅ Request ${countMsg}! Waiting for approval…`);
         } else {
           status.style.display = '';
           status.textContent   = '⚠ ' + res.message;
@@ -6082,13 +6198,26 @@
     }
 
     /* ========== FORGOT PASSWORD (POS Login) ========== */
-    let posForgotPendingUser = '';
-
+    /* ========== FORGOT PASSWORD (POS Login) ========== */
     function showPosForgotStep1() {
       document.getElementById('pos-step-credentials').style.display = 'none';
       document.getElementById('pos-step-2fa').style.display = 'none';
       document.getElementById('pos-step-forgot-reset').style.display = 'none';
       document.getElementById('pos-step-forgot-request').style.display = 'block';
+
+      const formEl = document.getElementById('pos-forgot-form');
+      const sentMsg = document.getElementById('pos-forgot-sent-msg');
+      const instruction = document.getElementById('pos-forgot-instruction');
+      if (formEl) formEl.style.display = 'block';
+      if (sentMsg) sentMsg.style.display = 'none';
+      if (instruction) instruction.style.display = 'block';
+
+      const btn = document.getElementById('pos-forgot-send-btn');
+      if (btn) {
+        btn.disabled = false;
+        btn.innerHTML = '<i class="bi bi-send-fill me-1"></i> Send Recovery Link';
+      }
+
       const footer = document.getElementById('pos-login-footer');
       if (footer) footer.style.display = 'none';
       const errEl = document.getElementById('login-error');
@@ -6097,7 +6226,10 @@
       if (sucEl) sucEl.style.display = 'none';
       setTimeout(() => {
         const inp = document.getElementById('pos-forgot-user');
-        if (inp) inp.focus();
+        if (inp) {
+          inp.value = '';
+          inp.focus();
+        }
       }, 100);
     }
 
@@ -6105,6 +6237,14 @@
       document.getElementById('pos-step-forgot-request').style.display = 'none';
       document.getElementById('pos-step-forgot-reset').style.display = 'none';
       document.getElementById('pos-step-credentials').style.display = 'block';
+
+      const formEl = document.getElementById('pos-forgot-form');
+      const sentMsg = document.getElementById('pos-forgot-sent-msg');
+      const instruction = document.getElementById('pos-forgot-instruction');
+      if (formEl) formEl.style.display = 'block';
+      if (sentMsg) sentMsg.style.display = 'none';
+      if (instruction) instruction.style.display = 'block';
+
       const footer = document.getElementById('pos-login-footer');
       if (footer) footer.style.display = 'block';
       const errEl = document.getElementById('login-error');
@@ -6113,143 +6253,106 @@
       if (sucEl) sucEl.style.display = 'none';
     }
 
-    async function handlePosSendForgotCode(e) {
+    async function handlePosSendForgotLink(e) {
       e.preventDefault();
       const errEl = document.getElementById('login-error');
       const sucEl = document.getElementById('login-success');
-      errEl.style.display = 'none'; sucEl.style.display = 'none';
+      if (errEl) errEl.style.display = 'none';
+      if (sucEl) sucEl.style.display = 'none';
+
       const identifier = document.getElementById('pos-forgot-user').value.trim();
       if (!identifier) {
         errEl.textContent = 'Please enter your username or email.';
         errEl.style.display = 'block';
         return;
       }
+
       const btn = document.getElementById('pos-forgot-send-btn');
-      btn.disabled = true;
-      btn.innerHTML = '<span class="spinner-border spinner-border-sm me-1"></span>Sending code...';
+      if (btn) {
+        btn.disabled = true;
+        btn.innerHTML = '<span class="spinner-border spinner-border-sm me-1"></span>Sending reset link...';
+      }
+
       try {
         const res = await api('auth.php?action=forgot_password', { identifier });
-        if (res.success) {
-          posForgotPendingUser = res.identifier || identifier;
-          document.getElementById('pos-forgot-email-display').textContent = res.masked_email || 'your email';
-          document.getElementById('pos-step-forgot-request').style.display = 'none';
-          document.getElementById('pos-step-forgot-reset').style.display = 'block';
-          document.getElementById('pos-forgot-code').value = '';
-          document.getElementById('pos-forgot-new-pass').value = '';
-          document.getElementById('pos-forgot-confirm-pass').value = '';
-          if (res.dev_code) {
-            document.getElementById('pos-forgot-dev-hint').style.display = 'block';
-            document.getElementById('pos-forgot-dev-code').textContent = res.dev_code;
-            document.getElementById('pos-forgot-code').value = res.dev_code;
-          } else {
-            document.getElementById('pos-forgot-dev-hint').style.display = 'none';
-          }
-          sucEl.textContent = res.message;
-          sucEl.style.display = 'block';
-          setTimeout(() => {
-            const inp = document.getElementById('pos-forgot-code');
-            if (inp) inp.focus();
-          }, 100);
-        } else {
-          errEl.textContent = res.message || 'Could not send recovery code.';
-          errEl.style.display = 'block';
-        }
+        // The form/button disappears and "The email has been sent" appears!
+        const formEl = document.getElementById('pos-forgot-form');
+        const sentMsg = document.getElementById('pos-forgot-sent-msg');
+        const instruction = document.getElementById('pos-forgot-instruction');
+
+        if (formEl) formEl.style.display = 'none';
+        if (instruction) instruction.style.display = 'none';
+        if (sentMsg) sentMsg.style.display = 'block';
       } catch (err) {
         errEl.textContent = 'Connection error. Please try again.';
         errEl.style.display = 'block';
-      } finally {
-        btn.disabled = false;
-        btn.innerHTML = '<i class="bi bi-send-fill me-1"></i> Send Recovery Code';
+        if (btn) {
+          btn.disabled = false;
+          btn.innerHTML = '<i class="bi bi-send-fill me-1"></i> Send Recovery Link';
+        }
       }
     }
 
-    async function handlePosResendForgotCode() {
-      const btn = document.getElementById('pos-forgot-resend-btn');
+    async function handlePosResetPasswordViaLink(e) {
+      e.preventDefault();
       const errEl = document.getElementById('login-error');
       const sucEl = document.getElementById('login-success');
-      errEl.style.display = 'none'; sucEl.style.display = 'none';
-      if (!posForgotPendingUser) {
-        showPosForgotStep1();
+      if (errEl) errEl.style.display = 'none';
+      if (sucEl) sucEl.style.display = 'none';
+
+      const newPass     = document.getElementById('pos-reset-new-pass').value.trim();
+      const confirmPass = document.getElementById('pos-reset-confirm-pass').value.trim();
+
+      if (newPass !== confirmPass) {
+        errEl.textContent = 'Passwords do not match.';
+        errEl.style.display = 'block';
         return;
       }
-      btn.disabled = true;
-      btn.innerHTML = '<span class="spinner-border spinner-border-sm me-1"></span>Resending...';
+      const pwdErr = checkPasswordComplexity(newPass);
+      if (pwdErr) {
+        errEl.textContent = pwdErr;
+        errEl.style.display = 'block';
+        return;
+      }
+
+      const urlParams = new URLSearchParams(window.location.search);
+      const token = urlParams.get('reset_token') || '';
+      if (!token) {
+        errEl.textContent = 'Invalid or missing reset token. Please request a new link.';
+        errEl.style.display = 'block';
+        return;
+      }
+
+      const btn = document.getElementById('pos-reset-submit-btn');
+      if (btn) {
+        btn.disabled = true;
+        btn.innerHTML = '<span class="spinner-border spinner-border-sm me-1"></span>Saving password...';
+      }
+
       try {
-        const res = await api('auth.php?action=forgot_password', { identifier: posForgotPendingUser });
-        if (res.success) {
-          sucEl.textContent = res.message || 'Recovery code resent.';
+        const res = await api('auth.php?action=reset_password_link', {
+          token,
+          new_password: newPass
+        });
+        if (res && res.success) {
+          hidePosForgot();
+          sucEl.innerHTML = '<div style="display:flex;align-items:center;gap:8px;"><i class="bi bi-check-circle-fill"></i> <span>Password reset successfully! You can now sign in.</span></div>';
           sucEl.style.display = 'block';
-          if (res.dev_code) {
-            document.getElementById('pos-forgot-dev-hint').style.display = 'block';
-            document.getElementById('pos-forgot-dev-code').textContent = res.dev_code;
-            document.getElementById('pos-forgot-code').value = res.dev_code;
-          }
+          document.getElementById('login-pass').value = '';
+          // Remove token from URL cleanly
+          history.replaceState({}, '', window.location.pathname);
         } else {
-          errEl.textContent = res.message || 'Failed to resend code.';
+          errEl.textContent = (res && res.message) || 'Could not reset password.';
           errEl.style.display = 'block';
         }
       } catch (err) {
         errEl.textContent = 'Server error. Please try again.';
         errEl.style.display = 'block';
       } finally {
-        setTimeout(() => {
+        if (btn) {
           btn.disabled = false;
-          btn.innerHTML = '<i class="bi bi-arrow-clockwise"></i> Resend Code';
-        }, 3000);
-      }
-    }
-
-    async function handlePosResetPassword(e) {
-      e.preventDefault();
-      const errEl = document.getElementById('login-error');
-      const sucEl = document.getElementById('login-success');
-      errEl.style.display = 'none'; sucEl.style.display = 'none';
-
-      const token = document.getElementById('pos-forgot-code').value.trim();
-      const newPass = document.getElementById('pos-forgot-new-pass').value.trim();
-      const confirmPass = document.getElementById('pos-forgot-confirm-pass').value.trim();
-
-      if (!token) {
-        errEl.textContent = 'Please enter the 6-digit recovery code.';
-        errEl.style.display = 'block'; return;
-      }
-      if (newPass !== confirmPass) {
-        errEl.textContent = 'Passwords do not match.';
-        errEl.style.display = 'block'; return;
-      }
-      const pwdErr = checkPasswordComplexity(newPass);
-      if (pwdErr) {
-        errEl.textContent = pwdErr;
-        errEl.style.display = 'block'; return;
-      }
-
-      const btn = document.getElementById('pos-forgot-submit-btn');
-      btn.disabled = true;
-      btn.innerHTML = '<span class="spinner-border spinner-border-sm me-1"></span>Updating password...';
-
-      try {
-        const res = await api('auth.php?action=reset_password_code', {
-          identifier: posForgotPendingUser,
-          token,
-          new_password: newPass
-        });
-        if (res.success) {
-          hidePosForgot();
-          sucEl.textContent = '🎉 ' + (res.message || 'Password reset successful! You can now log in.');
-          sucEl.style.display = 'block';
-          document.getElementById('login-pass').value = '';
-          document.getElementById('login-user').value = posForgotPendingUser;
-          posForgotPendingUser = '';
-        } else {
-          errEl.textContent = res.message || 'Could not reset password.';
-          errEl.style.display = 'block';
+          btn.innerHTML = '<i class="bi bi-check-circle-fill me-1"></i> Save New Password';
         }
-      } catch (err) {
-        errEl.textContent = 'Connection error. Please try again.';
-        errEl.style.display = 'block';
-      } finally {
-        btn.disabled = false;
-        btn.innerHTML = '<i class="bi bi-check-circle-fill me-1"></i> Update Password';
       }
     }
 
@@ -6683,6 +6786,21 @@
 
     /* ========== INIT ========== */
     window.addEventListener('DOMContentLoaded', () => {
+      // Check for password reset token in URL (?reset_token=...)
+      const urlParams = new URLSearchParams(window.location.search);
+      const resetToken = urlParams.get('reset_token');
+      if (resetToken) {
+        document.getElementById('pos-step-credentials').style.display = 'none';
+        document.getElementById('pos-step-2fa').style.display = 'none';
+        document.getElementById('pos-step-forgot-request').style.display = 'none';
+        document.getElementById('pos-step-forgot-reset').style.display = 'block';
+        const footer = document.getElementById('pos-login-footer');
+        if (footer) footer.style.display = 'none';
+        const pInput = document.getElementById('pos-reset-new-pass');
+        if (pInput) pInput.focus();
+        return;
+      }
+
       // Check for existing session
       api('auth.php?action=session').then(res => {
         if (res.success && res.loggedIn) {

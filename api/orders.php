@@ -24,6 +24,71 @@ elseif ($method === 'GET' && $action === 'check_batch_status') { handleCheckBatc
 elseif ($method === 'GET' && $action === 'decide_void_refund') { handleDecideVoidRefund(); }
 else { jsonResponse(['success' => false, 'message' => 'Invalid action.'], 400); }
 
+function getVoidRefundRecipients() {
+    $db = getDB();
+    $managerEmailsStr = getSetting('void_refund_manager_email');
+    $adminIdsStr      = getSetting('void_refund_admin_ids');
+
+    $recipients = [];
+
+    // Strictly exclude any inactive POS accounts from receiving tokens
+    $inactiveEmails = $db->query("SELECT LOWER(email) as email FROM users WHERE is_active = 0 AND email != ''")->fetchAll(PDO::FETCH_COLUMN);
+    $inactiveSet = array_flip($inactiveEmails);
+
+    // 1. If admin IDs were saved from Super Admin settings, fetch those admins' emails ONLY IF active in POS
+    if (!empty($adminIdsStr)) {
+        $ids = array_filter(array_map('intval', explode(',', $adminIdsStr)));
+        if (!empty($ids)) {
+            $inClause = implode(',', $ids);
+            $stmt = $db->query("SELECT email FROM users WHERE id IN ($inClause) AND email != '' AND is_active = 1");
+            foreach ($stmt->fetchAll() as $row) {
+                $em = trim($row['email']);
+                $low = strtolower($em);
+                if (!isset($inactiveSet[$low]) && filter_var($em, FILTER_VALIDATE_EMAIL)) {
+                    $recipients[$low] = $em;
+                }
+            }
+        }
+    }
+
+    // 2. Also check void_refund_manager_email setting, strictly excluding any inactive POS accounts
+    if (!empty($managerEmailsStr)) {
+        $mgrList = array_filter(array_map('trim', explode(',', $managerEmailsStr)));
+        foreach ($mgrList as $mEmail) {
+            $cleanEmail = strtolower($mEmail);
+            // Inactive emails in POS cannot receive tokens
+            if (isset($inactiveSet[$cleanEmail])) {
+                continue;
+            }
+            if (filter_var($mEmail, FILTER_VALIDATE_EMAIL)) {
+                $recipients[$cleanEmail] = $mEmail;
+            }
+        }
+    }
+
+    // 3. Fallback only if NO recipients were ever configured in settings (active admins only)
+    if (empty($recipients)) {
+        $admins = $db->query("SELECT email FROM users WHERE role IN ('admin','super_admin') AND email != '' AND is_active = 1")->fetchAll();
+        foreach ($admins as $adm) {
+            $em = trim($adm['email']);
+            $low = strtolower($em);
+            if (!isset($inactiveSet[$low]) && filter_var($em, FILTER_VALIDATE_EMAIL)) {
+                $recipients[$low] = $em;
+            }
+        }
+    }
+    return $recipients;
+}
+
+function generateUniquePinCode($db) {
+    do {
+        $pinCode = sprintf("%06d", mt_rand(100000, 999999));
+        $stmt = $db->prepare("SELECT id FROM admin_tokens WHERE token = ? AND is_used = 0 AND expires_at > NOW()");
+        $stmt->execute([$pinCode]);
+    } while ($stmt->fetch());
+    return $pinCode;
+}
+
 function handleVoidOrder() {
     requireLogin();
     session_write_close();
@@ -43,8 +108,16 @@ function handleVoidOrder() {
 
     $requester = $_SESSION['full_name'] ?? $_SESSION['username'];
     
-    // Generate a secure token for email approval
+    // Generate a secure token for email approval and a 6-digit PIN for POS
     $approvalToken = bin2hex(random_bytes(32));
+    $pinCode = generateUniquePinCode($db);
+
+    // Store the PIN code in admin_tokens for POS validation
+    $expiryMin = intval(getSetting('token_expiry_minutes') ?: TOKEN_EXPIRY_MINUTES);
+    if ($expiryMin < 5) $expiryMin = 10;
+    $expiresAt = date('Y-m-d H:i:s', strtotime("+$expiryMin minutes"));
+    $stmt = $db->prepare("INSERT INTO admin_tokens (token, user_id, purpose, expires_at) VALUES (?, ?, ?, ?)");
+    $stmt->execute([$pinCode, $_SESSION['user_id'], $approvalToken, $expiresAt]);
 
     // Create the request
     $db->prepare("INSERT INTO system_requests (type, requested_by, requester_name, title, description, payload, approval_token) VALUES (?,?,?,?,?,?,?)")
@@ -54,50 +127,34 @@ function handleVoidOrder() {
            $requester,
            "Void Order #{$orderId}",
            "Reason: {$reason}",
-           json_encode(['order_id' => $orderId, 'reason' => $reason, 'amount' => $order['total']]),
+           json_encode(['order_id' => $orderId, 'reason' => $reason, 'amount' => $order['total'], 'pin' => $pinCode]),
            $approvalToken
        ]);
 
-    // Send emails: manager gets notification-only; owner + superadmin get approve/deny (deduplicated)
-    $storeName        = getSetting('store_name') ?: 'ChipiPie Cafe';
-    $managerEmailsStr = getSetting('void_refund_manager_email');
-    $ownerEmail       = trim(getSetting('owner_email') ?? '');
-    $superAdminEmail  = trim(getSetting('superadmin_email') ?? '');
-
+    $storeName  = getSetting('store_name') ?: 'ChipiPie Cafe';
     $approveUrl = "http://" . ($_SERVER['HTTP_HOST'] ?? 'localhost') . "/CHIPIPIE_SYSTEM/api/orders.php?action=decide_void_refund&token=" . $approvalToken . "&decision=approve";
     $rejectUrl  = "http://" . ($_SERVER['HTTP_HOST'] ?? 'localhost') . "/CHIPIPIE_SYSTEM/api/orders.php?action=decide_void_refund&token=" . $approvalToken . "&decision=reject";
 
-    // --- Shared detail rows ---
     $detailRows = "
         <tr><td style='padding: 6px 0; font-weight: 600; color: #aaa;'>Order ID:</td><td style='font-weight: 700; color: #fff;'>#{$orderId}</td></tr>
         <tr><td style='padding: 6px 0; font-weight: 600; color: #aaa;'>Requested By:</td><td>{$requester}</td></tr>
         <tr><td style='padding: 6px 0; font-weight: 600; color: #aaa;'>Amount:</td><td style='color: #dc2626; font-weight: bold;'>&#8369;" . number_format($order['total'], 2) . "</td></tr>
         <tr><td style='padding: 6px 0; font-weight: 600; color: #aaa;'>Reason:</td><td>{$reason}</td></tr>";
 
-    // --- Notification-only body (no buttons) ---
-    $notifyBody = "
-    <div style='font-family: Segoe UI, sans-serif; max-width: 500px; margin: 0 auto; padding: 30px; background: #1a1514; color: #f4f4f4; border-radius: 16px; border: 1px solid #332d2c;'>
-        <div style='text-align: center; margin-bottom: 20px;'>
-            <div style='display: inline-block; width: 50px; height: 50px; background: #dc2626; color: #fff; border-radius: 12px; line-height: 50px; font-size: 24px;'>&#9888;</div>
-            <h2 style='color: #fff; margin: 10px 0 5px;'>$storeName</h2>
-            <p style='color: #aaa; font-size: 13px; margin: 0;'>Order Void Request (Notification)</p>
-        </div>
-        <div style='background: #2a2423; border-radius: 12px; padding: 24px; border: 1px solid #3d3533;'>
-            <table style='width: 100%; font-size: 14px; color: #ddd; margin: 0 0 16px 0;'>{$detailRows}</table>
-            <p style='font-size: 12px; color: #888; margin: 0;'>This is a notification only. Approval is handled by the owner/super admin.</p>
-        </div>
-    </div>";
-
-    // --- Approve/deny body ---
     $actionBody = "
     <div style='font-family: Segoe UI, sans-serif; max-width: 500px; margin: 0 auto; padding: 30px; background: #1a1514; color: #f4f4f4; border-radius: 16px; border: 1px solid #332d2c;'>
         <div style='text-align: center; margin-bottom: 20px;'>
             <div style='display: inline-block; width: 50px; height: 50px; background: #dc2626; color: #fff; border-radius: 12px; line-height: 50px; font-size: 24px;'>&#9888;</div>
             <h2 style='color: #fff; margin: 10px 0 5px;'>$storeName</h2>
-            <p style='color: #aaa; font-size: 13px; margin: 0;'>Order Void Request &mdash; Action Required</p>
+            <p style='color: #aaa; font-size: 13px; margin: 0;'>Order Void Request &mdash; Authorization Required</p>
         </div>
         <div style='background: #2a2423; border-radius: 12px; padding: 24px; border: 1px solid #3d3533;'>
             <table style='width: 100%; font-size: 14px; color: #ddd; margin: 0 0 16px 0;'>{$detailRows}</table>
+            <div style='text-align:center;margin:20px 0;'>
+                <p style='font-size:12px;color:#aaa;margin-bottom:6px;'>Authorization PIN / Token for POS:</p>
+                <span style='background:#3a2f2d;color:#fff;padding:12px 24px;border-radius:10px;font-size:24px;font-weight:700;letter-spacing:4px;font-family:monospace;'>$pinCode</span>
+                <p style='font-size:11px;color:#888;margin-top:6px;'>Valid for $expiryMin minutes</p>
+            </div>
             <div style='display: flex; gap: 10px; margin-top: 20px; text-align: center;'>
                 <a href='{$approveUrl}' style='flex: 1; display: inline-block; background: #16a34a; color: #fff; padding: 12px 10px; border-radius: 8px; text-decoration: none; font-weight: 600; font-size: 14px;'>&#10003; Approve Void</a>
                 <a href='{$rejectUrl}' style='flex: 1; display: inline-block; background: #3f3f46; color: #fff; padding: 12px 10px; border-radius: 8px; text-decoration: none; font-weight: 600; font-size: 14px;'>&#10007; Reject</a>
@@ -105,28 +162,18 @@ function handleVoidOrder() {
         </div>
     </div>";
 
-    // Send notification-only to managers
-    if ($managerEmailsStr) {
-        $managerEmails = array_filter(array_map('trim', explode(',', $managerEmailsStr)));
-        foreach ($managerEmails as $email) {
-            if (filter_var($email, FILTER_VALIDATE_EMAIL)) {
-                sendEmail($email, "$storeName - Void Request: Order #{$orderId} (Notification)", $notifyBody);
-            }
-        }
+    $recipients = getVoidRefundRecipients();
+    foreach ($recipients as $email) {
+        sendEmail($email, "$storeName - Void Authorization Code: Order #{$orderId} ($pinCode)", $actionBody);
     }
 
-    // Send approve/deny to owner and superadmin (deduplicated)
-    $actionRecipients = [];
-    if ($ownerEmail && filter_var($ownerEmail, FILTER_VALIDATE_EMAIL)) {
-        $actionRecipients[] = strtolower($ownerEmail);
-        sendEmail($ownerEmail, "$storeName - Void Request: Order #{$orderId}", $actionBody);
-    }
-    if ($superAdminEmail && filter_var($superAdminEmail, FILTER_VALIDATE_EMAIL)
-        && !in_array(strtolower($superAdminEmail), $actionRecipients)) {
-        sendEmail($superAdminEmail, "$storeName - Void Request: Order #{$orderId}", $actionBody);
-    }
-
-    jsonResponse(['success' => true, 'message' => 'Void request submitted for manager/admin approval.']);
+    $resp = [
+        'success'     => true,
+        'message'     => 'Void request submitted for manager/admin approval.',
+        'batch_token' => $approvalToken
+    ];
+    if (DEV_MODE) $resp['dev_token'] = $pinCode;
+    jsonResponse($resp);
 }
 
 function handleRefundOrder() {
@@ -148,8 +195,16 @@ function handleRefundOrder() {
 
     $requester = $_SESSION['full_name'] ?? $_SESSION['username'];
 
-    // Generate a secure token for email approval
+    // Generate a secure token for email approval and a 6-digit PIN for POS
     $approvalToken = bin2hex(random_bytes(32));
+    $pinCode = generateUniquePinCode($db);
+
+    // Store the PIN code in admin_tokens for POS validation
+    $expiryMin = intval(getSetting('token_expiry_minutes') ?: TOKEN_EXPIRY_MINUTES);
+    if ($expiryMin < 5) $expiryMin = 10;
+    $expiresAt = date('Y-m-d H:i:s', strtotime("+$expiryMin minutes"));
+    $stmt = $db->prepare("INSERT INTO admin_tokens (token, user_id, purpose, expires_at) VALUES (?, ?, ?, ?)");
+    $stmt->execute([$pinCode, $_SESSION['user_id'], $approvalToken, $expiresAt]);
 
     // Create the request
     $db->prepare("INSERT INTO system_requests (type, requested_by, requester_name, title, description, payload, approval_token) VALUES (?,?,?,?,?,?,?)")
@@ -159,50 +214,34 @@ function handleRefundOrder() {
            $requester,
            "Refund Order #{$orderId}",
            "Reason: {$reason}",
-           json_encode(['order_id' => $orderId, 'reason' => $reason, 'amount' => $order['total']]),
+           json_encode(['order_id' => $orderId, 'reason' => $reason, 'amount' => $order['total'], 'pin' => $pinCode]),
            $approvalToken
        ]);
 
-    // Send emails: manager gets notification-only; owner + superadmin get approve/deny (deduplicated)
-    $storeName        = getSetting('store_name') ?: 'ChipiPie Cafe';
-    $managerEmailsStr = getSetting('void_refund_manager_email');
-    $ownerEmail       = trim(getSetting('owner_email') ?? '');
-    $superAdminEmail  = trim(getSetting('superadmin_email') ?? '');
-
+    $storeName  = getSetting('store_name') ?: 'ChipiPie Cafe';
     $approveUrl = "http://" . ($_SERVER['HTTP_HOST'] ?? 'localhost') . "/CHIPIPIE_SYSTEM/api/orders.php?action=decide_void_refund&token=" . $approvalToken . "&decision=approve";
     $rejectUrl  = "http://" . ($_SERVER['HTTP_HOST'] ?? 'localhost') . "/CHIPIPIE_SYSTEM/api/orders.php?action=decide_void_refund&token=" . $approvalToken . "&decision=reject";
 
-    // --- Shared detail rows ---
     $detailRows = "
         <tr><td style='padding: 6px 0; font-weight: 600; color: #aaa;'>Order ID:</td><td style='font-weight: 700; color: #fff;'>#{$orderId}</td></tr>
         <tr><td style='padding: 6px 0; font-weight: 600; color: #aaa;'>Requested By:</td><td>{$requester}</td></tr>
         <tr><td style='padding: 6px 0; font-weight: 600; color: #aaa;'>Amount:</td><td style='color: #ea580c; font-weight: bold;'>&#8369;" . number_format($order['total'], 2) . "</td></tr>
         <tr><td style='padding: 6px 0; font-weight: 600; color: #aaa;'>Reason:</td><td>{$reason}</td></tr>";
 
-    // --- Notification-only body (no buttons) ---
-    $notifyBody = "
-    <div style='font-family: Segoe UI, sans-serif; max-width: 500px; margin: 0 auto; padding: 30px; background: #1a1514; color: #f4f4f4; border-radius: 16px; border: 1px solid #332d2c;'>
-        <div style='text-align: center; margin-bottom: 20px;'>
-            <div style='display: inline-block; width: 50px; height: 50px; background: #ea580c; color: #fff; border-radius: 12px; line-height: 50px; font-size: 24px;'>&#9888;</div>
-            <h2 style='color: #fff; margin: 10px 0 5px;'>$storeName</h2>
-            <p style='color: #aaa; font-size: 13px; margin: 0;'>Order Refund Request (Notification)</p>
-        </div>
-        <div style='background: #2a2423; border-radius: 12px; padding: 24px; border: 1px solid #3d3533;'>
-            <table style='width: 100%; font-size: 14px; color: #ddd; margin: 0 0 16px 0;'>{$detailRows}</table>
-            <p style='font-size: 12px; color: #888; margin: 0;'>This is a notification only. Approval is handled by the owner/super admin.</p>
-        </div>
-    </div>";
-
-    // --- Approve/deny body ---
     $actionBody = "
     <div style='font-family: Segoe UI, sans-serif; max-width: 500px; margin: 0 auto; padding: 30px; background: #1a1514; color: #f4f4f4; border-radius: 16px; border: 1px solid #332d2c;'>
         <div style='text-align: center; margin-bottom: 20px;'>
-            <div style='display: inline-block; width: 50px; height: 50px; background: #ea580c; color: #fff; border-radius: 12px; line-height: 50px; font-size: 24px;'>&#9888;</div>
+            <div style='display: inline-block; width: 50px; height: 50px; background: #ea580c; color: #fff; border-radius: 12px; line-height: 50px; font-size: 24px;'>&#8634;</div>
             <h2 style='color: #fff; margin: 10px 0 5px;'>$storeName</h2>
-            <p style='color: #aaa; font-size: 13px; margin: 0;'>Order Refund Request &mdash; Action Required</p>
+            <p style='color: #aaa; font-size: 13px; margin: 0;'>Order Refund Request &mdash; Authorization Required</p>
         </div>
         <div style='background: #2a2423; border-radius: 12px; padding: 24px; border: 1px solid #3d3533;'>
             <table style='width: 100%; font-size: 14px; color: #ddd; margin: 0 0 16px 0;'>{$detailRows}</table>
+            <div style='text-align:center;margin:20px 0;'>
+                <p style='font-size:12px;color:#aaa;margin-bottom:6px;'>Authorization PIN / Token for POS:</p>
+                <span style='background:#3a2f2d;color:#fff;padding:12px 24px;border-radius:10px;font-size:24px;font-weight:700;letter-spacing:4px;font-family:monospace;'>$pinCode</span>
+                <p style='font-size:11px;color:#888;margin-top:6px;'>Valid for $expiryMin minutes</p>
+            </div>
             <div style='display: flex; gap: 10px; margin-top: 20px; text-align: center;'>
                 <a href='{$approveUrl}' style='flex: 1; display: inline-block; background: #16a34a; color: #fff; padding: 12px 10px; border-radius: 8px; text-decoration: none; font-weight: 600; font-size: 14px;'>&#10003; Approve Refund</a>
                 <a href='{$rejectUrl}' style='flex: 1; display: inline-block; background: #3f3f46; color: #fff; padding: 12px 10px; border-radius: 8px; text-decoration: none; font-weight: 600; font-size: 14px;'>&#10007; Reject</a>
@@ -210,28 +249,18 @@ function handleRefundOrder() {
         </div>
     </div>";
 
-    // Send notification-only to managers
-    if ($managerEmailsStr) {
-        $managerEmails = array_filter(array_map('trim', explode(',', $managerEmailsStr)));
-        foreach ($managerEmails as $email) {
-            if (filter_var($email, FILTER_VALIDATE_EMAIL)) {
-                sendEmail($email, "$storeName - Refund Request: Order #{$orderId} (Notification)", $notifyBody);
-            }
-        }
+    $recipients = getVoidRefundRecipients();
+    foreach ($recipients as $email) {
+        sendEmail($email, "$storeName - Refund Authorization Code: Order #{$orderId} ($pinCode)", $actionBody);
     }
 
-    // Send approve/deny to owner and superadmin (deduplicated)
-    $actionRecipients = [];
-    if ($ownerEmail && filter_var($ownerEmail, FILTER_VALIDATE_EMAIL)) {
-        $actionRecipients[] = strtolower($ownerEmail);
-        sendEmail($ownerEmail, "$storeName - Refund Request: Order #{$orderId}", $actionBody);
-    }
-    if ($superAdminEmail && filter_var($superAdminEmail, FILTER_VALIDATE_EMAIL)
-        && !in_array(strtolower($superAdminEmail), $actionRecipients)) {
-        sendEmail($superAdminEmail, "$storeName - Refund Request: Order #{$orderId}", $actionBody);
-    }
-
-    jsonResponse(['success' => true, 'message' => 'Refund request submitted for manager/admin approval.']);
+    $resp = [
+        'success'     => true,
+        'message'     => 'Refund request submitted for manager/admin approval.',
+        'batch_token' => $approvalToken
+    ];
+    if (DEV_MODE) $resp['dev_token'] = $pinCode;
+    jsonResponse($resp);
 }
 
 function handleGetAdjustments() {
@@ -697,7 +726,31 @@ function handleDecideVoidRefund() {
     $requests = $stmt->fetchAll();
 
     if (!$requests || count($requests) === 0) {
-        die("Request not found, already processed, or invalid token.");
+        echo "
+        <!DOCTYPE html>
+        <html lang='en'>
+        <head>
+            <meta charset='UTF-8'>
+            <meta name='viewport' content='width=device-width, initial-scale=1.0'>
+            <title>Request Already Processed</title>
+            <style>
+                body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background-color: #1a1514; color: #f4f4f4; display: flex; justify-content: center; align-items: center; min-height: 100vh; margin: 0; }
+                .container { text-align: center; background: #2a2423; padding: 40px; border-radius: 16px; border: 1px solid #3d3533; box-shadow: 0 10px 25px rgba(0,0,0,0.5); max-width: 420px; width: 90%; }
+                .icon { font-size: 52px; margin-bottom: 16px; }
+                h1 { color: #f59e0b; margin: 0 0 10px 0; font-size: 22px; }
+                p { color: #aaa; margin: 0; line-height: 1.5; font-size: 14px; }
+            </style>
+        </head>
+        <body>
+            <div class='container'>
+                <div class='icon'>&#9888;</div>
+                <h1>Request Already Processed</h1>
+                <p>This void/refund request has already been approved, rejected, or expired.</p>
+                <p style='margin-top: 16px; font-size: 12px; color: #777;'>You can safely close this window.</p>
+            </div>
+        </body>
+        </html>";
+        exit;
     }
 
     $now = date('Y-m-d H:i:s');
@@ -728,11 +781,20 @@ function handleDecideVoidRefund() {
                         $db->prepare("UPDATE menu_items SET stock = stock + ?, is_available = 1 WHERE id = ?")
                            ->execute([$item['quantity'], $item['menu_item_id']]);
                     }
+                    $processedBy = !empty($_SESSION['user_id']) ? $_SESSION['user_id'] : (!empty($request['requested_by']) ? $request['requested_by'] : null);
+                    if ($processedBy) {
+                        $chkUser = $db->prepare("SELECT id FROM users WHERE id = ?");
+                        $chkUser->execute([$processedBy]);
+                        if (!$chkUser->fetch()) {
+                            $processedBy = null;
+                        }
+                    }
                     $db->prepare("INSERT INTO order_adjustments (order_id, type, amount, reason, processed_by) VALUES (?, ?, ?, ?, ?)")
-                       ->execute([$orderId, $adjType, $payload['amount'] ?? 0, $payload['reason'] ?? '', 0]);
+                       ->execute([$orderId, $adjType, $payload['amount'] ?? 0, $payload['reason'] ?? '', $processedBy]);
                     $db->commit();
                 } catch (Exception $e) {
                     $db->rollBack();
+                    error_log("Void/Refund error for order {$orderId}: " . $e->getMessage());
                 }
             }
         }
@@ -784,13 +846,14 @@ function handleRequestVoidBatch() {
 
     $db = getDB();
     $approvalToken = bin2hex(random_bytes(32));
-    $pinCode = strtoupper(substr(generateToken(16), 0, 6)); // 6-digit PIN for POS
+    $pinCode = generateUniquePinCode($db);
     
     // Store the PIN code in admin_tokens for POS validation
     $expiryMin = intval(getSetting('token_expiry_minutes') ?: TOKEN_EXPIRY_MINUTES);
+    if ($expiryMin < 5) $expiryMin = 10;
     $expiresAt = date('Y-m-d H:i:s', strtotime("+$expiryMin minutes"));
     $stmt = $db->prepare("INSERT INTO admin_tokens (token, user_id, purpose, expires_at) VALUES (?, ?, ?, ?)");
-    $stmt->execute([$pinCode, $_SESSION['user_id'], $approvalToken, $expiresAt]); // Using purpose field to store the approval_token linkage!
+    $stmt->execute([$pinCode, $_SESSION['user_id'], $approvalToken, $expiresAt]);
 
     $requester = $_SESSION['full_name'] ?? $_SESSION['username'];
     $orderListHtml = '';
@@ -799,7 +862,7 @@ function handleRequestVoidBatch() {
         $orderId = intval($o['id']);
         $type = $o['type'] === 'void' ? 'void_order' : 'refund_order';
         $perReason = trim($o['reason'] ?: ($type === 'void_order' ? 'Order cancelled' : 'Customer refund'));
-        $reason = $manager ? "{$perReason} — Authorized by: {$manager}" : $perReason;
+        $reason = $manager ? "{$perReason} — Requested by: {$manager}" : $perReason;
         
         $orderInfo = $db->prepare("SELECT total FROM orders WHERE id = ?");
         $orderInfo->execute([$orderId]);
@@ -826,17 +889,18 @@ function handleRequestVoidBatch() {
         </tr>";
     }
 
-    $storeName        = getSetting('store_name') ?: 'ChipiPie Cafe';
-    $managerEmailsStr = getSetting('void_refund_manager_email');
-    $ownerEmail       = trim(getSetting('owner_email') ?? '');
-    $superAdminEmail  = trim(getSetting('superadmin_email') ?? '');
-
+    $storeName  = getSetting('store_name') ?: 'ChipiPie Cafe';
     $approveUrl = "http://" . ($_SERVER['HTTP_HOST'] ?? 'localhost') . "/CHIPIPIE_SYSTEM/api/orders.php?action=decide_void_refund&token=" . $approvalToken . "&decision=approve";
     $rejectUrl  = "http://" . ($_SERVER['HTTP_HOST'] ?? 'localhost') . "/CHIPIPIE_SYSTEM/api/orders.php?action=decide_void_refund&token=" . $approvalToken . "&decision=reject";
 
+    $requesterDesc = "<strong>{$requester}</strong>";
+    if ($manager && strtolower($manager) !== strtolower($requester)) {
+        $requesterDesc .= " (Staff: <strong>" . htmlspecialchars($manager) . "</strong>)";
+    }
+
     // --- Shared order table ---
     $orderTable = "
-        <p style='color: #ddd; margin-top: 0;'>Requested By: <strong>{$requester}</strong></p>
+        <p style='color: #ddd; margin-top: 0;'>Requested By: {$requesterDesc}</p>
         <table style='width: 100%; font-size: 14px; text-align: left; margin: 0 0 16px 0; border-collapse: collapse;'>
             <tr>
                 <th style='border-bottom: 1px solid #444; padding-bottom: 4px; color:#888;'>ID</th>
@@ -846,33 +910,20 @@ function handleRequestVoidBatch() {
             {$orderListHtml}
         </table>";
 
-    // --- Notification-only body (manager) ---
-    $notifyBody = "
-    <div style='font-family: Segoe UI, sans-serif; max-width: 500px; margin: 0 auto; padding: 30px; background: #1a1514; color: #f4f4f4; border-radius: 16px; border: 1px solid #332d2c;'>
-        <div style='text-align: center; margin-bottom: 20px;'>
-            <div style='display: inline-block; width: 50px; height: 50px; background: #dc2626; color: #fff; border-radius: 12px; line-height: 50px; font-size: 24px;'>&#9888;</div>
-            <h2 style='color: #fff; margin: 10px 0 5px;'>$storeName</h2>
-            <p style='color: #aaa; font-size: 13px; margin: 0;'>Batch Void/Refund Request (Notification)</p>
-        </div>
-        <div style='background: #2a2423; border-radius: 12px; padding: 24px; border: 1px solid #3d3533;'>
-            {$orderTable}
-            <p style='font-size: 12px; color: #888; margin: 0;'>This is a notification only. Approval is handled by the owner/super admin.</p>
-        </div>
-    </div>";
-
-    // --- Approve/deny body (owner + superadmin) ---
+    // --- Action required email body sent to manager(s) and admin/owner ---
     $actionBody = "
     <div style='font-family: Segoe UI, sans-serif; max-width: 500px; margin: 0 auto; padding: 30px; background: #1a1514; color: #f4f4f4; border-radius: 16px; border: 1px solid #332d2c;'>
         <div style='text-align: center; margin-bottom: 20px;'>
             <div style='display: inline-block; width: 50px; height: 50px; background: #dc2626; color: #fff; border-radius: 12px; line-height: 50px; font-size: 24px;'>&#9888;</div>
             <h2 style='color: #fff; margin: 10px 0 5px;'>$storeName</h2>
-            <p style='color: #aaa; font-size: 13px; margin: 0;'>Batch Void/Refund Request &mdash; Action Required</p>
+            <p style='color: #aaa; font-size: 13px; margin: 0;'>Batch Void/Refund Request &mdash; Authorization Token</p>
         </div>
         <div style='background: #2a2423; border-radius: 12px; padding: 24px; border: 1px solid #3d3533;'>
             {$orderTable}
             <div style='text-align:center;margin:24px 0;'>
-                <p style='font-size:12px;color:#aaa;margin-bottom:6px;'>Or provide this PIN code to the cashier:</p>
+                <p style='font-size:12px;color:#aaa;margin-bottom:6px;'>Authorization PIN / Token for POS:</p>
                 <span style='background:#3a2f2d;color:#fff;padding:12px 24px;border-radius:10px;font-size:24px;font-weight:700;letter-spacing:4px;font-family:monospace;'>$pinCode</span>
+                <p style='font-size:11px;color:#888;margin-top:6px;'>Valid for $expiryMin minutes</p>
             </div>
             <div style='display: flex; gap: 10px; margin-top: 20px; text-align: center;'>
                 <a href='{$approveUrl}' style='flex: 1; display: inline-block; background: #16a34a; color: #fff; padding: 12px 10px; border-radius: 8px; text-decoration: none; font-weight: 600; font-size: 14px;'>&#10003; Approve All</a>
@@ -881,34 +932,25 @@ function handleRequestVoidBatch() {
         </div>
     </div>";
 
-    // Send notification-only to managers
-    if ($managerEmailsStr) {
-        $managerEmails = array_filter(array_map('trim', explode(',', $managerEmailsStr)));
-        foreach ($managerEmails as $email) {
-            if (filter_var($email, FILTER_VALIDATE_EMAIL)) {
-                sendEmail($email, "$storeName - Batch Void/Refund Request (Notification)", $notifyBody);
-            }
-        }
+    $recipients = getVoidRefundRecipients();
+    foreach ($recipients as $email) {
+        sendEmail($email, "$storeName - Void/Refund Authorization Token ($pinCode)", $actionBody);
     }
 
-    // Send approve/deny to owner and superadmin (deduplicated)
-    $actionRecipients = [];
-    if ($ownerEmail && filter_var($ownerEmail, FILTER_VALIDATE_EMAIL)) {
-        $actionRecipients[] = strtolower($ownerEmail);
-        sendEmail($ownerEmail, "$storeName - Batch Void/Refund Request", $actionBody);
-    }
-    if ($superAdminEmail && filter_var($superAdminEmail, FILTER_VALIDATE_EMAIL)
-        && !in_array(strtolower($superAdminEmail), $actionRecipients)) {
-        sendEmail($superAdminEmail, "$storeName - Batch Void/Refund Request", $actionBody);
-    }
-
-    $resp = ['success' => true, 'message' => 'Requests submitted to Super Admin & Managers.', 'batch_token' => $approvalToken];
+    $countRecipients = count($recipients);
+    $resp = [
+        'success'          => true, 
+        'message'          => "Void/refund request submitted! Token sent to {$countRecipients} manager/admin email(s).", 
+        'batch_token'      => $approvalToken,
+        'recipients_count' => $countRecipients
+    ];
     if (DEV_MODE) $resp['dev_token'] = $pinCode;
     jsonResponse($resp);
 }
 
 function handleExecuteVoidBatchWithCode() {
     requireLogin();
+    $savedUserId = $_SESSION['user_id'] ?? null;
     session_write_close();
     $input = getJsonInput();
     $token = strtoupper(trim($input['token'] ?? ''));
@@ -916,34 +958,92 @@ function handleExecuteVoidBatchWithCode() {
 
     $db = getDB();
     $now = date('Y-m-d H:i:s');
-    
+
     // Validate PIN in admin_tokens
     $stmt = $db->prepare("SELECT * FROM admin_tokens WHERE token = ? AND is_used = 0 AND expires_at > ?");
     $stmt->execute([$token, $now]);
     $tokenRow = $stmt->fetch();
-    
+
     if (!$tokenRow) {
         jsonResponse(['success' => false, 'message' => 'Invalid or expired PIN code.'], 400);
     }
-    
-    $approvalToken = $tokenRow['purpose']; // We stored approval_token here
-    
+
+    $approvalToken = $tokenRow['purpose']; // We stored the approval_token in purpose column
+
     // Mark token as used
     $db->prepare("UPDATE admin_tokens SET is_used = 1, used_at = ? WHERE id = ?")->execute([$now, $tokenRow['id']]);
 
-    // Now approve all requests matching this approval_token (sets review_note = 'Processed via Email Link' from handleDecideVoidRefund)
-    $_GET['token'] = $approvalToken;
-    $_GET['decision'] = 'approve';
-    
-    ob_start();
-    handleDecideVoidRefund();
-    ob_end_clean();
-    
-    // Override review_note to reflect PIN approval
-    $db->prepare("UPDATE system_requests SET review_note = 'Processed via PIN Code' WHERE approval_token = ? AND status = 'approved'")
-       ->execute([$approvalToken]);
-    
-    jsonResponse(['success' => true, 'message' => 'Void requests successfully approved and processed via PIN.']);
+    // Fetch all pending system_requests for this approval token
+    $stmt = $db->prepare("SELECT * FROM system_requests WHERE approval_token = ? AND status = 'pending'");
+    $stmt->execute([$approvalToken]);
+    $requests = $stmt->fetchAll();
+
+    if (!$requests || count($requests) === 0) {
+        // May have already been approved via email link â€” still return success to the cashier
+        jsonResponse(['success' => true, 'message' => 'Request already processed.']);
+    }
+
+    // Mark all matching requests as approved via PIN
+    $db->prepare("UPDATE system_requests SET status = 'approved', reviewed_at = ?, review_note = 'Processed via PIN Code' WHERE approval_token = ?")
+       ->execute([$now, $approvalToken]);
+
+    $processed = 0;
+    $errors    = [];
+
+    foreach ($requests as $request) {
+        $payload   = $request['payload'] ? json_decode($request['payload'], true) : [];
+        $orderId   = intval($payload['order_id'] ?? 0);
+        if (!$orderId) continue;
+
+        $newOrderStatus = $request['type'] === 'void_order' ? 'Voided' : 'Refunded';
+        $adjType        = $request['type'] === 'void_order' ? 'void'   : 'refund';
+
+        try {
+            $db->beginTransaction();
+
+            // Update order status
+            $db->prepare("UPDATE orders SET status = ? WHERE id = ?")->execute([$newOrderStatus, $orderId]);
+
+            // Restore stock
+            $items = $db->prepare("SELECT menu_item_id, quantity FROM order_items WHERE order_id = ?");
+            $items->execute([$orderId]);
+            foreach ($items->fetchAll() as $item) {
+                $db->prepare("UPDATE menu_items SET stock = stock + ?, is_available = 1 WHERE id = ?")
+                   ->execute([$item['quantity'], $item['menu_item_id']]);
+            }
+
+            // Resolve processed_by: prefer the session user who entered PIN, then token owner, then requester
+            $processedBy = $savedUserId ? intval($savedUserId) : null;
+            if (!$processedBy && !empty($tokenRow['user_id'])) {
+                $processedBy = intval($tokenRow['user_id']);
+            }
+            if (!$processedBy && !empty($request['requested_by'])) {
+                $processedBy = intval($request['requested_by']);
+            }
+            // Validate the user actually exists
+            if ($processedBy) {
+                $chk = $db->prepare("SELECT id FROM users WHERE id = ?");
+                $chk->execute([$processedBy]);
+                if (!$chk->fetch()) $processedBy = null;
+            }
+
+            $db->prepare("INSERT INTO order_adjustments (order_id, type, amount, reason, processed_by) VALUES (?, ?, ?, ?, ?)")
+               ->execute([$orderId, $adjType, $payload['amount'] ?? 0, $payload['reason'] ?? '', $processedBy]);
+
+            $db->commit();
+            $processed++;
+        } catch (Exception $e) {
+            $db->rollBack();
+            $errors[] = "Order {$orderId}: " . $e->getMessage();
+            error_log("Void/Refund PIN error for order {$orderId}: " . $e->getMessage());
+        }
+    }
+
+    if ($processed === 0 && !empty($errors)) {
+        jsonResponse(['success' => false, 'message' => 'Processing failed: ' . implode('; ', $errors)], 500);
+    }
+
+    jsonResponse(['success' => true, 'message' => "Successfully processed {$processed} order(s) via PIN."]);
 }
 
 function handleCheckBatchStatus() {

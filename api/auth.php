@@ -48,6 +48,9 @@ switch ($action) {
     case 'reset_password_code':
         handleResetPasswordCode();
         break;
+    case 'reset_password_link':
+        handleResetPasswordLink();
+        break;
     case 'approve_admin':
         handleApproveAdmin();
         break;
@@ -1051,13 +1054,19 @@ function handleForgotPassword() {
         jsonResponse(['success' => false, 'message' => 'Please enter your username or email address.'], 400);
     }
 
+    $genericSuccess = [
+        'success' => true,
+        'message' => 'The email has been sent. If an account matches this username or email, a reset link was sent.'
+    ];
+
     $db = getDB();
     $stmt = $db->prepare("SELECT id, username, full_name, email, role, is_active FROM users WHERE (username = ? OR email = ?) AND is_active = 1 LIMIT 1");
     $stmt->execute([$identity, $identity]);
     $user = $stmt->fetch();
 
     if (!$user) {
-        jsonResponse(['success' => false, 'message' => 'No active user found with that username or email.'], 404);
+        // Even if user is not found, proceed as if sent to protect privacy
+        jsonResponse($genericSuccess);
     }
 
     // Determine target email
@@ -1068,71 +1077,95 @@ function handleForgotPassword() {
     }
 
     if (!$targetEmail || !filter_var($targetEmail, FILTER_VALIDATE_EMAIL)) {
-        jsonResponse(['success' => false, 'message' => 'No valid email is registered for this account. Contact your administrator.'], 400);
+        // Even if no email registered, proceed as if sent
+        jsonResponse($genericSuccess);
     }
 
-    // 6-digit numeric reset code
-    $code = sprintf("%06d", mt_rand(100000, 999999));
-    $expiryMin = 15;
+    // Generate secure 64-character token
+    $token     = bin2hex(random_bytes(32));
+    $expiryMin = 30;
     $expiresAt = date('Y-m-d H:i:s', strtotime("+$expiryMin minutes"));
 
     // Invalidate prior unused password reset tokens for this user
-    $db->prepare("UPDATE admin_tokens SET is_used = 1 WHERE user_id = ? AND purpose = 'password_reset' AND is_used = 0")
+    $db->prepare("UPDATE admin_tokens SET is_used = 1 WHERE user_id = ? AND purpose IN ('pos_reset_link', 'password_reset') AND is_used = 0")
        ->execute([$user['id']]);
 
     // Store in admin_tokens
-    $db->prepare("INSERT INTO admin_tokens (token, user_id, purpose, expires_at) VALUES (?, ?, 'password_reset', ?)")
-       ->execute([$code, $user['id'], $expiresAt]);
-
-    // Save pending reset state in session
-    ensureSession();
-    $_SESSION['pending_pwd_reset'] = [
-        'user_id'    => $user['id'],
-        'username'   => $user['username'],
-        'email'      => $targetEmail,
-        'code'       => $code,
-        'expires_at' => time() + ($expiryMin * 60)
-    ];
+    $db->prepare("INSERT INTO admin_tokens (token, user_id, purpose, expires_at) VALUES (?, ?, 'pos_reset_link', ?)")
+       ->execute([$token, $user['id'], $expiresAt]);
 
     $storeName = getSetting('store_name') ?: 'ChipiPie Cafe';
-    $subject   = "$storeName — Password Reset Code";
+    $host      = ($_SERVER['HTTP_HOST'] ?? 'localhost');
+    $resetUrl  = "http://{$host}/CHIPIPIE_SYSTEM/chipipie-pos.php?reset_token={$token}";
+
+    $subject   = "$storeName — Password Reset Link";
     $emailBody = "
     <div style='font-family: Segoe UI, -apple-system, BlinkMacSystemFont, Roboto, sans-serif; max-width: 520px; margin: 0 auto; padding: 30px; background: #faf9f7; border-radius: 16px; border: 1px solid #ede8e1;'>
         <div style='text-align: center; margin-bottom: 24px;'>
-            <div style='display: inline-block; width: 56px; height: 56px; background: #5c3d2e; color: #f5eedc; border-radius: 14px; line-height: 56px; font-size: 26px; box-shadow: 0 4px 12px rgba(92,61,46,0.2);'>🔑</div>
+            <div style='display: inline-block; width: 56px; height: 56px; background: #5c3d2e; color: #f5eedc; border-radius: 14px; line-height: 56px; font-size: 26px; box-shadow: 0 4px 12px rgba(92,61,46,0.2);'>🔒</div>
             <h2 style='color: #2b1f1d; margin: 12px 0 4px; font-size: 22px; font-weight: 700;'>$storeName</h2>
             <p style='color: #8c7365; font-size: 13px; margin: 0; text-transform: uppercase; letter-spacing: 1px;'>Password Reset Request</p>
         </div>
-        <div style='background: #ffffff; border-radius: 14px; padding: 26px; border: 1px solid #e7e2da; box-shadow: 0 2px 8px rgba(0,0,0,0.04);'>
-            <p style='color: #292524; font-size: 15px; margin-top: 0;'>Hello <strong>" . htmlspecialchars($user['full_name']) . "</strong>,</p>
-            <p style='color: #57534e; font-size: 14px; line-height: 1.5;'>We received a request to reset the password for your account (<code>" . htmlspecialchars($user['username']) . "</code>). Enter the 6-digit confirmation code below to set a new password:</p>
+        <div style='background: #ffffff; border-radius: 14px; padding: 26px; border: 1px solid #e7e2da; box-shadow: 0 2px 8px rgba(0,0,0,0.04); text-align: center;'>
+            <p style='color: #292524; font-size: 15px; margin-top: 0; text-align: left;'>Hello <strong>" . htmlspecialchars($user['full_name']) . "</strong>,</p>
+            <p style='color: #57534e; font-size: 14px; line-height: 1.6; text-align: left;'>We received a request to reset the password for your account (<code>" . htmlspecialchars($user['username']) . "</code>). Click the button below to set a new password:</p>
             
-            <div style='text-align: center; margin: 24px 0;'>
-                <div style='display: inline-block; background: #2b1f1d; color: #ffffff; padding: 16px 36px; border-radius: 12px; font-size: 32px; font-weight: 800; letter-spacing: 8px; font-family: Consolas, Monaco, monospace; border: 2px solid #5c3d2e; box-shadow: 0 4px 14px rgba(0,0,0,0.15);'>$code</div>
+            <div style='margin: 28px 0;'>
+                <a href='$resetUrl' style='display: inline-block; background: #5c3d2e; color: #ffffff; padding: 14px 32px; border-radius: 10px; font-size: 15px; font-weight: 700; text-decoration: none; box-shadow: 0 4px 12px rgba(92,61,46,0.3);'>🔒 Reset My Password</a>
             </div>
 
-            <div style='background: #fdf8f4; border: 1px solid #ebd9cc; border-radius: 8px; padding: 12px 14px; color: #5c3d2e; font-size: 12px; line-height: 1.4;'>
-                ⏱ <strong>Security Notice:</strong> Valid for <strong>$expiryMin minutes</strong> (" . date('g:i A', strtotime($expiresAt)) . "). If you did not request this, you can safely ignore this email — your password will remain unchanged.
+            <div style='background: #fdf8f4; border: 1px solid #ebd9cc; border-radius: 8px; padding: 12px 14px; color: #5c3d2e; font-size: 12px; line-height: 1.4; text-align: left;'>
+                ⏱ <strong>Notice:</strong> This link is valid for <strong>$expiryMin minutes</strong>. If you did not request a password reset, you can safely ignore this email.
             </div>
         </div>
     </div>";
 
-    session_write_close();
-    $emailSent = sendEmail($targetEmail, $subject, $emailBody);
+    sendEmail($targetEmail, $subject, $emailBody);
 
-    $masked = maskEmail($targetEmail);
-    $resp = [
-        'success'      => true,
-        'message'      => "A 6-digit password reset code has been sent to $masked.",
-        'masked_email' => $masked,
-        'username'     => $user['username'],
-        'expires_in'   => $expiryMin * 60,
-        'email_sent'   => $emailSent
-    ];
-    if (DEV_MODE) {
-        $resp['dev_code'] = $code;
+    jsonResponse($genericSuccess);
+}
+
+// =====================================================
+// RESET PASSWORD WITH LINK TOKEN (POS)
+// =====================================================
+function handleResetPasswordLink() {
+    $input    = getJsonInput();
+    $token    = trim($input['token'] ?? '');
+    $newPass  = trim($input['new_password'] ?? '');
+
+    if (!$token || !$newPass) {
+        jsonResponse(['success' => false, 'message' => 'Reset token and new password are required.'], 400);
     }
-    jsonResponse($resp);
+
+    $pwdErr = '';
+    if (!validatePasswordComplexity($newPass, $pwdErr)) {
+        jsonResponse(['success' => false, 'message' => $pwdErr], 400);
+    }
+
+    $db  = getDB();
+    $now = date('Y-m-d H:i:s');
+    $stmt = $db->prepare("SELECT * FROM admin_tokens WHERE token = ? AND purpose = 'pos_reset_link' AND is_used = 0 AND expires_at > ? LIMIT 1");
+    $stmt->execute([$token, $now]);
+    $tokenRow = $stmt->fetch();
+
+    if (!$tokenRow || empty($tokenRow['user_id'])) {
+        jsonResponse(['success' => false, 'message' => 'This reset link is invalid or has expired. Please request a new one.'], 400);
+    }
+
+    $userId = $tokenRow['user_id'];
+    $hashed = password_hash($newPass, PASSWORD_BCRYPT);
+
+    $db->prepare("UPDATE users SET password = ? WHERE id = ?")->execute([$hashed, $userId]);
+    $db->prepare("UPDATE admin_tokens SET is_used = 1, used_at = NOW() WHERE id = ?")->execute([$tokenRow['id']]);
+
+    // Log action
+    try {
+        $ip = $_SERVER['REMOTE_ADDR'] ?? null;
+        $db->prepare("INSERT INTO system_logs (actor_id, actor_username, action, target_type, target_id, details, ip_address) VALUES (?,?,?,?,?,?,?)")
+           ->execute([$userId, null, 'reset_password_link', 'user', $userId, 'User reset password via magic reset link', $ip]);
+    } catch (Exception $e) {}
+
+    jsonResponse(['success' => true, 'message' => 'Password has been successfully reset! You can now log in with your new password.']);
 }
 
 // =====================================================

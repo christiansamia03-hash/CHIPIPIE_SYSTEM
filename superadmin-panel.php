@@ -548,6 +548,10 @@
       to   { opacity: 1; transform: translateY(0)     scale(1);    }
     }
 
+    @keyframes spin {
+      to { transform: rotate(360deg); }
+    }
+
     .sa-modal-header {
       padding: 20px 24px 16px;
       border-bottom: 1px solid var(--sa-border);
@@ -890,9 +894,64 @@
       padding: 48px 20px;
       color: var(--sa-muted);
     }
-
     .sa-empty i { font-size: 40px; opacity: 0.3; margin-bottom: 12px; display: block; }
     .sa-empty p { font-size: 13px; }
+
+    /* Multi-Admin Void/Refund Recipients */
+    .sa-admin-recipient-card {
+      background: var(--sa-surface);
+      border: 1.5px solid var(--sa-border);
+      border-radius: 12px;
+      padding: 12px 14px;
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      cursor: pointer;
+      transition: all 0.2s cubic-bezier(0.22,1,0.36,1);
+      user-select: none;
+      position: relative;
+    }
+    .sa-admin-recipient-card:hover {
+      border-color: rgba(124, 58, 237, 0.45);
+      background: rgba(124, 58, 237, 0.05);
+    }
+    .sa-admin-recipient-card.selected {
+      border-color: #a855f7;
+      background: rgba(109, 40, 217, 0.14);
+      box-shadow: 0 0 16px rgba(109, 40, 217, 0.18);
+    }
+    .sa-admin-recipient-card.inactive {
+      opacity: 0.55;
+      cursor: not-allowed;
+    }
+    .sa-admin-recipient-chk {
+      width: 18px;
+      height: 18px;
+      accent-color: #7c3aed;
+      cursor: pointer;
+      flex-shrink: 0;
+    }
+    .sa-recipient-pill {
+      display: inline-flex;
+      align-items: center;
+      gap: 7px;
+      background: rgba(124, 58, 237, 0.12);
+      border: 1px solid rgba(168, 85, 247, 0.35);
+      color: #e2e8f0;
+      padding: 5px 12px;
+      border-radius: 20px;
+      font-size: 12px;
+      font-weight: 500;
+    }
+    .sa-recipient-pill .pill-tag {
+      font-size: 10px;
+      padding: 2px 7px;
+      border-radius: 10px;
+      background: #7c3aed;
+      color: #fff;
+      font-weight: 700;
+      letter-spacing: 0.02em;
+    }
   </style>
 </head>
 <body>
@@ -914,7 +973,7 @@
           <div class="sa-form-row">
             <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:6px;">
               <label class="sa-label" style="margin-bottom:0;">Password</label>
-              <a href="#" onclick="saShowForgotStep1(); return false;" style="font-size:11.5px; color:var(--sa-accent); text-decoration:none;">Forgot Password?</a>
+              <a href="#" id="sa-forgot-pass-link" onclick="saShowForgot(); return false;" style="font-size:11.5px; color:var(--sa-accent2); text-decoration:none; font-weight:500;">Forgot Password?</a>
             </div>
             <input type="password" id="sa-login-pass" class="sa-input" placeholder="••••••••" autocomplete="current-password" required>
           </div>
@@ -960,79 +1019,60 @@
         </div>
       </div>
 
-      <!-- STEP 3: FORGOT PASSWORD - REQUEST CODE -->
+      <!-- STEP 3: FORGOT PASSWORD - ONE-CLICK SEND (button disappears, sent text appears) -->
       <div id="sa-step-forgot-request" style="display:none;">
-        <div style="background:rgba(245,158,11,0.08); border:1px solid rgba(245,158,11,0.25); border-radius:12px; padding:14px; margin-bottom:18px; text-align:center;">
-          <div style="font-size:26px; margin-bottom:4px;">🔑</div>
-          <div style="font-size:14px; font-weight:600; color:var(--sa-text); margin-bottom:3px;">Reset Super Admin Password</div>
-          <div style="font-size:12px; color:var(--sa-muted); line-height:1.4;">
-            Enter your Super Admin username or registered email to receive a 6-digit recovery code.
+        <div style="text-align:center; margin-bottom:22px;">
+          <div style="font-size:38px; margin-bottom:10px;">🔑</div>
+          <div style="font-size:15px; font-weight:700; color:var(--sa-text); margin-bottom:6px;">Reset Super Admin Password</div>
+          <div style="font-size:12px; color:var(--sa-muted); line-height:1.6;" id="sa-forgot-instruction">
+            Click the button below to receive a password reset link in your email.
           </div>
         </div>
 
-        <form onsubmit="saHandleSendForgotCode(event)">
-          <div class="sa-form-row">
-            <label class="sa-label">Username or Email</label>
-            <input type="text" id="sa-forgot-user" class="sa-input" placeholder="superadmin or email" required>
-          </div>
-          <button type="submit" id="sa-forgot-send-btn" class="sa-btn sa-btn-primary w-100" style="width:100%;justify-content:center;padding:13px;font-size:14px;margin-top:8px;">
-            <i class="bi bi-send-fill"></i> Send Recovery Code
-          </button>
-        </form>
+        <button type="button" id="sa-forgot-send-btn" onclick="saHandleSendForgotLink()" class="sa-btn sa-btn-primary w-100" style="width:100%;justify-content:center;padding:13px;font-size:14px;">
+          <i class="bi bi-envelope-arrow-up-fill"></i> Send Reset Link to My Email
+        </button>
 
-        <div style="margin-top:14px; text-align:center;">
-          <a href="#" onclick="saHideForgot(); return false;" style="font-size:12px; color:var(--sa-muted); text-decoration:none;">
+        <div id="sa-forgot-sent-msg" style="display:none; background:rgba(16,185,129,0.1); border:1px solid rgba(16,185,129,0.3); border-radius:12px; padding:18px; text-align:center; color:#10b981;">
+          <div style="font-size:30px; margin-bottom:8px;">📬</div>
+          <div style="font-size:15px; font-weight:700; margin-bottom:4px;">The email has been sent.</div>
+          <div style="font-size:12px; color:var(--sa-muted); line-height:1.5;">Please check your Gmail inbox or spam folder for the password reset link.</div>
+        </div>
+
+        <div style="margin-top:16px; text-align:center;">
+          <a href="#" onclick="saHideForgot(); return false;" style="font-size:12px; color:var(--sa-muted); text-decoration:none; display:inline-flex; align-items:center; gap:5px;">
             <i class="bi bi-arrow-left"></i> Back to Login
           </a>
         </div>
       </div>
 
-      <!-- STEP 4: FORGOT PASSWORD - VERIFY & RESET -->
-      <div id="sa-step-forgot-reset" style="display:none;">
-        <div style="background:rgba(245,158,11,0.08); border:1px solid rgba(245,158,11,0.25); border-radius:12px; padding:14px; margin-bottom:18px; text-align:center;">
-          <div style="font-size:26px; margin-bottom:4px;">📬</div>
-          <div style="font-size:14px; font-weight:600; color:var(--sa-text); margin-bottom:3px;">Enter Recovery Code</div>
-          <div style="font-size:12px; color:var(--sa-muted); line-height:1.4;">
-            Code sent to: <strong id="sa-forgot-email-display" style="color:var(--sa-accent); word-break:break-all;"></strong>
-          </div>
+      <!-- FULL-SCREEN RESET OVERLAY (triggered by ?reset_token= in URL) -->
+      <div id="sa-reset-overlay" style="display:none;">
+        <div style="text-align:center; margin-bottom:20px;">
+          <div style="font-size:36px; margin-bottom:10px;">🔒</div>
+          <div style="font-size:15px; font-weight:700; color:var(--sa-text); margin-bottom:4px;">Set New Password</div>
+          <div style="font-size:12px; color:var(--sa-muted);">Enter and confirm your new Super Admin password.</div>
         </div>
 
-        <form onsubmit="saHandleResetPassword(event)">
-          <div class="sa-form-row">
-            <label class="sa-label" style="text-align:center; display:block; font-size:12px;">Enter 6-Digit Code</label>
-            <input type="text" id="sa-forgot-code" class="sa-input" maxlength="6" placeholder="000000" required
-                   style="text-align:center; font-family:Consolas, Monaco, monospace; font-size:26px; font-weight:700; letter-spacing:8px; padding:12px; text-transform:uppercase;">
-          </div>
-
-          <div id="sa-forgot-dev-hint" style="display:none; margin-bottom:14px; font-size:11.5px; color:#10b981; background:rgba(16,185,129,0.1); border:1px solid rgba(16,185,129,0.25); border-radius:8px; padding:7px 10px; text-align:center;">
-            💡 Dev Mode Token: <code id="sa-forgot-dev-code" style="font-weight:700;"></code> (auto-filled)
-          </div>
-
+        <form onsubmit="saHandleResetViaLink(event)">
           <div class="sa-form-row">
             <label class="sa-label">New Password</label>
-            <input type="password" id="sa-forgot-new-pass" class="sa-input" placeholder="••••••••" required minlength="8">
-            <div style="font-size:11px; color:var(--sa-muted); margin-top:4px;">
-              Min. 8 characters with uppercase, lowercase, and number.
-            </div>
+            <input type="password" id="sa-reset-new-pass" class="sa-input" placeholder="••••••••" required minlength="8">
+            <div style="font-size:11px; color:var(--sa-muted); margin-top:4px;">Min. 8 characters with uppercase, lowercase, and number.</div>
           </div>
-
           <div class="sa-form-row">
             <label class="sa-label">Confirm New Password</label>
-            <input type="password" id="sa-forgot-confirm-pass" class="sa-input" placeholder="••••••••" required minlength="8">
+            <input type="password" id="sa-reset-confirm-pass" class="sa-input" placeholder="••••••••" required minlength="8">
           </div>
-
-          <button type="submit" id="sa-forgot-submit-btn" class="sa-btn sa-btn-primary w-100" style="width:100%;justify-content:center;padding:13px;font-size:14px;margin-top:6px;">
-            <i class="bi bi-shield-check"></i> Reset Password
+          <button type="submit" id="sa-reset-submit-btn" class="sa-btn sa-btn-primary w-100" style="width:100%;justify-content:center;padding:13px;font-size:14px;margin-top:6px;">
+            <i class="bi bi-shield-check"></i> Save New Password
           </button>
         </form>
 
-        <div style="display:flex; justify-content:space-between; align-items:center; margin-top:14px; font-size:12px;">
-          <button type="button" onclick="saHandleResendForgotCode()" id="sa-forgot-resend-btn" style="background:none; border:none; color:var(--sa-accent); cursor:pointer; padding:4px 0; font-size:12px; display:inline-flex; align-items:center; gap:4px;">
-            <i class="bi bi-arrow-clockwise"></i> Resend Code
-          </button>
-          <button type="button" onclick="saHideForgot()" style="background:none; border:none; color:var(--sa-muted); cursor:pointer; padding:4px 0; font-size:12px; display:inline-flex; align-items:center; gap:4px;">
-            <i class="bi bi-arrow-left"></i> Back to Login
-          </button>
+        <div style="margin-top:14px; text-align:center;">
+          <a href="superadmin-panel.php" style="font-size:12px; color:var(--sa-muted); text-decoration:none;">
+            <i class="bi bi-arrow-left"></i> Cancel & Back to Login
+          </a>
         </div>
       </div>
 
@@ -1659,13 +1699,64 @@
                 <label class="sa-label">Token Expiry (minutes)</label>
                 <input type="number" class="sa-input" id="setting-token_expiry_minutes" min="5" max="60">
               </div>
-              <div class="sa-form-row" style="grid-column: 1 / -1;">
-                <label class="sa-label">Void/Refund Notification Email(s)</label>
-                <input type="text" class="sa-input" id="setting-void_refund_manager_email" placeholder="manager1@example.com, manager2@example.com">
-                <div style="font-size:11px;color:#888;margin-top:4px;">Email addresses (comma-separated) to receive interactive Approve/Reject notifications when a cashier requests an order void or refund.</div>
-              </div>
             </div>
             <div style="margin-top:8px;">
+              <button class="sa-btn sa-btn-primary" onclick="saveSettings()">
+                <i class="bi bi-floppy-fill"></i> Save Store Settings
+              </button>
+            </div>
+          </div>
+
+          <!-- Multi-Admin Void & Refund Recipients Card -->
+          <div class="sa-card" style="margin-top:20px;">
+            <div style="display:flex;align-items:flex-start;justify-content:space-between;margin-bottom:16px;flex-wrap:wrap;gap:12px;">
+              <div>
+                <div class="sa-card-title" style="margin-bottom:4px;display:flex;align-items:center;gap:8px;">
+                  <i class="bi bi-shield-lock-fill" style="color:#ef4444;"></i> Void &amp; Refund Authorization &mdash; Admin Recipients
+                  <span id="sa-admin-count-badge" style="font-size:11px;font-weight:700;padding:2px 8px;border-radius:20px;background:rgba(239,68,68,0.15);color:#ef4444;">0 Admins</span>
+                </div>
+                <div style="font-size:12px;color:var(--sa-muted);max-width:680px;line-height:1.5;">
+                  Select which Administrators and Managers will receive 6-digit PIN codes and 1-click email authorization links whenever a cashier requests an order void or refund. All checked admins receive the email simultaneously.
+                </div>
+              </div>
+              <div style="display:flex;gap:8px;">
+                <button type="button" class="sa-btn sa-btn-ghost" style="font-size:11.5px;padding:6px 12px;" onclick="selectAllAdminRecipients(true)">
+                  <i class="bi bi-check-all"></i> Select All
+                </button>
+                <button type="button" class="sa-btn sa-btn-ghost" style="font-size:11.5px;padding:6px 12px;color:var(--sa-muted);" onclick="selectAllAdminRecipients(false)">
+                  ✕ Deselect All
+                </button>
+              </div>
+            </div>
+
+            <!-- Admin Recipient Cards Grid -->
+            <div style="margin-bottom:18px;">
+              <label class="sa-label" style="font-weight:700;color:var(--sa-text);margin-bottom:8px;">
+                <i class="bi bi-people-fill me-1" style="color:var(--sa-accent2);"></i> Registered Administrators &amp; Super Admins
+              </label>
+              <div id="sa-admin-recipients-list" style="display:grid;grid-template-columns:repeat(auto-fill, minmax(280px, 1fr));gap:12px;">
+                <div style="color:var(--sa-muted);font-size:12px;padding:16px;text-align:center;">Loading admin accounts...</div>
+              </div>
+            </div>
+
+            <!-- Live Active Recipients Pill Summary -->
+            <div style="background:var(--sa-surface);border:1px solid var(--sa-border);border-radius:12px;padding:14px 16px;margin-top:16px;">
+              <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;">
+                <span style="font-size:11px;font-weight:700;color:var(--sa-muted);text-transform:uppercase;letter-spacing:0.06em;">
+                  <i class="bi bi-send-check-fill me-1" style="color:#10b981;"></i> Active Authorization Recipients (<span id="sa-recipient-count">0</span>)
+                </span>
+                <span style="font-size:11px;font-weight:600;" id="sa-recipient-status-badge"></span>
+              </div>
+              <div id="sa-recipient-pills" style="display:flex;flex-wrap:wrap;gap:8px;">
+                <span style="color:var(--sa-muted);font-size:12px;">No administrators selected. Please check at least one administrator above.</span>
+              </div>
+            </div>
+
+            <!-- Hidden inputs maintaining exact settings compatibility -->
+            <input type="hidden" id="setting-void_refund_manager_email">
+            <input type="hidden" id="setting-void_refund_admin_ids">
+
+            <div style="margin-top:18px;">
               <button class="sa-btn sa-btn-primary" onclick="saveSettings()">
                 <i class="bi bi-floppy-fill"></i> Save Settings
               </button>
@@ -1912,13 +2003,14 @@
        API HELPER
     ============================================= */
     const BASE = 'api/';
-    async function saApi(endpoint, data = null) {
+    async function saApi(endpoint, data = null, method = null) {
+      const m = method || (data !== null ? 'POST' : 'GET');
       const opts = {
-        method: data ? 'POST' : 'GET',
+        method: m,
         headers: { 'Content-Type': 'application/json' },
         credentials: 'same-origin'
       };
-      if (data) opts.body = JSON.stringify(data);
+      if (m === 'POST' && data !== null) opts.body = JSON.stringify(data);
       const res  = await fetch(BASE + endpoint, opts);
       const text = await res.text();
       // Strip any PHP warnings/notices that may be prepended
@@ -2102,173 +2194,142 @@
     /* =============================================
        FORGOT PASSWORD (Super Admin)
     ============================================= */
-    let saForgotPendingUser = '';
+    // No stored pending user needed — we always target the superadmin email from settings
 
-    function saShowForgotStep1() {
-      document.getElementById('sa-step-credentials').style.display = 'none';
-      document.getElementById('sa-step-2fa').style.display = 'none';
-      document.getElementById('sa-step-forgot-reset').style.display = 'none';
-      document.getElementById('sa-step-forgot-request').style.display = 'block';
+    function saShowForgot() {
+      const cred = document.getElementById('sa-step-credentials');
+      const twoFa = document.getElementById('sa-step-2fa');
+      const req = document.getElementById('sa-step-forgot-request');
+      const overlay = document.getElementById('sa-reset-overlay');
+      if (cred) cred.style.display = 'none';
+      if (twoFa) twoFa.style.display = 'none';
+      if (overlay) overlay.style.display = 'none';
+      if (req) req.style.display = 'block';
+
+      // Reset button and sent message inside the forgot step
+      const btn = document.getElementById('sa-forgot-send-btn');
+      const sentMsg = document.getElementById('sa-forgot-sent-msg');
+      const instruction = document.getElementById('sa-forgot-instruction');
+      if (btn) {
+        btn.style.display = 'flex';
+        btn.disabled = false;
+        btn.innerHTML = '<i class="bi bi-envelope-arrow-up-fill"></i> Send Reset Link to My Email';
+      }
+      if (sentMsg) sentMsg.style.display = 'none';
+      if (instruction) instruction.style.display = 'block';
+
       const errEl = document.getElementById('sa-login-error');
       const succEl = document.getElementById('sa-login-success');
       if (errEl) errEl.style.display = 'none';
       if (succEl) succEl.style.display = 'none';
-      setTimeout(() => {
-        const inp = document.getElementById('sa-forgot-user');
-        if (inp) inp.focus();
-      }, 100);
     }
 
     function saHideForgot() {
-      document.getElementById('sa-step-forgot-request').style.display = 'none';
-      document.getElementById('sa-step-forgot-reset').style.display = 'none';
-      document.getElementById('sa-step-credentials').style.display = 'block';
+      const req = document.getElementById('sa-step-forgot-request');
+      const cred = document.getElementById('sa-step-credentials');
+      if (req) req.style.display = 'none';
+      if (cred) cred.style.display = 'block';
+
       const errEl = document.getElementById('sa-login-error');
       const succEl = document.getElementById('sa-login-success');
       if (errEl) errEl.style.display = 'none';
       if (succEl) succEl.style.display = 'none';
     }
 
-    async function saHandleSendForgotCode(e) {
-      e.preventDefault();
+    async function saHandleSendForgotLink() {
       const errEl = document.getElementById('sa-login-error');
-      const succEl = document.getElementById('sa-login-success');
-      errEl.style.display = 'none'; succEl.style.display = 'none';
-
-      const identifier = document.getElementById('sa-forgot-user').value.trim();
-      if (!identifier) {
-        errEl.textContent = 'Please enter your username or email.';
-        errEl.style.display = 'block';
-        return;
-      }
+      if (errEl) errEl.style.display = 'none';
 
       const btn = document.getElementById('sa-forgot-send-btn');
-      btn.disabled = true;
-      btn.innerHTML = '<span class="spinner-border spinner-border-sm me-1"></span> Sending code...';
+      const sentMsg = document.getElementById('sa-forgot-sent-msg');
+      const instruction = document.getElementById('sa-forgot-instruction');
+
+      if (btn) {
+        btn.disabled = true;
+        btn.innerHTML = '<span style="display:inline-block;width:14px;height:14px;border:2px solid #fff;border-top-color:transparent;border-radius:50%;animation:spin .7s linear infinite;vertical-align:middle;margin-right:6px;"></span> Sending reset link...';
+      }
 
       try {
-        const res = await saApi('auth.php?action=forgot_password', { identifier });
-        if (res.success) {
-          saForgotPendingUser = res.identifier || identifier;
-          document.getElementById('sa-forgot-email-display').textContent = res.masked_email || 'your email';
-          document.getElementById('sa-step-forgot-request').style.display = 'none';
-          document.getElementById('sa-step-forgot-reset').style.display = 'block';
-          document.getElementById('sa-forgot-code').value = '';
-          document.getElementById('sa-forgot-new-pass').value = '';
-          document.getElementById('sa-forgot-confirm-pass').value = '';
-          if (res.dev_code) {
-            document.getElementById('sa-forgot-dev-hint').style.display = 'block';
-            document.getElementById('sa-forgot-dev-code').textContent = res.dev_code;
-            document.getElementById('sa-forgot-code').value = res.dev_code;
-          } else {
-            document.getElementById('sa-forgot-dev-hint').style.display = 'none';
-          }
-          succEl.textContent = res.message;
-          succEl.style.display = 'block';
-          setTimeout(() => {
-            const inp = document.getElementById('sa-forgot-code');
-            if (inp) inp.focus();
-          }, 100);
+        const res = await saApi('superadmin.php?action=forgot_password', {});
+        if (res && res.success) {
+          // The button disappears!
+          if (btn) btn.style.display = 'none';
+          if (instruction) instruction.style.display = 'none';
+          // The text "The email has been sent" appears!
+          if (sentMsg) sentMsg.style.display = 'block';
         } else {
-          errEl.textContent = res.message || 'Could not send recovery code.';
+          if (btn) {
+            btn.disabled = false;
+            btn.innerHTML = '<i class="bi bi-envelope-arrow-up-fill"></i> Send Reset Link to My Email';
+          }
+          errEl.textContent = '⚠ ' + ((res && res.message) || 'Could not send reset link. Please try again.');
           errEl.style.display = 'block';
         }
       } catch (err) {
-        errEl.textContent = 'Connection error. Please try again.';
-        errEl.style.display = 'block';
-      } finally {
-        btn.disabled = false;
-        btn.innerHTML = '<i class="bi bi-send-fill"></i> Send Recovery Code';
-      }
-    }
-
-    async function saHandleResendForgotCode() {
-      const btn = document.getElementById('sa-forgot-resend-btn');
-      const errEl = document.getElementById('sa-login-error');
-      const succEl = document.getElementById('sa-login-success');
-      errEl.style.display = 'none'; succEl.style.display = 'none';
-      if (!saForgotPendingUser) {
-        saShowForgotStep1();
-        return;
-      }
-      btn.disabled = true;
-      btn.innerHTML = '<span class="spinner-border spinner-border-sm me-1"></span> Resending...';
-      try {
-        const res = await saApi('auth.php?action=forgot_password', { identifier: saForgotPendingUser });
-        if (res.success) {
-          succEl.textContent = res.message || 'Recovery code resent.';
-          succEl.style.display = 'block';
-          if (res.dev_code) {
-            document.getElementById('sa-forgot-dev-hint').style.display = 'block';
-            document.getElementById('sa-forgot-dev-code').textContent = res.dev_code;
-            document.getElementById('sa-forgot-code').value = res.dev_code;
-          }
-        } else {
-          errEl.textContent = res.message || 'Failed to resend code.';
-          errEl.style.display = 'block';
-        }
-      } catch (err) {
-        errEl.textContent = 'Server error. Please try again.';
-        errEl.style.display = 'block';
-      } finally {
-        setTimeout(() => {
+        if (btn) {
           btn.disabled = false;
-          btn.innerHTML = '<i class="bi bi-arrow-clockwise"></i> Resend Code';
-        }, 3000);
+          btn.innerHTML = '<i class="bi bi-envelope-arrow-up-fill"></i> Send Reset Link to My Email';
+        }
+        errEl.textContent = '⚠ Connection error. Please try again.';
+        errEl.style.display = 'block';
       }
     }
 
-    async function saHandleResetPassword(e) {
+    // Called when user opens the reset link from email (?reset_token=...)
+    async function saHandleResetViaLink(e) {
       e.preventDefault();
       const errEl = document.getElementById('sa-login-error');
       const succEl = document.getElementById('sa-login-success');
       errEl.style.display = 'none'; succEl.style.display = 'none';
 
-      const token = document.getElementById('sa-forgot-code').value.trim();
-      const newPass = document.getElementById('sa-forgot-new-pass').value.trim();
-      const confirmPass = document.getElementById('sa-forgot-confirm-pass').value.trim();
+      const newPass     = document.getElementById('sa-reset-new-pass').value.trim();
+      const confirmPass = document.getElementById('sa-reset-confirm-pass').value.trim();
 
-      if (!token) {
-        errEl.textContent = 'Please enter the 6-digit recovery code.';
-        errEl.style.display = 'block'; return;
-      }
       if (newPass !== confirmPass) {
-        errEl.textContent = 'Passwords do not match.';
+        errEl.textContent = '⚠ Passwords do not match.';
         errEl.style.display = 'block'; return;
       }
       const pwdErr = checkPasswordComplexity(newPass);
       if (pwdErr) {
-        errEl.textContent = pwdErr;
+        errEl.textContent = '⚠ ' + pwdErr;
         errEl.style.display = 'block'; return;
       }
 
-      const btn = document.getElementById('sa-forgot-submit-btn');
+      const urlParams = new URLSearchParams(window.location.search);
+      const token = urlParams.get('reset_token') || '';
+      if (!token) {
+        errEl.textContent = '⚠ Invalid or missing reset token. Please request a new link.';
+        errEl.style.display = 'block'; return;
+      }
+
+      const btn = document.getElementById('sa-reset-submit-btn');
       btn.disabled = true;
-      btn.innerHTML = '<span class="spinner-border spinner-border-sm me-1"></span> Updating password...';
+      btn.innerHTML = '<span style="display:inline-block;width:14px;height:14px;border:2px solid #fff;border-top-color:transparent;border-radius:50%;animation:spin .7s linear infinite;vertical-align:middle;margin-right:6px;"></span> Saving...';
 
       try {
-        const res = await saApi('auth.php?action=reset_password_code', {
-          identifier: saForgotPendingUser,
+        const res = await saApi('superadmin.php?action=reset_password_link', {
           token,
           new_password: newPass
         });
         if (res.success) {
-          saHideForgot();
-          succEl.textContent = '🎉 ' + (res.message || 'Password reset successful! You can now sign in.');
+          document.getElementById('sa-reset-overlay').style.display = 'none';
+          document.getElementById('sa-step-credentials').style.display = 'block';
+          succEl.textContent = '🎉 Password reset successfully! You can now sign in.';
           succEl.style.display = 'block';
+          document.getElementById('sa-login-user').value = 'superadmin';
           document.getElementById('sa-login-pass').value = '';
-          document.getElementById('sa-login-user').value = saForgotPendingUser;
-          saForgotPendingUser = '';
+          // Remove token from URL cleanly
+          history.replaceState({}, '', window.location.pathname);
         } else {
-          errEl.textContent = res.message || 'Could not reset password.';
+          errEl.textContent = '⚠ ' + (res.message || 'Could not reset password. The link may have expired.');
           errEl.style.display = 'block';
         }
       } catch (err) {
-        errEl.textContent = 'Connection error. Please try again.';
+        errEl.textContent = '⚠ Connection error. Please try again.';
         errEl.style.display = 'block';
       } finally {
         btn.disabled = false;
-        btn.innerHTML = '<i class="bi bi-shield-check"></i> Reset Password';
+        btn.innerHTML = '<i class="bi bi-shield-check"></i> Save New Password';
       }
     }
 
@@ -3813,22 +3874,230 @@
     }
 
     /* =============================================
-       SETTINGS
+       SETTINGS & MULTI-ADMIN VOID/REFUND RECIPIENTS
     ============================================= */
+    let _saAdminUsers = [];
+
+    function escapeHtml(str) {
+      if (str === null || str === undefined) return '';
+      return String(str)
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#39;');
+    }
+
     async function loadSettings() {
       try {
         const res = await saApi('superadmin.php?action=settings');
         if (!res.success) return;
 
+        _saAdminUsers = res.admins || [];
+
+        let voidRefundEmails = '';
+        let voidRefundAdminIds = '';
         res.settings.forEach(s => {
           const el = document.getElementById(`setting-${s.setting_key}`);
           if (el) el.value = s.setting_value;
+          if (s.setting_key === 'void_refund_manager_email') {
+            voidRefundEmails = s.setting_value || '';
+          }
+          if (s.setting_key === 'void_refund_admin_ids') {
+            voidRefundAdminIds = s.setting_value || '';
+          }
         });
-      } catch (e) { console.error(e); }
+
+        renderAdminRecipients(_saAdminUsers, voidRefundEmails, voidRefundAdminIds);
+      } catch (e) { console.error('Settings load failed:', e); }
+    }
+
+    function renderAdminRecipients(admins, configuredEmailsStr, configuredIdsStr) {
+      const container = document.getElementById('sa-admin-recipients-list');
+      if (!container) return;
+
+      const configuredEmails = (configuredEmailsStr || '')
+        .split(',')
+        .map(e => e.trim().toLowerCase())
+        .filter(Boolean);
+
+      const configuredIds = (configuredIdsStr || '')
+        .split(',')
+        .map(i => parseInt(i.trim()))
+        .filter(i => !isNaN(i) && i > 0);
+
+      const hasConfig = configuredEmails.length > 0 || configuredIds.length > 0;
+
+      const countBadge = document.getElementById('sa-admin-count-badge');
+      if (countBadge) {
+        countBadge.textContent = `${admins.length} Admin${admins.length === 1 ? '' : 's'}`;
+      }
+
+      if (!admins.length) {
+        container.innerHTML = `<div style="color:var(--sa-muted);font-size:12px;padding:12px;grid-column:1/-1;">No administrator accounts found. Create admin accounts in the Users tab.</div>`;
+        updateRecipientSummary();
+        return;
+      }
+
+      container.innerHTML = admins.map(adm => {
+        const email = (adm.email || '').trim();
+        const hasEmail = Boolean(email);
+        const isActive = parseInt(adm.is_active) === 1;
+        const admId = parseInt(adm.id);
+
+        // Inactive account in POS or missing email CANNOT be added to receive a token!
+        const canReceive = hasEmail && isActive;
+
+        let isChecked = false;
+        if (canReceive) {
+          if (hasConfig) {
+            isChecked = configuredIds.includes(admId) || configuredEmails.includes(email.toLowerCase());
+          } else {
+            isChecked = true; // default active admins with emails on first setup
+          }
+        }
+
+        const isSuper = adm.role === 'super_admin';
+        const roleLabel = isSuper ? 'Super Admin' : 'Admin';
+        const roleBg = isSuper ? 'rgba(245,158,11,0.15)' : 'rgba(124,58,237,0.15)';
+        const roleColor = isSuper ? '#f59e0b' : '#a855f7';
+        const initials = ((adm.full_name || adm.username || 'A').split(' ').map(n=>n[0]).join('').slice(0,2) || 'AD').toUpperCase();
+
+        return `
+          <div class="sa-admin-recipient-card ${isChecked ? 'selected' : ''} ${!canReceive ? 'inactive' : ''}" 
+               id="card-admin-${adm.id}" 
+               onclick="toggleAdminRecipient(${adm.id}, event)"
+               ${!canReceive ? `title="${!isActive ? 'Inactive in POS — cannot receive tokens' : 'No email set — cannot receive tokens'}"` : ''}>
+            <input type="checkbox" class="sa-admin-recipient-chk" 
+                   id="chk-admin-${adm.id}" 
+                   data-id="${adm.id}" 
+                   data-name="${escapeHtml(adm.full_name || adm.username)}" 
+                   data-role="${roleLabel}" 
+                   value="${escapeHtml(email)}" 
+                   ${isChecked ? 'checked' : ''} 
+                   ${!canReceive ? 'disabled' : ''} 
+                   onchange="onAdminCheckChanged(${adm.id})">
+            <div style="width:38px;height:38px;border-radius:10px;background:${roleBg};color:${roleColor};display:flex;align-items:center;justify-content:center;font-weight:800;font-size:13px;flex-shrink:0;">
+              ${initials}
+            </div>
+            <div style="flex:1;min-width:0;">
+              <div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap;">
+                <span style="font-size:13px;font-weight:700;color:#fff;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${escapeHtml(adm.full_name || adm.username)}</span>
+                <span style="font-size:9.5px;font-weight:700;padding:1px 6px;border-radius:6px;background:${roleBg};color:${roleColor};white-space:nowrap;">${roleLabel}</span>
+                ${!canReceive ? `<span style="font-size:9px;padding:1px 5px;border-radius:4px;background:rgba(239,68,68,0.15);color:#ef4444;">${!isActive ? 'Inactive in POS - cannot receive tokens' : 'No Email - cannot receive tokens'}</span>` : ''}
+              </div>
+              <div style="font-size:11.5px;color:${hasEmail ? 'var(--sa-muted)' : '#ef4444'};overflow:hidden;text-overflow:ellipsis;white-space:nowrap;margin-top:3px;">
+                ${hasEmail ? `<i class="bi bi-envelope me-1"></i>${escapeHtml(email)}` : '⚠ No email set in profile'}
+              </div>
+            </div>
+          </div>
+        `;
+      }).join('');
+
+      updateRecipientSummary();
+    }
+
+    function toggleAdminRecipient(id, event) {
+      if (event.target && event.target.tagName === 'INPUT') return;
+      const chk = document.getElementById(`chk-admin-${id}`);
+      if (chk && !chk.disabled) {
+        chk.checked = !chk.checked;
+        onAdminCheckChanged(id);
+      }
+    }
+
+    function onAdminCheckChanged(id) {
+      const chk = document.getElementById(`chk-admin-${id}`);
+      const card = document.getElementById(`card-admin-${id}`);
+      if (chk && card) {
+        if (chk.checked) card.classList.add('selected');
+        else card.classList.remove('selected');
+      }
+      updateRecipientSummary();
+    }
+
+    function selectAllAdminRecipients(select) {
+      const chks = document.querySelectorAll('.sa-admin-recipient-chk:not(:disabled)');
+      chks.forEach(c => {
+        c.checked = select;
+        const card = document.getElementById(`card-admin-${c.dataset.id}`);
+        if (card) {
+          if (select) card.classList.add('selected');
+          else card.classList.remove('selected');
+        }
+      });
+      updateRecipientSummary();
+    }
+
+    function updateRecipientSummary() {
+      const recipientList = [];
+      const recipientIds = [];
+      const recipientMap = new Map();
+
+      // Collect exclusively checked registered admins and super admin
+      const chks = document.querySelectorAll('.sa-admin-recipient-chk:checked:not(:disabled)');
+      chks.forEach(c => {
+        const email = c.value.trim().toLowerCase();
+        const admId = parseInt(c.dataset.id);
+        if (email && !recipientMap.has(email)) {
+          const item = {
+            id: admId,
+            email: email,
+            name: c.dataset.name,
+            role: c.dataset.role,
+            isSuper: c.dataset.role === 'Super Admin'
+          };
+          recipientMap.set(email, item);
+          recipientList.push(item);
+          if (admId) recipientIds.push(admId);
+        }
+      });
+
+      // Sync hidden setting inputs
+      const settingEmailInput = document.getElementById('setting-void_refund_manager_email');
+      if (settingEmailInput) {
+        settingEmailInput.value = recipientList.map(r => r.email).join(', ');
+      }
+      const settingIdInput = document.getElementById('setting-void_refund_admin_ids');
+      if (settingIdInput) {
+        settingIdInput.value = recipientIds.join(',');
+      }
+
+      // Update count & badge
+      const countEl = document.getElementById('sa-recipient-count');
+      if (countEl) countEl.textContent = recipientList.length;
+
+      const badgeEl = document.getElementById('sa-recipient-status-badge');
+      if (badgeEl) {
+        if (recipientList.length > 0) {
+          badgeEl.style.color = '#10b981';
+          badgeEl.textContent = '● Ready to Receive Tokens';
+        } else {
+          badgeEl.style.color = '#ef4444';
+          badgeEl.textContent = '⚠ No administrators selected';
+        }
+      }
+
+      // Render pills
+      const pillsContainer = document.getElementById('sa-recipient-pills');
+      if (pillsContainer) {
+        if (!recipientList.length) {
+          pillsContainer.innerHTML = `<span style="color:var(--sa-muted);font-size:12px;">No administrators selected. Please check at least one administrator above.</span>`;
+        } else {
+          pillsContainer.innerHTML = recipientList.map(r => `
+            <div class="sa-recipient-pill">
+              <i class="bi bi-shield-check" style="color:${r.isSuper ? '#f59e0b' : '#a855f7'};"></i>
+              <span>${escapeHtml(r.email)}</span>
+              <span class="pill-tag">${escapeHtml(r.name)} (${escapeHtml(r.role)})</span>
+            </div>
+          `).join('');
+        }
+      }
     }
 
     async function saveSettings() {
-      const keys   = ['store_name','owner_email','superadmin_email','token_expiry_minutes','void_refund_manager_email'];
+      updateRecipientSummary();
+      const keys   = ['store_name','owner_email','superadmin_email','token_expiry_minutes','void_refund_manager_email','void_refund_admin_ids'];
       const settings = {};
       keys.forEach(k => {
         const el = document.getElementById(`setting-${k}`);
@@ -3929,6 +4198,17 @@
        INIT — Check Existing Session
     ============================================= */
     window.addEventListener('DOMContentLoaded', () => {
+      // Check if this is a password reset link click (?reset_token=...)
+      const urlParams = new URLSearchParams(window.location.search);
+      const resetToken = urlParams.get('reset_token');
+      if (resetToken) {
+        // Show reset overlay, hide normal login steps
+        document.getElementById('sa-step-credentials').style.display = 'none';
+        document.getElementById('sa-reset-overlay').style.display = 'block';
+        document.getElementById('sa-reset-new-pass').focus();
+        return;
+      }
+
       saApi('auth.php?action=session').then(res => {
         if (res.success && res.loggedIn && res.user && res.user.role === 'super_admin') {
           saCurrentUser = res.user;
