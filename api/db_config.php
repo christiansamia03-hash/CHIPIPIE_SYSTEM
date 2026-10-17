@@ -232,6 +232,291 @@ function getSetting($key) {
     return $row ? $row['setting_value'] : null;
 }
 
+// =====================================================
+// RATE LIMITING SYSTEM
+// =====================================================
+
+/**
+ * Get client IP address reliably across proxies / Cloudflare / local network
+ */
+function getClientIP() {
+    $keys = [
+        'HTTP_CF_CONNECTING_IP',
+        'HTTP_X_FORWARDED_FOR',
+        'HTTP_X_REAL_IP',
+        'HTTP_CLIENT_IP',
+        'REMOTE_ADDR'
+    ];
+    foreach ($keys as $key) {
+        if (!empty($_SERVER[$key])) {
+            $ips = explode(',', $_SERVER[$key]);
+            $ip = trim($ips[0]);
+            if (filter_var($ip, FILTER_VALIDATE_IP)) {
+                return $ip;
+            }
+        }
+    }
+    return $_SERVER['REMOTE_ADDR'] ?? '127.0.0.1';
+}
+
+/**
+ * Ensure rate_limits table exists in database
+ */
+function ensureRateLimitTable() {
+    static $ensured = false;
+    if ($ensured) return;
+    try {
+        $db = getDB();
+        $db->exec("CREATE TABLE IF NOT EXISTS rate_limits (
+            id INT AUTO_INCREMENT PRIMARY KEY,
+            rate_key VARCHAR(128) NOT NULL,
+            action VARCHAR(64) NOT NULL,
+            identifier VARCHAR(64) NOT NULL,
+            hits INT NOT NULL DEFAULT 1,
+            lockout_count INT NOT NULL DEFAULT 0,
+            first_hit_at DATETIME NOT NULL,
+            last_hit_at DATETIME NOT NULL,
+            locked_until DATETIME DEFAULT NULL,
+            INDEX idx_rate_key (rate_key),
+            INDEX idx_action_id (action, identifier),
+            INDEX idx_locked_until (locked_until)
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci");
+
+        // Ensure lockout_count exists for upgrades
+        $cols = $db->query("SHOW COLUMNS FROM rate_limits LIKE 'lockout_count'")->fetchAll();
+        if (empty($cols)) {
+            $db->exec("ALTER TABLE rate_limits ADD COLUMN lockout_count INT NOT NULL DEFAULT 0 AFTER hits");
+        }
+        $ensured = true;
+    } catch (Exception $e) {
+        // Table might already exist or DB error
+    }
+}
+
+/**
+ * Check if rate limiting is enabled
+ */
+function isRateLimitEnabled() {
+    $val = getSetting('rate_limit_enabled');
+    return $val === null || $val === '1' || $val === 1 || $val === true || $val === 'true';
+}
+
+/**
+ * Clean up stale rate limit entries older than 24 hours (run opportunistically)
+ */
+function cleanupExpiredRateLimits() {
+    if (mt_rand(1, 40) === 1) {
+        try {
+            $db = getDB();
+            $db->exec("DELETE FROM rate_limits WHERE (locked_until IS NOT NULL AND locked_until < NOW() - INTERVAL 2 HOUR) OR (locked_until IS NULL AND last_hit_at < NOW() - INTERVAL 24 HOUR)");
+        } catch (Exception $e) {}
+    }
+}
+
+/**
+ * Check if an action + identifier has exceeded its rate limit without recording a hit
+ */
+function checkRateLimit($action, $identifier, $maxAttempts, $windowSeconds, $lockoutSeconds = 0) {
+    if (!isRateLimitEnabled()) {
+        return ['allowed' => true, 'remaining' => $maxAttempts, 'retry_after' => 0, 'locked' => false, 'hits' => 0, 'lockout_count' => 0];
+    }
+
+    ensureRateLimitTable();
+    cleanupExpiredRateLimits();
+    $db = getDB();
+    $rateKey = $action . ':' . strtolower(trim($identifier));
+
+    $stmt = $db->prepare("SELECT id, hits, lockout_count, first_hit_at, last_hit_at, locked_until FROM rate_limits WHERE rate_key = ? ORDER BY id DESC LIMIT 1");
+    $stmt->execute([$rateKey]);
+    $rec = $stmt->fetch();
+
+    if (!$rec) {
+        return ['allowed' => true, 'remaining' => $maxAttempts, 'retry_after' => 0, 'locked' => false, 'hits' => 0, 'lockout_count' => 0];
+    }
+
+    $now = time();
+    $lockoutCount = intval($rec['lockout_count'] ?? 0);
+
+    // 1. Check if currently locked
+    if (!empty($rec['locked_until'])) {
+        $lockedTime = strtotime($rec['locked_until']);
+        if ($lockedTime > $now) {
+            $retryAfter = $lockedTime - $now;
+            return [
+                'allowed'       => false,
+                'remaining'     => 0,
+                'retry_after'   => $retryAfter,
+                'locked'        => true,
+                'hits'          => intval($rec['hits']),
+                'lockout_count' => $lockoutCount,
+                'message'       => "Rate limit exceeded. Locked for {$retryAfter} seconds."
+            ];
+        }
+    }
+
+    // 2. Check rolling window
+    $firstHit = strtotime($rec['first_hit_at']);
+    $windowElapsed = $now - $firstHit;
+
+    if ($windowElapsed > $windowSeconds) {
+        // Window expired; allowed and will reset on next hit
+        return ['allowed' => true, 'remaining' => $maxAttempts, 'retry_after' => 0, 'locked' => false, 'hits' => 0, 'lockout_count' => $lockoutCount];
+    }
+
+    $hits = intval($rec['hits']);
+    if ($hits >= $maxAttempts) {
+        $retryAfter = $lockoutSeconds > 0 ? $lockoutSeconds : max(1, $windowSeconds - $windowElapsed);
+        return [
+            'allowed'       => false,
+            'remaining'     => 0,
+            'retry_after'   => $retryAfter,
+            'locked'        => true,
+            'hits'          => $hits,
+            'lockout_count' => $lockoutCount,
+            'message'       => "Rate limit reached. Please wait {$retryAfter} seconds."
+        ];
+    }
+
+    return [
+        'allowed'       => true,
+        'remaining'     => max(0, $maxAttempts - $hits),
+        'retry_after'   => 0,
+        'locked'        => false,
+        'hits'          => $hits,
+        'lockout_count' => $lockoutCount
+    ];
+}
+
+/**
+ * Record a hit against an action + identifier. Increments counter and sets lockout if limit is reached.
+ * Supports progressive lockout (3rd lockout triggers 20-minute extended lockout).
+ */
+function recordRateLimitHit($action, $identifier, $maxAttempts, $windowSeconds, $lockoutSeconds = 0, $enableProgressiveLockout = false) {
+    if (!isRateLimitEnabled()) {
+        return ['allowed' => true, 'remaining' => $maxAttempts, 'retry_after' => 0, 'locked' => false, 'just_locked' => false, 'hits' => 1, 'lockout_count' => 0, 'locked_until' => null];
+    }
+
+    ensureRateLimitTable();
+    $db = getDB();
+    $rateKey = $action . ':' . strtolower(trim($identifier));
+    $now = time();
+
+    $stmt = $db->prepare("SELECT id, hits, lockout_count, first_hit_at, locked_until FROM rate_limits WHERE rate_key = ? ORDER BY id DESC LIMIT 1");
+    $stmt->execute([$rateKey]);
+    $rec = $stmt->fetch();
+
+    $newHits = 1;
+    $prevLockoutCount = $rec ? intval($rec['lockout_count'] ?? 0) : 0;
+    $newLockoutCount = $prevLockoutCount;
+    $lockedUntil = null;
+    $justLocked = false;
+    $effectiveLockoutSecs = $lockoutSeconds > 0 ? $lockoutSeconds : $windowSeconds;
+
+    if ($rec) {
+        $firstHit = strtotime($rec['first_hit_at']);
+        $windowExpired = ($now - $firstHit) > $windowSeconds;
+
+        if ($windowExpired) {
+            // New window
+            $newHits = 1;
+            if ($newHits >= $maxAttempts && $lockoutSeconds > 0) {
+                $newLockoutCount++;
+                if ($enableProgressiveLockout && $newLockoutCount >= 3) {
+                    $effectiveLockoutSecs = 20 * 60; // 20 minutes
+                }
+                $lockedUntil = date('Y-m-d H:i:s', $now + $effectiveLockoutSecs);
+                $justLocked = true;
+            }
+            $db->prepare("UPDATE rate_limits SET hits = ?, lockout_count = ?, first_hit_at = NOW(), last_hit_at = NOW(), locked_until = ? WHERE id = ?")
+               ->execute([$newHits, $newLockoutCount, $lockedUntil, $rec['id']]);
+        } else {
+            // Continuing window
+            $newHits = intval($rec['hits']) + 1;
+            $wasAlreadyLocked = !empty($rec['locked_until']) && (strtotime($rec['locked_until']) > $now);
+
+            if ($newHits >= $maxAttempts && $lockoutSeconds > 0) {
+                if (!$wasAlreadyLocked) {
+                    $newLockoutCount++;
+                    $justLocked = true;
+                }
+                if ($enableProgressiveLockout && $newLockoutCount >= 3) {
+                    $effectiveLockoutSecs = 20 * 60; // 20 minutes
+                }
+                $lockedUntil = date('Y-m-d H:i:s', $now + $effectiveLockoutSecs);
+            }
+            $db->prepare("UPDATE rate_limits SET hits = ?, lockout_count = ?, last_hit_at = NOW(), locked_until = COALESCE(?, locked_until) WHERE id = ?")
+               ->execute([$newHits, $newLockoutCount, $lockedUntil, $rec['id']]);
+        }
+    } else {
+        if ($newHits >= $maxAttempts && $lockoutSeconds > 0) {
+            $newLockoutCount = 1;
+            if ($enableProgressiveLockout && $newLockoutCount >= 3) {
+                $effectiveLockoutSecs = 20 * 60;
+            }
+            $lockedUntil = date('Y-m-d H:i:s', $now + $effectiveLockoutSecs);
+            $justLocked = true;
+        }
+        $db->prepare("INSERT INTO rate_limits (rate_key, action, identifier, hits, lockout_count, first_hit_at, last_hit_at, locked_until) VALUES (?, ?, ?, ?, ?, NOW(), NOW(), ?)")
+           ->execute([$rateKey, $action, strtolower(trim($identifier)), $newHits, $newLockoutCount, $lockedUntil]);
+    }
+
+    $isLocked = ($newHits >= $maxAttempts);
+    $cooldown = $lockedUntil ? (strtotime($lockedUntil) - $now) : ($lockoutSeconds > 0 ? $lockoutSeconds : $windowSeconds);
+
+    return [
+        'allowed'       => !$isLocked,
+        'remaining'     => max(0, $maxAttempts - $newHits),
+        'retry_after'   => $isLocked ? max(1, $cooldown) : 0,
+        'locked'        => $isLocked,
+        'just_locked'   => $justLocked,
+        'hits'          => $newHits,
+        'lockout_count' => $newLockoutCount,
+        'locked_until'  => $lockedUntil
+    ];
+}
+
+/**
+ * Clear rate limit for an action + identifier (e.g. on successful login)
+ */
+function clearRateLimit($action, $identifier) {
+    try {
+        $db = getDB();
+        $rateKey = $action . ':' . strtolower(trim($identifier));
+        $db->prepare("DELETE FROM rate_limits WHERE rate_key = ?")->execute([$rateKey]);
+    } catch (Exception $e) {}
+}
+
+/**
+ * Enforce global API rate limit per client IP
+ */
+function enforceApiRateLimit() {
+    if (!isRateLimitEnabled() || defined('SKIP_RATE_LIMIT')) {
+        return;
+    }
+
+    $rpm = intval(getSetting('rate_limit_api_rpm') ?: 120);
+    if ($rpm <= 0) return; // 0 disables RPM limit
+
+    $ip = getClientIP();
+    $status = checkRateLimit('api_rpm', $ip, $rpm, 60, 60);
+
+    header('X-RateLimit-Limit: ' . $rpm);
+    header('X-RateLimit-Remaining: ' . max(0, $status['remaining']));
+
+    if (!$status['allowed']) {
+        header('Retry-After: ' . $status['retry_after']);
+        jsonResponse([
+            'success'      => false,
+            'rate_limited' => true,
+            'message'      => "Too many API requests. Please wait {$status['retry_after']}s before making more requests.",
+            'retry_after'  => $status['retry_after']
+        ], 429);
+    }
+
+    // Record hit for this IP
+    recordRateLimitHit('api_rpm', $ip, $rpm, 60, 60);
+}
+
 // Set CORS headers for API access
 header('Access-Control-Allow-Origin: *');
 header('Access-Control-Allow-Methods: GET, POST, OPTIONS');
@@ -240,4 +525,9 @@ header('Access-Control-Allow-Headers: Content-Type');
 if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS') {
     http_response_code(200);
     exit;
+}
+
+// Enforce global API rate limit on incoming web requests
+if (php_sapi_name() !== 'cli' && isset($_SERVER['REQUEST_URI'])) {
+    enforceApiRateLimit();
 }

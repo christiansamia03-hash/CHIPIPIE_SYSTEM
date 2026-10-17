@@ -1166,6 +1166,9 @@
 
         <!-- ── DASHBOARD VIEW ── -->
         <div id="sa-view-dashboard" class="sa-view active">
+          <!-- Active Security Alert Banner -->
+          <div id="dashboard-security-alert" style="display:none;margin-bottom:20px;"></div>
+
           <div class="kpi-grid" id="sa-kpi-grid">
             <div class="kpi-tile kc-purple">
               <div class="kt-icon"><i class="bi bi-people-fill"></i></div>
@@ -1797,6 +1800,88 @@
               </button>
             </div>
             <div id="sa-pm-key-status" style="display:none;margin-top:10px;font-size:12px;border-radius:8px;padding:8px 12px;"></div>
+          </div>
+
+          <!-- Rate Limiting & Security Protection Card -->
+          <div class="sa-card" style="margin-top:20px;">
+            <div style="display:flex;align-items:flex-start;justify-content:space-between;margin-bottom:16px;flex-wrap:wrap;gap:12px;">
+              <div>
+                <div class="sa-card-title" style="margin-bottom:4px;display:flex;align-items:center;gap:8px;">
+                  <i class="bi bi-shield-lock-fill" style="color:#f59e0b;"></i> Rate Limiting &amp; Brute-Force Protection
+                  <span id="sa-rate-limit-badge" style="font-size:11px;font-weight:700;padding:2px 8px;border-radius:20px;background:rgba(16,185,129,0.15);color:#10b981;">Active Protection</span>
+                </div>
+                <div style="font-size:12px;color:var(--sa-muted);max-width:680px;line-height:1.5;">
+                  Safeguards the POS against brute-force password guessing, 2FA code enumeration, email flooding, and DoS request spikes.
+                </div>
+              </div>
+              <div style="display:flex;gap:8px;">
+                <button type="button" class="sa-btn sa-btn-ghost" style="font-size:11.5px;padding:6px 12px;color:#ef4444;" onclick="resetAllRateLimits()">
+                  <i class="bi bi-unlock-fill"></i> Clear All Active Lockouts
+                </button>
+                <button type="button" class="sa-btn sa-btn-ghost" style="font-size:11.5px;padding:6px 12px;" onclick="loadRateLimitsTable()">
+                  <i class="bi bi-arrow-clockwise"></i> Refresh Status
+                </button>
+              </div>
+            </div>
+
+            <div class="settings-grid" style="margin-bottom:16px;">
+              <div class="sa-form-row">
+                <label class="sa-label">Rate Limiting System</label>
+                <select class="sa-select" id="setting-rate_limit_enabled">
+                  <option value="1">Enabled (Recommended)</option>
+                  <option value="0">Disabled</option>
+                </select>
+                <div style="font-size:11px;color:var(--sa-muted);margin-top:4px;">Master switch for all API &amp; authentication rate limits.</div>
+              </div>
+              <div class="sa-form-row">
+                <label class="sa-label">Max Failed Login Attempts</label>
+                <input type="number" class="sa-input" id="setting-rate_limit_login_attempts" min="3" max="20" placeholder="5">
+                <div style="font-size:11px;color:var(--sa-muted);margin-top:4px;">Number of bad passwords before account/IP temporary lock.</div>
+              </div>
+              <div class="sa-form-row">
+                <label class="sa-label">Lockout Duration (Minutes)</label>
+                <input type="number" class="sa-input" id="setting-rate_limit_lockout_minutes" min="1" max="120" placeholder="5">
+                <div style="font-size:11px;color:var(--sa-muted);margin-top:4px;">How long the user/IP is locked out after exceeding limit.</div>
+              </div>
+              <div class="sa-form-row">
+                <label class="sa-label">API Rate Limit (Requests/Min)</label>
+                <input type="number" class="sa-input" id="setting-rate_limit_api_rpm" min="30" max="600" placeholder="120">
+                <div style="font-size:11px;color:var(--sa-muted);margin-top:4px;">Maximum requests per minute per IP across API endpoints.</div>
+              </div>
+              <div class="sa-form-row">
+                <label class="sa-label">Email &amp; 2FA Throttle (Per 10 Mins)</label>
+                <input type="number" class="sa-input" id="setting-rate_limit_email_throttle" min="1" max="10" placeholder="3">
+                <div style="font-size:11px;color:var(--sa-muted);margin-top:4px;">Limits 2FA resends &amp; reset password requests to prevent spam.</div>
+              </div>
+            </div>
+
+            <div style="display:flex;align-items:center;justify-content:space-between;margin-top:8px;margin-bottom:16px;">
+              <button class="sa-btn sa-btn-primary" onclick="saveSettings()">
+                <i class="bi bi-floppy-fill"></i> Save Rate Limit Settings
+              </button>
+            </div>
+
+            <!-- Active Rate Limits / Lockouts Monitor -->
+            <div style="background:var(--sa-surface);border:1px solid var(--sa-border);border-radius:12px;padding:14px 16px;margin-top:14px;">
+              <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;">
+                <span style="font-size:11px;font-weight:700;color:var(--sa-muted);text-transform:uppercase;letter-spacing:0.06em;">
+                  <i class="bi bi-activity me-1" style="color:var(--sa-accent2);"></i> Active Throttled Identifiers &amp; Lockouts
+                </span>
+                <span id="sa-active-lockout-count" style="font-size:11px;color:var(--sa-muted);">Loading active records...</span>
+              </div>
+              <div class="sa-table-wrap" style="max-height:220px;overflow-y:auto;">
+                <table class="sa-table" style="font-size:12px;">
+                  <thead>
+                    <tr>
+                      <th>Action</th><th>Identifier</th><th>Hits</th><th>First Hit</th><th>Status / Lockout</th><th>Action</th>
+                    </tr>
+                  </thead>
+                  <tbody id="sa-rate-limits-tbody">
+                    <tr><td colspan="6" class="text-center" style="padding:16px;color:var(--sa-muted);">No active rate limits recorded.</td></tr>
+                  </tbody>
+                </table>
+              </div>
+            </div>
           </div>
         </div>
 
@@ -2437,6 +2522,45 @@
           logEl.innerHTML = '<div class="sa-empty"><i class="bi bi-journal"></i><p>No activity yet</p></div>';
         }
 
+        // Live Security Alert Banner
+        const alertEl = document.getElementById('dashboard-security-alert');
+        if (alertEl) {
+          if (res.security_alerts && res.security_alerts.length > 0) {
+            alertEl.style.display = 'block';
+            alertEl.innerHTML = res.security_alerts.map(a => {
+              const lockMins = Math.max(1, Math.ceil((new Date(a.locked_until) - new Date()) / 60000));
+              const lockCount = a.lockout_count || 1;
+              return `
+                <div style="background:linear-gradient(135deg,rgba(239,68,68,0.18),rgba(153,27,27,0.28));border:1.5px solid rgba(239,68,68,0.45);border-radius:14px;padding:16px 20px;display:flex;align-items:center;justify-content:space-between;gap:16px;box-shadow:0 4px 20px rgba(239,68,68,0.15);margin-bottom:12px;">
+                  <div style="display:flex;align-items:center;gap:14px;">
+                    <div style="width:42px;height:42px;border-radius:12px;background:#ef4444;color:#fff;display:flex;align-items:center;justify-content:center;font-size:20px;flex-shrink:0;box-shadow:0 4px 12px rgba(239,68,68,0.4);">
+                      <i class="bi bi-shield-slash-fill"></i>
+                    </div>
+                    <div>
+                      <div style="font-weight:700;font-size:14px;color:#fff;display:flex;align-items:center;gap:8px;">
+                        <span>Security Alert: Account Locked</span>
+                        <span style="font-size:10px;padding:2px 8px;border-radius:12px;background:#ef4444;color:#fff;font-weight:800;letter-spacing:0.5px;">LOCKOUT #${escapeHtml(lockCount)}</span>
+                      </div>
+                      <div style="font-size:12.5px;color:#fca5a5;margin-top:2px;">
+                        User <strong>${escapeHtml(a.identifier)}</strong> is locked for <strong>${lockMins} more minute(s)</strong> due to multiple failed sign-in attempts.
+                      </div>
+                    </div>
+                  </div>
+                  <div style="display:flex;gap:8px;flex-shrink:0;">
+                    <button class="sa-btn sa-btn-danger" style="padding:7px 14px;font-size:12px;" onclick="resetRateLimitKey('${escapeHtml(a.rate_key)}')">
+                      <i class="bi bi-unlock-fill"></i> Unlock Account
+                    </button>
+                    <button class="sa-btn sa-btn-ghost" style="padding:7px 14px;font-size:12px;" onclick="saShowView('settings', document.getElementById('nav-btn-settings'))">
+                      View Rate Limits
+                    </button>
+                  </div>
+                </div>`;
+            }).join('');
+          } else {
+            alertEl.style.display = 'none';
+          }
+        }
+
         // Pending summary
         const pendEl = document.getElementById('dashboard-pending');
         if (pendingTotal === 0) {
@@ -2527,6 +2651,8 @@
         save_system_settings:       { icon: 'bi-gear-fill',          color: 'rgba(109,40,217,0.15)', iconColor: '#a855f7' },
         superadmin_login:           { icon: 'bi-shield-check',       color: 'rgba(16,185,129,0.15)', iconColor: '#10b981' },
         admin_login:                { icon: 'bi-shield-lock-fill',   color: 'rgba(5,150,105,0.15)',  iconColor: '#059669' },
+        account_lockout:            { icon: 'bi-shield-slash-fill',  color: 'rgba(239,68,68,0.2)',   iconColor: '#ef4444' },
+        security_warning:           { icon: 'bi-exclamation-triangle-fill', color: 'rgba(245,158,11,0.2)', iconColor: '#f59e0b' },
       };
       const style = icons[log.action] || { icon: 'bi-activity', color: 'rgba(100,116,139,0.15)', iconColor: '#64748b' };
       const time  = new Date(log.created_at).toLocaleString('en-PH', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' });
@@ -3546,6 +3672,7 @@
       submit_request:             { label: 'Submit Request',      color: '#6366f1', icon: 'bi-send-fill' },
       superadmin_login:           { label: 'Super Admin Login',   color: '#10b981', icon: 'bi-shield-check' },
       admin_login:                { label: 'Admin Login (2FA)',   color: '#059669', icon: 'bi-shield-lock-fill' },
+      account_lockout:            { label: 'Account Locked',      color: '#ef4444', icon: 'bi-shield-slash-fill' },
     };
 
     function getISOWeekString(date) {
@@ -3909,6 +4036,7 @@
         });
 
         renderAdminRecipients(_saAdminUsers, voidRefundEmails, voidRefundAdminIds);
+        loadRateLimitsTable();
       } catch (e) { console.error('Settings load failed:', e); }
     }
 
@@ -4097,7 +4225,19 @@
 
     async function saveSettings() {
       updateRecipientSummary();
-      const keys   = ['store_name','owner_email','superadmin_email','token_expiry_minutes','void_refund_manager_email','void_refund_admin_ids'];
+      const keys   = [
+        'store_name',
+        'owner_email',
+        'superadmin_email',
+        'token_expiry_minutes',
+        'void_refund_manager_email',
+        'void_refund_admin_ids',
+        'rate_limit_enabled',
+        'rate_limit_login_attempts',
+        'rate_limit_lockout_minutes',
+        'rate_limit_api_rpm',
+        'rate_limit_email_throttle'
+      ];
       const settings = {};
       keys.forEach(k => {
         const el = document.getElementById(`setting-${k}`);
@@ -4106,6 +4246,80 @@
 
       const res = await saApi('superadmin.php?action=save_settings', { settings });
       saToast(res.message, res.success ? 'success' : 'error');
+      loadRateLimitsTable();
+    }
+
+    async function loadRateLimitsTable() {
+      const tbody = document.getElementById('sa-rate-limits-tbody');
+      const countEl = document.getElementById('sa-active-lockout-count');
+      const badge = document.getElementById('sa-rate-limit-badge');
+      if (!tbody) return;
+
+      try {
+        const res = await saApi('superadmin.php?action=rate_limits');
+        if (!res.success) return;
+
+        const list = res.rate_limits || [];
+        const activeLockouts = list.filter(r => parseInt(r.is_locked) === 1);
+
+        if (countEl) {
+          countEl.innerHTML = `<strong>${activeLockouts.length}</strong> active lockout(s) &bull; <strong>${list.length}</strong> tracked record(s)`;
+        }
+
+        const enabled = document.getElementById('setting-rate_limit_enabled')?.value !== '0';
+        if (badge) {
+          if (enabled) {
+            badge.style.background = 'rgba(16,185,129,0.15)';
+            badge.style.color = '#10b981';
+            badge.textContent = 'Active Protection';
+          } else {
+            badge.style.background = 'rgba(239,68,68,0.15)';
+            badge.style.color = '#ef4444';
+            badge.textContent = 'Protection Disabled';
+          }
+        }
+
+        if (!list.length) {
+          tbody.innerHTML = '<tr><td colspan="6" class="text-center" style="padding:16px;color:var(--sa-muted);">No rate limit records found. System running smoothly.</td></tr>';
+          return;
+        }
+
+        tbody.innerHTML = list.map(r => {
+          const isLocked = parseInt(r.is_locked) === 1;
+          const statusPill = isLocked 
+            ? `<span style="display:inline-block;padding:2px 8px;border-radius:12px;background:rgba(239,68,68,0.15);color:#ef4444;font-weight:700;font-size:11px;">🔒 Locked until ${new Date(r.locked_until).toLocaleTimeString()}</span>`
+            : `<span style="display:inline-block;padding:2px 8px;border-radius:12px;background:rgba(16,185,129,0.15);color:#10b981;font-weight:600;font-size:11px;">● Active (${r.hits} hits)</span>`;
+
+          return `<tr>
+            <td><code>${escapeHtml(r.action)}</code></td>
+            <td><strong>${escapeHtml(r.identifier)}</strong></td>
+            <td>${escapeHtml(r.hits)}</td>
+            <td style="color:var(--sa-muted);">${new Date(r.first_hit_at).toLocaleTimeString()}</td>
+            <td>${statusPill}</td>
+            <td>
+              <button class="sa-btn sa-btn-ghost" style="padding:3px 8px;font-size:11px;" onclick="resetRateLimitKey('${escapeHtml(r.rate_key)}')">
+                <i class="bi bi-unlock"></i> Clear
+              </button>
+            </td>
+          </tr>`;
+        }).join('');
+      } catch (e) {
+        console.error('Failed to load rate limits:', e);
+      }
+    }
+
+    async function resetRateLimitKey(key) {
+      if (!confirm(`Clear rate limit record for "${key}"?`)) return;
+      const res = await saApi('superadmin.php?action=reset_rate_limits', { rate_key: key });
+      saToast(res.message, res.success ? 'success' : 'error');
+      loadRateLimitsTable();
+    }
+
+    async function resetAllRateLimits() {
+      if (!confirm('Are you sure you want to clear all rate limits and active lockouts?')) return;
+      const res = await saApi('superadmin.php?action=reset_rate_limits', {});
+      saToast(res.message, res.success ? 'success' : 'error');
+      loadRateLimitsTable();
     }
 
     async function saveSAPaymongoKey() {

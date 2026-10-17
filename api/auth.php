@@ -76,22 +76,104 @@ function handleLogin() {
         jsonResponse(['success' => false, 'message' => 'Username and password are required.'], 400);
     }
 
+    // Rate Limiting Checks
+    $maxAttempts    = intval(getSetting('rate_limit_login_attempts') ?: 5);
+    $lockoutMinutes = intval(getSetting('rate_limit_lockout_minutes') ?: 5);
+    $lockoutSeconds = $lockoutMinutes * 60;
+    $windowSeconds  = $lockoutMinutes * 60;
+    $ip             = getClientIP();
+    $userKey        = strtolower($username);
+
+    // Check IP lockout (allow 3x max attempts per IP to accommodate multiple cashiers/terminals behind the same NAT router)
+    $ipCheck = checkRateLimit('login_ip', $ip, $maxAttempts * 3, $windowSeconds, $lockoutSeconds);
+    if (!$ipCheck['allowed']) {
+        $mins = ceil($ipCheck['retry_after'] / 60);
+        jsonResponse([
+            'success'      => false,
+            'rate_limited' => true,
+            'retry_after'  => $ipCheck['retry_after'],
+            'message'      => "Too many failed login attempts from this network. Temporarily locked for {$mins} minute" . ($mins > 1 ? 's' : '') . "."
+        ], 429);
+    }
+
     $db = getDB();
     $stmt = $db->prepare("SELECT id, username, password, full_name, email, role, is_active FROM users WHERE username = ?");
     $stmt->execute([$username]);
     $user = $stmt->fetch();
 
+    // 1. If username is NOT registered in the system:
+    // Do NOT add it to the user history or rate_limits table.
     if (!$user) {
+        recordRateLimitHit('login_ip', $ip, $maxAttempts * 3, $windowSeconds, $lockoutSeconds, false);
         jsonResponse(['success' => false, 'message' => 'Invalid credentials.'], 401);
+    }
+
+    // 2. If username IS registered: Check if this user account is currently locked out
+    $userCheck = checkRateLimit('login_user', $user['username'], $maxAttempts, $windowSeconds, $lockoutSeconds);
+    if (!$userCheck['allowed']) {
+        $mins = ceil($userCheck['retry_after'] / 60);
+        $cnt = $userCheck['lockout_count'] ?: 1;
+        jsonResponse([
+            'success'       => false,
+            'rate_limited'  => true,
+            'retry_after'   => $userCheck['retry_after'],
+            'lockout_count' => $cnt,
+            'message'       => "Account is temporarily locked due to multiple failed login attempts. Please try again in {$mins} minutes." . ($cnt >= 3 ? " (Extended 20-minute security lockout applied)" : "")
+        ], 429);
     }
 
     if (!$user['is_active']) {
         jsonResponse(['success' => false, 'message' => 'Account is deactivated. Contact admin.'], 403);
     }
 
+    // 3. Verify password
     if (!password_verify($password, $user['password'])) {
-        jsonResponse(['success' => false, 'message' => 'Invalid credentials.'], 401);
+        // Record failed attempt with progressive lockout enabled (3rd lockout = 20 mins)
+        $uRec = recordRateLimitHit('login_user', $user['username'], $maxAttempts, $windowSeconds, $lockoutSeconds, true);
+        $iRec = recordRateLimitHit('login_ip', $ip, $maxAttempts * 3, $windowSeconds, $lockoutSeconds, false);
+
+        $lockCount = $uRec['lockout_count'];
+        $lockSecs  = $uRec['retry_after'];
+        $lockMins  = ceil($lockSecs / 60);
+
+        if ($uRec['just_locked']) {
+            // First lockout: Send security email notification to user's registered email
+            if ($lockCount === 1 && !empty($user['email'])) {
+                sendUserLockoutNotification($user, $ip, $lockMins);
+            }
+
+            // Send notification to Super Admin via email
+            sendSuperAdminLockoutNotification($user, $ip, $lockCount, $lockMins);
+
+            // Log security warning in system audit log
+            $logDetail = "Security Warning: Account '{$user['username']}' locked for {$lockMins}m (Lockout #{$lockCount}) after {$maxAttempts} failed login attempts from IP: {$ip}";
+            try {
+                $db->prepare("INSERT INTO system_logs (actor_id, actor_username, action, target_type, target_id, details, ip_address) VALUES (NULL, ?, 'account_lockout', 'user', ?, ?, ?)")
+                   ->execute([$user['username'], $user['id'], $logDetail, $ip]);
+            } catch (Exception $e) {}
+
+            // Create warning in system requests for Super Admin review
+            createSecurityWarningRequest($user, $ip, $lockCount, $lockMins);
+        }
+
+        if (!$uRec['allowed']) {
+            jsonResponse([
+                'success'       => false,
+                'rate_limited'  => true,
+                'retry_after'   => $lockSecs,
+                'lockout_count' => $lockCount,
+                'message'       => "Account temporarily locked for {$lockMins} minutes due to multiple failed login attempts." . ($lockCount >= 3 ? " (Extended 20-minute security lockout applied)" : "")
+            ], 429);
+        }
+
+        $rem = $uRec['remaining'];
+        $remMsg = $rem > 0 ? " ({$rem} attempt" . ($rem === 1 ? '' : 's') . " remaining)" : "";
+        jsonResponse(['success' => false, 'message' => "Invalid credentials.{$remMsg}"], 401);
     }
+
+    // Clear rate limit counters upon successful authentication
+    clearRateLimit('login_user', $user['username']);
+    clearRateLimit('login_ip', $ip);
 
     // Two-Factor Authentication (2FA) for Super Admin
     if ($user['role'] === 'super_admin') {
@@ -862,6 +944,20 @@ function handleVerify2FA() {
     $db = getDB();
     $now = date('Y-m-d H:i:s');
     $purpose = ($pending['role'] === 'super_admin' ? 'superadmin_2fa' : 'admin_2fa');
+    $userId  = $pending['user_id'];
+
+    // Check 2FA verification rate limit
+    $twoFaCheck = checkRateLimit('verify_2fa', $userId, 5, 300, 300);
+    if (!$twoFaCheck['allowed']) {
+        unset($_SESSION['pending_2fa']);
+        $mins = ceil($twoFaCheck['retry_after'] / 60);
+        jsonResponse([
+            'success'      => false,
+            'rate_limited' => true,
+            'retry_after'  => $twoFaCheck['retry_after'],
+            'message'      => "Too many failed verification attempts. Temporarily locked for {$mins} minute" . ($mins > 1 ? 's' : '') . ". Please sign in again later."
+        ], 429);
+    }
 
     // Check token in DB or session
     $stmt = $db->prepare("SELECT id FROM admin_tokens WHERE token = ? AND user_id = ? AND purpose = ? AND is_used = 0 AND expires_at > ? LIMIT 1");
@@ -872,9 +968,22 @@ function handleVerify2FA() {
 
     if (!$codeMatches) {
         $_SESSION['pending_2fa']['attempts'] = ($pending['attempts'] + 1);
-        $remaining = 5 - $_SESSION['pending_2fa']['attempts'];
+        $hit = recordRateLimitHit('verify_2fa', $userId, 5, 300, 300);
+        if (!$hit['allowed']) {
+            unset($_SESSION['pending_2fa']);
+            jsonResponse([
+                'success'      => false,
+                'rate_limited' => true,
+                'retry_after'  => 300,
+                'message'      => 'Too many invalid 2FA attempts. Temporarily locked for 5 minutes. Please sign in again later.'
+            ], 429);
+        }
+        $remaining = max(0, 5 - $_SESSION['pending_2fa']['attempts']);
         jsonResponse(['success' => false, 'message' => "Invalid verification code. ($remaining attempts remaining)"], 400);
     }
+
+    // Clear 2FA rate limit on successful verification
+    clearRateLimit('verify_2fa', $userId);
 
     // Mark token as used in DB
     if ($tokenRow) {
@@ -926,6 +1035,20 @@ function handleResend2FA() {
     if (!isset($_SESSION['pending_2fa'])) {
         jsonResponse(['success' => false, 'message' => 'No pending 2FA login session found. Please sign in again.'], 400);
     }
+
+    $emailThrottle = intval(getSetting('rate_limit_email_throttle') ?: 3);
+    $ip = getClientIP();
+    $throttleCheck = checkRateLimit('email_resend_2fa', $ip, $emailThrottle, 600, 600);
+    if (!$throttleCheck['allowed']) {
+        $mins = ceil($throttleCheck['retry_after'] / 60);
+        jsonResponse([
+            'success'      => false,
+            'rate_limited' => true,
+            'retry_after'  => $throttleCheck['retry_after'],
+            'message'      => "Too many verification code requests. Please wait {$mins} minute" . ($mins > 1 ? 's' : '') . " before requesting another code."
+        ], 429);
+    }
+    recordRateLimitHit('email_resend_2fa', $ip, $emailThrottle, 600, 600);
 
     $pending = $_SESSION['pending_2fa'];
     $db = getDB();
@@ -1053,6 +1176,21 @@ function handleForgotPassword() {
     if (!$identity) {
         jsonResponse(['success' => false, 'message' => 'Please enter your username or email address.'], 400);
     }
+
+    // Rate limit password reset requests per IP
+    $emailThrottle = intval(getSetting('rate_limit_email_throttle') ?: 3);
+    $ip = getClientIP();
+    $forgotCheck = checkRateLimit('email_forgot', $ip, $emailThrottle, 600, 600);
+    if (!$forgotCheck['allowed']) {
+        $mins = ceil($forgotCheck['retry_after'] / 60);
+        jsonResponse([
+            'success'      => false,
+            'rate_limited' => true,
+            'retry_after'  => $forgotCheck['retry_after'],
+            'message'      => "Too many password reset requests. Please wait {$mins} minute" . ($mins > 1 ? 's' : '') . " before trying again."
+        ], 429);
+    }
+    recordRateLimitHit('email_forgot', $ip, $emailThrottle, 600, 600);
 
     $genericSuccess = [
         'success' => true,
@@ -1222,5 +1360,113 @@ function handleResetPasswordCode() {
     unset($_SESSION['pending_pwd_reset']);
 
     jsonResponse(['success' => true, 'message' => 'Password has been successfully reset! You can now log in with your new password.']);
+}
+
+// =====================================================
+// SECURITY LOCKOUT NOTIFICATIONS & WARNINGS
+// =====================================================
+
+/**
+ * Send security email notice to the user's Gmail/email upon account lockout
+ */
+function sendUserLockoutNotification($user, $ip, $lockMins) {
+    if (empty($user['email']) || !filter_var($user['email'], FILTER_VALIDATE_EMAIL)) return;
+
+    $storeName = getSetting('store_name') ?: 'ChipiPie Cafe';
+    $subject   = "$storeName — Security Notice: Unauthorized Sign-In Attempts Detected";
+    $timeStr   = date('F j, Y, g:i A');
+
+    $body = "
+    <div style='font-family: Segoe UI, -apple-system, BlinkMacSystemFont, Roboto, sans-serif; max-width: 520px; margin: 0 auto; padding: 30px; background: #faf9f7; border-radius: 16px; border: 1px solid #ede8e1;'>
+        <div style='text-align: center; margin-bottom: 24px;'>
+            <div style='display: inline-block; width: 56px; height: 56px; background: #991b1b; color: #ffffff; border-radius: 14px; line-height: 56px; font-size: 26px; box-shadow: 0 4px 12px rgba(153,27,27,0.25);'>⚠️</div>
+            <h2 style='color: #26221f; margin: 12px 0 4px; font-size: 22px; font-weight: 700;'>$storeName</h2>
+            <p style='color: #b91c1c; font-size: 13px; margin: 0; text-transform: uppercase; letter-spacing: 1px; font-weight: 700;'>Security Notice — Account Temporarily Locked</p>
+        </div>
+        <div style='background: #ffffff; border-radius: 14px; padding: 26px; border: 1px solid #e7e2da; box-shadow: 0 2px 8px rgba(0,0,0,0.04);'>
+            <p style='color: #292524; font-size: 15px; margin-top: 0;'>Hello <strong>" . htmlspecialchars($user['full_name']) . "</strong>,</p>
+            <p style='color: #57534e; font-size: 14px; line-height: 1.5;'>We detected repeated failed sign-in attempts on your ChipiPie POS account (<code>" . htmlspecialchars($user['username']) . "</code>) using incorrect passwords.</p>
+            <p style='color: #57534e; font-size: 14px; line-height: 1.5;'>To protect your account from unauthorized access, it has been temporarily locked for <strong>$lockMins minutes</strong>.</p>
+            
+            <div style='background: #fef2f2; border: 1px solid #fee2e2; border-radius: 10px; padding: 14px 16px; margin: 18px 0;'>
+                <div style='font-size: 12px; color: #991b1b; margin-bottom: 6px; font-weight: 700;'>Security Details:</div>
+                <div style='font-size: 13px; color: #450a0a; margin-bottom: 3px;'><strong>Target Account:</strong> " . htmlspecialchars($user['username']) . " (" . htmlspecialchars($user['role']) . ")</div>
+                <div style='font-size: 13px; color: #450a0a; margin-bottom: 3px;'><strong>Date & Time:</strong> $timeStr</div>
+                <div style='font-size: 13px; color: #450a0a; margin-bottom: 3px;'><strong>Source IP:</strong> $ip</div>
+                <div style='font-size: 13px; color: #450a0a;'><strong>Lockout Cooldown:</strong> $lockMins minutes</div>
+            </div>
+
+            <div style='background: #fffbeb; border: 1px solid #fef3c7; border-radius: 8px; padding: 12px 14px; color: #92400e; font-size: 12px; line-height: 1.4;'>
+                🛡️ <strong>If this was NOT you:</strong> Someone may be attempting to guess your password. Please notify your Super Administrator immediately so your account can be safeguarded.
+            </div>
+            <p style='font-size: 12px; color: #a8a29e; margin-top: 18px; margin-bottom: 0; text-align: center;'>If this was you, you may sign in again once the $lockMins-minute cooldown period expires.</p>
+        </div>
+    </div>";
+
+    sendEmail($user['email'], $subject, $body);
+}
+
+/**
+ * Send security email notice to the Super Administrator upon account lockout
+ */
+function sendSuperAdminLockoutNotification($user, $ip, $lockCount, $lockMins) {
+    $saEmail = getSetting('superadmin_email') ?: getSetting('owner_email');
+    if (!$saEmail) return;
+
+    $storeName    = getSetting('store_name') ?: 'ChipiPie Cafe';
+    $subject      = "$storeName — [SECURITY WARNING] Account Locked: {$user['username']} (Lockout #$lockCount)";
+    $timeStr      = date('F j, Y, g:i A');
+    $durationDesc = ($lockCount >= 3) ? "$lockMins minutes (Extended 20-minute security lockout applied due to 3 lockouts)" : "$lockMins minutes";
+
+    $body = "
+    <div style='font-family: Segoe UI, -apple-system, BlinkMacSystemFont, Roboto, sans-serif; max-width: 520px; margin: 0 auto; padding: 30px; background: #faf9f7; border-radius: 16px; border: 1px solid #ede8e1;'>
+        <div style='text-align: center; margin-bottom: 24px;'>
+            <div style='display: inline-block; width: 56px; height: 56px; background: #1e1b18; color: #ef4444; border-radius: 14px; line-height: 56px; font-size: 26px; box-shadow: 0 4px 12px rgba(0,0,0,0.1);'>🚨</div>
+            <h2 style='color: #26221f; margin: 12px 0 4px; font-size: 22px; font-weight: 700;'>$storeName</h2>
+            <p style='color: #dc2626; font-size: 13px; margin: 0; text-transform: uppercase; letter-spacing: 1px; font-weight: 700;'>Super Admin Security Warning</p>
+        </div>
+        <div style='background: #ffffff; border-radius: 14px; padding: 26px; border: 1px solid #e7e2da; box-shadow: 0 2px 8px rgba(0,0,0,0.04);'>
+            <p style='color: #292524; font-size: 15px; margin-top: 0;'>Hello Administrator,</p>
+            <p style='color: #57534e; font-size: 14px; line-height: 1.5;'>A security lockout was triggered for user <strong>" . htmlspecialchars($user['full_name']) . "</strong> (<code>" . htmlspecialchars($user['username']) . "</code>) after consecutive failed login attempts.</p>
+            
+            <div style='background: #fdf2f8; border: 1px solid #fce7f3; border-radius: 10px; padding: 14px 16px; margin: 18px 0;'>
+                <div style='font-size: 12px; color: #9d174d; margin-bottom: 6px; font-weight: 700;'>Lockout Breakdown:</div>
+                <div style='font-size: 13px; color: #831843; margin-bottom: 3px;'><strong>Username:</strong> " . htmlspecialchars($user['username']) . " (" . htmlspecialchars($user['role']) . ")</div>
+                <div style='font-size: 13px; color: #831843; margin-bottom: 3px;'><strong>User Email:</strong> " . htmlspecialchars($user['email'] ?: 'Not set') . "</div>
+                <div style='font-size: 13px; color: #831843; margin-bottom: 3px;'><strong>Lockout Frequency:</strong> Lockout #$lockCount</div>
+                <div style='font-size: 13px; color: #831843; margin-bottom: 3px;'><strong>Lockout Duration:</strong> $durationDesc</div>
+                <div style='font-size: 13px; color: #831843; margin-bottom: 3px;'><strong>Source IP:</strong> $ip</div>
+                <div style='font-size: 13px; color: #831843;'><strong>Time:</strong> $timeStr</div>
+            </div>
+
+            <div style='background: #f0fdf4; border: 1px solid #dcfce7; border-radius: 8px; padding: 12px 14px; color: #166534; font-size: 12px; line-height: 1.4;'>
+                ⚙️ <strong>In-System Warning:</strong> A warning has been recorded in the Super Admin System Requests and Audit Log. You can inspect or clear this lockout anytime in Super Admin Control Center &rarr; System Settings &rarr; Rate Limiting.
+            </div>
+        </div>
+    </div>";
+
+    sendEmail($saEmail, $subject, $body);
+}
+
+/**
+ * Create a system warning request in database for Super Admin
+ */
+function createSecurityWarningRequest($user, $ip, $lockCount, $lockMins) {
+    try {
+        $db = getDB();
+        $title = "Security Warning: Account Locked — {$user['username']}";
+        $desc = "User '{$user['full_name']}' ({$user['username']}) was temporarily locked for {$lockMins}m (Lockout #{$lockCount}) after consecutive failed sign-in attempts from IP {$ip}.";
+        $payload = json_encode([
+            'type'          => 'account_lockout',
+            'username'      => $user['username'],
+            'user_id'       => $user['id'],
+            'ip'            => $ip,
+            'lockout_count' => $lockCount,
+            'lockout_mins'  => $lockMins
+        ]);
+
+        $db->prepare("INSERT INTO system_requests (type, requested_by, requester_name, title, description, payload, status) VALUES ('other', ?, ?, ?, ?, ?, 'pending')")
+           ->execute([$user['id'], $user['full_name'], $title, $desc, $payload]);
+    } catch (Exception $e) {}
 }
 

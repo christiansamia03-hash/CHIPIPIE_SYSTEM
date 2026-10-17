@@ -43,6 +43,8 @@ switch ($action) {
     case 'forgot_info':        handleSAForgotInfo(); break;
     case 'forgot_password':     handleSAForgotPassword(); break;
     case 'reset_password_link': handleSAResetPasswordLink(); break;
+    case 'rate_limits':         handleSAGetRateLimits(); break;
+    case 'reset_rate_limits':   handleSAResetRateLimits(); break;
     default:
         jsonResponse(['success' => false, 'message' => 'Invalid action.'], 400);
 }
@@ -287,6 +289,13 @@ function handleSADashboard() {
         GROUP BY DATE(created_at) ORDER BY rev DESC LIMIT 1
     ")->fetch();
 
+    // Active security lockouts
+    ensureRateLimitTable();
+    $activeLockouts = $db->query("SELECT id, rate_key, action, identifier, hits, lockout_count, first_hit_at, last_hit_at, locked_until 
+                                 FROM rate_limits 
+                                 WHERE locked_until IS NOT NULL AND locked_until > NOW() 
+                                 ORDER BY locked_until DESC")->fetchAll();
+
     jsonResponse([
         'success' => true,
         'users' => [
@@ -316,6 +325,7 @@ function handleSADashboard() {
         'best_day'       => $bestDay ? ['date' => $bestDay['d'], 'rev' => (float)$bestDay['rev']] : null,
         'top_seller'     => $topSeller ? ['name' => $topSeller['name'], 'sold' => (int)$topSeller['sold']] : null,
         'recent_logs'    => $recentLogs,
+        'security_alerts'=> $activeLockouts,
         'weekly_chart'   => $weeklyData,
         'hourly_chart'   => $hourlyData,
         'monthly_chart'  => $monthlyData,
@@ -1025,7 +1035,20 @@ function handleSASaveSettings() {
     }
 
     $db = getDB();
-    $allowed = ['store_name','owner_email','token_expiry_minutes','superadmin_email','require_superadmin_approval','void_refund_manager_email','void_refund_admin_ids'];
+    $allowed = [
+        'store_name',
+        'owner_email',
+        'token_expiry_minutes',
+        'superadmin_email',
+        'require_superadmin_approval',
+        'void_refund_manager_email',
+        'void_refund_admin_ids',
+        'rate_limit_enabled',
+        'rate_limit_login_attempts',
+        'rate_limit_lockout_minutes',
+        'rate_limit_api_rpm',
+        'rate_limit_email_throttle'
+    ];
 
     // Inactive accounts in POS cannot be added to receive a token
     if (isset($settings['void_refund_admin_ids'])) {
@@ -1061,6 +1084,38 @@ function handleSASaveSettings() {
 
     logAction('save_system_settings', 'settings', null, json_encode($settings));
     jsonResponse(['success' => true, 'message' => 'Settings saved successfully.']);
+}
+
+// =====================================================
+// RATE LIMIT MANAGEMENT
+// =====================================================
+function handleSAGetRateLimits() {
+    requireSuperAdmin();
+    $db = getDB();
+    ensureRateLimitTable();
+    $limits = $db->query("SELECT id, rate_key, action, identifier, hits, first_hit_at, last_hit_at, locked_until, 
+                         CASE WHEN locked_until IS NOT NULL AND locked_until > NOW() THEN 1 ELSE 0 END AS is_locked
+                         FROM rate_limits ORDER BY (locked_until > NOW()) DESC, last_hit_at DESC LIMIT 60")->fetchAll();
+    jsonResponse(['success' => true, 'rate_limits' => $limits]);
+}
+
+function handleSAResetRateLimits() {
+    requireSuperAdmin();
+    $input = getJsonInput();
+    $db = getDB();
+    ensureRateLimitTable();
+
+    $key = trim($input['rate_key'] ?? '');
+    if ($key) {
+        $stmt = $db->prepare("DELETE FROM rate_limits WHERE rate_key = ?");
+        $stmt->execute([$key]);
+        logAction('reset_rate_limit', 'rate_limit', null, "Cleared rate limit lockout for key: {$key}");
+        jsonResponse(['success' => true, 'message' => "Rate limit for '{$key}' has been reset."]);
+    } else {
+        $db->exec("TRUNCATE TABLE rate_limits");
+        logAction('reset_all_rate_limits', 'rate_limit', null, "Reset all rate limits and active lockouts");
+        jsonResponse(['success' => true, 'message' => 'All active rate limits and lockouts have been reset.']);
+    }
 }
 
 // =====================================================
