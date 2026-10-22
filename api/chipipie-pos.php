@@ -5134,9 +5134,14 @@
 
     async function api(endpoint, data = null, method = null) {
       const opts = { credentials: 'include' };
+      opts.headers = {};
+      const sid = localStorage.getItem('chipipie_session_id');
+      if (sid) {
+        opts.headers['X-Session-Id'] = sid;
+      }
       if (data) {
         opts.method = method || 'POST';
-        opts.headers = { 'Content-Type': 'application/json' };
+        opts.headers['Content-Type'] = 'application/json';
         opts.body = JSON.stringify(data);
       } else {
         opts.method = method || 'GET';
@@ -8305,6 +8310,9 @@
         }
 
         if (res.success) {
+          if (res.session_id) {
+            localStorage.setItem('chipipie_session_id', res.session_id);
+          }
           // Super admin has a dedicated panel — redirect there
           if (res.redirect) {
             window.location.href = res.redirect;
@@ -8345,6 +8353,9 @@
       try {
         const res = await api('auth.php?action=verify_2fa', { code: code });
         if (res.success && res.user) {
+          if (res.session_id) {
+            localStorage.setItem('chipipie_session_id', res.session_id);
+          }
           currentUser = res.user;
           updateUserInfoUI(res.user);
           document.getElementById('pos-step-2fa').style.display = 'none';
@@ -8482,6 +8493,7 @@
 
     async function logout() {
       try { await api('auth.php?action=logout', {}); } catch (e) { }
+      localStorage.removeItem('chipipie_session_id');
       currentUser = null;
       document.getElementById('login-user').value = '';
       document.getElementById('login-pass').value = '';
@@ -9223,6 +9235,9 @@
       // Check for existing session
       api('auth.php?action=session').then(res => {
         if (res.success && res.loggedIn) {
+          if (res.session_id) {
+            localStorage.setItem('chipipie_session_id', res.session_id);
+          }
           // Super admin should use their dedicated panel
           if (res.user.role === 'super_admin') {
             window.location.href = 'superadmin-panel.php';

@@ -2255,8 +2255,12 @@
       const opts = {
         method: m,
         headers: { 'Content-Type': 'application/json' },
-        credentials: 'same-origin'
+        credentials: 'include'
       };
+      const sid = localStorage.getItem('chipipie_session_id');
+      if (sid) {
+        opts.headers['X-Session-Id'] = sid;
+      }
       if (m === 'POST' && data !== null) opts.body = JSON.stringify(data);
       const res  = await fetch(BASE + endpoint, opts);
       const text = await res.text();

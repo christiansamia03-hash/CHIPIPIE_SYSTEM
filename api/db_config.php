@@ -82,11 +82,119 @@ function getJsonInput() {
 }
 
 /**
- * Start session if not already started
+ * Ensure sessions table exists in TiDB/MySQL
+ */
+function ensureSessionTable() {
+    static $ensured = false;
+    if ($ensured) return;
+    try {
+        $db = getDB();
+        $db->exec("CREATE TABLE IF NOT EXISTS php_sessions (
+            id VARCHAR(128) NOT NULL PRIMARY KEY,
+            data MEDIUMTEXT NOT NULL,
+            last_activity INT NOT NULL,
+            INDEX idx_last_activity (last_activity)
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci");
+        $ensured = true;
+    } catch (Exception $e) {}
+}
+
+/**
+ * Register DB-backed session handler using TiDB / MySQL
+ * This enables session persistence across Vercel serverless Lambda instances!
+ */
+function registerDbSessionHandler() {
+    static $registered = false;
+    if ($registered) return;
+    $registered = true;
+
+    ensureSessionTable();
+
+    session_set_save_handler(
+        function($savePath, $sessionName) {
+            return true;
+        },
+        function() {
+            return true;
+        },
+        function($sessionId) {
+            try {
+                $db = getDB();
+                $stmt = $db->prepare("SELECT data FROM php_sessions WHERE id = ?");
+                $stmt->execute([$sessionId]);
+                $row = $stmt->fetch();
+                return ($row && isset($row['data'])) ? (string)$row['data'] : '';
+            } catch (Exception $e) {
+                return '';
+            }
+        },
+        function($sessionId, $data) {
+            try {
+                $db = getDB();
+                $stmt = $db->prepare("REPLACE INTO php_sessions (id, data, last_activity) VALUES (?, ?, ?)");
+                return $stmt->execute([$sessionId, $data, time()]);
+            } catch (Exception $e) {
+                return false;
+            }
+        },
+        function($sessionId) {
+            try {
+                $db = getDB();
+                return $db->prepare("DELETE FROM php_sessions WHERE id = ?")->execute([$sessionId]);
+            } catch (Exception $e) {
+                return false;
+            }
+        },
+        function($maxlifetime) {
+            try {
+                $db = getDB();
+                $expire = time() - $maxlifetime;
+                return $db->prepare("DELETE FROM php_sessions WHERE last_activity < ?")->execute([$expire]);
+            } catch (Exception $e) {
+                return false;
+            }
+        }
+    );
+}
+
+/**
+ * Start session with TiDB persistence and cookie/header support
  */
 function ensureSession() {
+    if (session_status() === PHP_SESSION_ACTIVE) {
+        return;
+    }
+
+    // Check for session ID in header or query param if cookie is missing
+    $cookieName = session_name();
+    if (empty($_COOKIE[$cookieName])) {
+        $altId = $_SERVER['HTTP_X_SESSION_ID'] 
+            ?? $_SERVER['HTTP_AUTHORIZATION'] 
+            ?? ($_GET['session_id'] ?? '');
+        if ($altId) {
+            $altId = preg_replace('/^Bearer\s+/i', '', trim($altId));
+            if (preg_match('/^[a-zA-Z0-9,-]{16,128}$/', $altId)) {
+                session_id($altId);
+            }
+        }
+    }
+
+    registerDbSessionHandler();
+
+    $isHttps = (!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off')
+        || (isset($_SERVER['HTTP_X_FORWARDED_PROTO']) && $_SERVER['HTTP_X_FORWARDED_PROTO'] === 'https')
+        || (isset($_SERVER['SERVER_PORT']) && $_SERVER['SERVER_PORT'] == 443);
+
     if (session_status() === PHP_SESSION_NONE) {
-        session_start();
+        session_set_cookie_params([
+            'lifetime' => 86400 * 7,
+            'path'     => '/',
+            'domain'   => '',
+            'secure'   => $isHttps,
+            'httponly' => true,
+            'samesite' => 'Lax'
+        ]);
+        @session_start();
     }
 }
 
@@ -563,10 +671,16 @@ function enforceApiRateLimit() {
     recordRateLimitHit('api_rpm', $ip, $rpm, 60, 60);
 }
 
-// Set CORS headers for API access
-header('Access-Control-Allow-Origin: *');
-header('Access-Control-Allow-Methods: GET, POST, OPTIONS');
-header('Access-Control-Allow-Headers: Content-Type');
+// Set CORS headers for API access (supports credentials & X-Session-Id for serverless Vercel)
+$origin = $_SERVER['HTTP_ORIGIN'] ?? '';
+if ($origin) {
+    header("Access-Control-Allow-Origin: $origin");
+    header('Access-Control-Allow-Credentials: true');
+} else {
+    header('Access-Control-Allow-Origin: *');
+}
+header('Access-Control-Allow-Methods: GET, POST, PUT, DELETE, OPTIONS');
+header('Access-Control-Allow-Headers: Content-Type, Authorization, X-Session-Id, X-Requested-With');
 
 if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS') {
     http_response_code(200);

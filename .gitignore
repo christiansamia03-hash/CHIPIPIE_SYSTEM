@@ -9,3 +9,7 @@ Thumbs.db
 # Editor dirs
 .vscode/
 .idea/
+
+# Environment and secrets
+.env
+database/chipipie_*.sql

@@ -366,8 +366,9 @@ function handleLogin() {
     $_SESSION['role']     = $user['role'];
 
     $response = [
-        'success' => true,
-        'message' => 'Login successful.',
+        'success'    => true,
+        'message'    => 'Login successful.',
+        'session_id' => session_id(),
         'user' => [
             'id'        => $user['id'],
             'username'  => $user['username'],
@@ -881,8 +882,9 @@ function handleCheckSession() {
     ensureSession();
     if (isset($_SESSION['user_id'])) {
         jsonResponse([
-            'success'  => true,
-            'loggedIn' => true,
+            'success'    => true,
+            'loggedIn'   => true,
+            'session_id' => session_id(),
             'user' => [
                 'id'        => $_SESSION['user_id'],
                 'username'  => $_SESSION['username'],
@@ -1011,9 +1013,10 @@ function handleVerify2FA() {
     } catch (Exception $e) {}
 
     $resp = [
-        'success'  => true,
-        'message'  => 'Two-factor verification successful.',
-        'user'     => [
+        'success'    => true,
+        'message'    => 'Two-factor verification successful.',
+        'session_id' => session_id(),
+        'user'       => [
             'id'        => $_SESSION['user_id'],
             'username'  => $_SESSION['username'],
             'full_name' => $_SESSION['full_name'],
