@@ -1,0 +1,3 @@
+<?php
+header("Location: chipipie-pos.php");
+exit;

@@ -12,11 +12,11 @@ error_reporting(E_ALL & ~E_NOTICE & ~E_WARNING & ~E_DEPRECATED);
 date_default_timezone_set('Asia/Manila');
 
 // ============ DATABASE CONFIG ============
-// CHANGED: 'localhost' to '127.0.0.1' to fix the [2002] connection refusal error
-define('DB_HOST', '127.0.0.1'); 
-define('DB_NAME', 'chipipie_pos');
-define('DB_USER', 'root');
-define('DB_PASS', '');       // Default XAMPP has no password
+define('DB_HOST', getenv('DB_HOST') ?: '127.0.0.1'); 
+define('DB_NAME', getenv('DB_NAME') ?: 'chipipie_pos');
+define('DB_USER', getenv('DB_USER') ?: 'root');
+define('DB_PASS', getenv('DB_PASS') !== false ? getenv('DB_PASS') : '');
+define('DB_PORT', getenv('DB_PORT') ?: '3306');
 define('DB_CHARSET', 'utf8mb4');
 
 // ============ EMAIL CONFIG ============
@@ -38,7 +38,8 @@ function getDB() {
     static $pdo = null;
     if ($pdo === null) {
         try {
-            $dsn = "mysql:host=" . DB_HOST . ";dbname=" . DB_NAME . ";charset=" . DB_CHARSET;
+            $port = defined('DB_PORT') && DB_PORT ? ';port=' . DB_PORT : '';
+            $dsn = "mysql:host=" . DB_HOST . $port . ";dbname=" . DB_NAME . ";charset=" . DB_CHARSET;
             $pdo = new PDO($dsn, DB_USER, DB_PASS, [
                 PDO::ATTR_ERRMODE            => PDO::ERRMODE_EXCEPTION,
                 PDO::ATTR_DEFAULT_FETCH_MODE => PDO::FETCH_ASSOC,
