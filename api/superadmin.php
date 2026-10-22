@@ -817,11 +817,14 @@ function handleSADeleteAdminRequest() {
     }
 
     $db = getDB();
-    $stmt = $db->prepare("SELECT id, username, full_name FROM admin_registration_requests WHERE id=?");
+    $stmt = $db->prepare("SELECT id, username, full_name, status FROM admin_registration_requests WHERE id=?");
     $stmt->execute([$id]);
     $req = $stmt->fetch();
     if (!$req) {
         jsonResponse(['success' => false, 'message' => 'Admin request not found.'], 404);
+    }
+    if ($req['status'] !== 'approved') {
+        jsonResponse(['success' => false, 'message' => 'Cannot delete an admin request that is not yet approved.'], 400);
     }
 
     $db->prepare("DELETE FROM admin_registration_requests WHERE id=?")->execute([$id]);
@@ -1021,6 +1024,19 @@ function handleSASettings() {
     requireSuperAdmin();
     $db = getDB();
     $settings = $db->query("SELECT setting_key, setting_value, updated_at FROM system_settings")->fetchAll();
+
+    // Ensure super_admin user email in `users` table matches `superadmin_email` in `system_settings`
+    $saEmail = '';
+    foreach ($settings as $s) {
+        if ($s['setting_key'] === 'superadmin_email') {
+            $saEmail = trim($s['setting_value'] ?? '');
+            break;
+        }
+    }
+    if ($saEmail && filter_var($saEmail, FILTER_VALIDATE_EMAIL)) {
+        $db->prepare("UPDATE users SET email = ? WHERE role = 'super_admin'")->execute([$saEmail]);
+    }
+
     $admins = $db->query("SELECT id, username, full_name, email, role, is_active FROM users WHERE role IN ('admin', 'super_admin') ORDER BY is_active DESC, role DESC, full_name ASC")->fetchAll();
     jsonResponse(['success' => true, 'settings' => $settings, 'admins' => $admins]);
 }
@@ -1050,6 +1066,17 @@ function handleSASaveSettings() {
         'rate_limit_email_throttle'
     ];
 
+    // Keep super_admin user in `users` table in sync with superadmin_email
+    if (!empty($settings['superadmin_email'])) {
+        $saEmail = trim($settings['superadmin_email']);
+        if (filter_var($saEmail, FILTER_VALIDATE_EMAIL)) {
+            $db->prepare("UPDATE users SET email = ? WHERE role = 'super_admin'")->execute([$saEmail]);
+            if (isset($_SESSION['email']) && ($_SESSION['role'] ?? '') === 'super_admin') {
+                $_SESSION['email'] = $saEmail;
+            }
+        }
+    }
+
     // Inactive accounts in POS cannot be added to receive a token
     if (isset($settings['void_refund_admin_ids'])) {
         $rawIds = array_filter(array_map('intval', explode(',', $settings['void_refund_admin_ids'])));
@@ -1069,7 +1096,7 @@ function handleSASaveSettings() {
         $cleanEmails = [];
         foreach ($rawEmails as $em) {
             $low = strtolower($em);
-            if (!isset($inactiveSet[$low]) && filter_var($em, FILTER_VALIDATE_EMAIL)) {
+            if (!isset($inactiveSet[$low]) && isValidSendableEmail($em)) {
                 $cleanEmails[] = $em;
             }
         }

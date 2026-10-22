@@ -2,9 +2,32 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
   <title>ChipiPie — Super Admin Control Center</title>
   <meta name="description" content="ChipiPie Cafe Super Admin Panel — System-wide management and approval center">
+
+  <!-- ===== iOS / Apple Touch Icon ===== -->
+  <link rel="apple-touch-icon" sizes="180x180" href="assets/img/apple-touch-icon.png">
+
+  <!-- ===== Android / PWA Icons ===== -->
+  <link rel="icon" type="image/png" sizes="512x512" href="assets/img/icon-512.png">
+  <link rel="icon" type="image/png" sizes="192x192" href="assets/img/icon-192.png">
+  <link rel="icon" type="image/png" sizes="144x144" href="assets/img/icon-144.png">
+  <link rel="icon" type="image/png" sizes="96x96"   href="assets/img/icon-96.png">
+  <link rel="icon" type="image/png" sizes="72x72"   href="assets/img/icon-72.png">
+  <link rel="icon" type="image/png" sizes="48x48"   href="assets/img/icon-48.png">
+
+  <!-- ===== Web App Manifest (Android "Add to Home Screen" + PWA) ===== -->
+  <link rel="manifest" href="site.webmanifest">
+
+  <!-- ===== Theme Colors ===== -->
+  <meta name="theme-color" content="#111118">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-title" content="ChipiPie Admin">
+  <meta name="msapplication-TileImage" content="assets/img/icon-144.png">
+  <meta name="msapplication-TileColor" content="#111118">
+
   <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css" rel="stylesheet">
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&display=swap" rel="stylesheet">
   <style>
@@ -27,15 +50,29 @@
       --sa-glow:     0 0 40px rgba(109,40,217,0.15);
     }
 
-    * { box-sizing: border-box; margin: 0; padding: 0; }
+    *, *::before, *::after {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+      touch-action: manipulation;
+    }
 
-    body {
+    html, body {
       font-family: 'Inter', system-ui, sans-serif;
       background: var(--sa-bg);
       color: var(--sa-text);
       height: 100vh;
       overflow: hidden;
       display: flex;
+      touch-action: manipulation;
+      -webkit-touch-callout: none;
+      -webkit-text-size-adjust: 100%;
+      text-size-adjust: 100%;
+    }
+
+    button, .sa-btn, .sa-nav-item, input, select, textarea {
+      -webkit-tap-highlight-color: transparent;
+      touch-action: manipulation;
     }
 
     /* ── SIDEBAR ── */
@@ -530,6 +567,10 @@
     }
 
     .sa-modal-overlay.open { display: flex; }
+
+    /* Confirm and Reject modals float above other open modals */
+    #sa-confirm-modal { z-index: 10100; }
+    #reject-request-modal { z-index: 10050; }
 
     .sa-modal {
       background: var(--sa-card);
@@ -1696,7 +1737,7 @@
               </div>
               <div class="sa-form-row">
                 <label class="sa-label">Super Admin Email</label>
-                <input type="email" class="sa-input" id="setting-superadmin_email" placeholder="superadmin@example.com">
+                <input type="email" class="sa-input" id="setting-superadmin_email" placeholder="superadmin@example.com" oninput="syncSuperadminEmailLive()" onchange="syncSuperadminEmailLive()">
               </div>
               <div class="sa-form-row">
                 <label class="sa-label">Token Expiry (minutes)</label>
@@ -1755,8 +1796,18 @@
               </div>
             </div>
 
-            <!-- Hidden inputs maintaining exact settings compatibility -->
-            <input type="hidden" id="setting-void_refund_manager_email">
+            <!-- Void & Refund Recipient Email Box -->
+            <div class="sa-form-row" style="margin-top:16px;">
+              <label class="sa-label" style="font-weight:700;color:var(--sa-text);display:flex;align-items:center;gap:6px;">
+                <i class="bi bi-envelope-at-fill" style="color:var(--sa-accent2);"></i> Void &amp; Refund Email Box
+              </label>
+              <input type="text" class="sa-input" id="setting-void_refund_manager_email" readonly style="background:var(--sa-surface);color:var(--sa-text);font-family:monospace;cursor:default;" placeholder="Selected admin and superadmin emails will reflect here...">
+              <div style="font-size:11px;color:var(--sa-muted);margin-top:4px;">
+                Automatically reflects the Super Admin Email and checked administrators in real-time.
+              </div>
+            </div>
+
+            <!-- Hidden input maintaining admin IDs compatibility -->
             <input type="hidden" id="setting-void_refund_admin_ids">
 
             <div style="margin-top:18px;">
@@ -1915,6 +1966,54 @@
     </div>
   </div>
 
+  <!-- ── MODAL: Reject Request ── -->
+  <div class="sa-modal-overlay" id="reject-request-modal">
+    <div class="sa-modal" style="max-width: 480px;">
+      <div class="sa-modal-header" style="border-bottom: 1px solid rgba(239, 68, 68, 0.25); background: rgba(239, 68, 68, 0.06);">
+        <div class="sa-modal-title" style="color: #ef4444; display: flex; align-items: center; gap: 8px;">
+          <i class="bi bi-x-circle-fill"></i> Reject Request
+        </div>
+        <button class="sa-modal-close" onclick="closeModal('reject-request-modal')">&#x2715;</button>
+      </div>
+      <div class="sa-modal-body">
+        <!-- Target Request Summary -->
+        <div id="reject-modal-summary" style="background: var(--sa-surface); border: 1px solid var(--sa-border); border-radius: 10px; padding: 14px; margin-bottom: 16px;">
+          <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 8px;">
+            <span id="reject-modal-type-badge" class="badge-sa" style="background: rgba(239,68,68,0.15); color: #ef4444; border: 1px solid rgba(239,68,68,0.3); font-weight: 600;">System Request</span>
+            <span id="reject-modal-id" style="font-size: 11px; color: var(--sa-muted); font-family: monospace;">#0</span>
+          </div>
+          <div id="reject-modal-title-text" style="font-weight: 700; font-size: 14.5px; color: var(--sa-text); margin-bottom: 4px;">Request Title</div>
+          <div id="reject-modal-requester" style="font-size: 12px; color: var(--sa-muted); margin-bottom: 6px;">Requested by: <strong style="color: var(--sa-text);">—</strong></div>
+          <div id="reject-modal-desc" style="font-size: 12px; color: var(--sa-muted); line-height: 1.4; border-top: 1px dashed var(--sa-border); padding-top: 6px; margin-top: 6px;">—</div>
+        </div>
+
+        <!-- Quick Reason Chips -->
+        <div style="margin-bottom: 12px;">
+          <label class="sa-label" style="margin-bottom: 6px;">Quick Reasons</label>
+          <div style="display: flex; flex-wrap: wrap; gap: 6px;" id="reject-reason-chips">
+            <button type="button" class="sa-btn sa-btn-ghost" style="padding: 4px 10px; font-size: 11px; border-radius: 6px;" onclick="setRejectReason('Duplicate request')">Duplicate request</button>
+            <button type="button" class="sa-btn sa-btn-ghost" style="padding: 4px 10px; font-size: 11px; border-radius: 6px;" onclick="setRejectReason('Incorrect information / pricing')">Incorrect information</button>
+            <button type="button" class="sa-btn sa-btn-ghost" style="padding: 4px 10px; font-size: 11px; border-radius: 6px;" onclick="setRejectReason('Out of stock / discontinued')">Out of stock</button>
+            <button type="button" class="sa-btn sa-btn-ghost" style="padding: 4px 10px; font-size: 11px; border-radius: 6px;" onclick="setRejectReason('Declined per store policy')">Store policy</button>
+          </div>
+        </div>
+
+        <!-- Reason / Note -->
+        <div class="sa-form-row">
+          <label class="sa-label">Rejection Reason / Note <span style="color: #ef4444;">*</span></label>
+          <textarea class="sa-input" id="reject-modal-note" rows="3" placeholder="Provide a reason for rejecting this request..."></textarea>
+          <div id="reject-modal-error" style="display:none; color:#ef4444; font-size:12px; margin-top:6px; font-weight:600;"></div>
+        </div>
+      </div>
+      <div class="sa-modal-footer">
+        <button class="sa-btn sa-btn-ghost" onclick="closeModal('reject-request-modal')">Cancel</button>
+        <button class="sa-btn sa-btn-reject" id="reject-modal-confirm-btn" onclick="submitRejectionModal()" style="background: #dc2626; border-color: #dc2626; color: #fff;">
+          <i class="bi bi-x-circle-fill me-1"></i> Confirm Rejection
+        </button>
+      </div>
+    </div>
+  </div>
+
   <!-- ── MODAL: Create User ── -->
   <div class="sa-modal-overlay" id="create-user-modal">
     <div class="sa-modal">
@@ -2004,6 +2103,8 @@
         </button>
       </div>
     </div>
+  </div>
+
   <!-- ── ADD MENU ITEM MODAL (Super Admin) ── -->
   <div class="sa-modal-overlay" id="sa-add-item-modal">
     <div class="sa-modal" style="max-width:480px;">
@@ -2020,15 +2121,7 @@
           <div class="sa-form-row">
             <label class="sa-label">Category</label>
             <select id="sa-new-menu-category" class="sa-select" required>
-              <option value="1">Hot Coffee</option>
-              <option value="2">Iced Coffee</option>
-              <option value="3">Classic Milktea</option>
-              <option value="4">Virgin Mojito</option>
-              <option value="5">Citrus Popping Boba</option>
-              <option value="6">Soda Float</option>
-              <option value="7">Matcha Series</option>
-              <option value="8">Frappé</option>
-              <option value="9">Fork and Fun</option>
+              <!-- Dynamically populated by saOpenAddMenuModal() -->
             </select>
           </div>
           <div class="sa-form-row">
@@ -2060,7 +2153,76 @@
     </div>
   </div>
 
-    <!-- ── CONFIRMATION MODAL ── -->
+  <!-- ── UPLOAD PHOTO MODAL ── -->
+  <div class="sa-modal-overlay" id="sa-photo-modal">
+    <div class="sa-modal" style="max-width:420px;">
+      <div class="sa-modal-header">
+        <h3><i class="bi bi-camera-fill me-2" style="color:var(--sa-accent2);"></i>Upload Item Photo</h3>
+        <button class="sa-modal-close" onclick="closeModal('sa-photo-modal')"><i class="bi bi-x-lg"></i></button>
+      </div>
+      <div class="sa-modal-body">
+        <p id="sa-photo-item-label" style="font-size:13px;color:var(--sa-muted);margin-bottom:12px;"></p>
+        <div id="sa-photo-preview-wrap" style="text-align:center;margin-bottom:14px;display:none;">
+          <img id="sa-photo-preview" src="" style="max-width:100%;max-height:180px;border-radius:10px;border:1px solid var(--sa-border);object-fit:cover;">
+        </div>
+        <div class="sa-form-row">
+          <label class="sa-label">Choose Photo</label>
+          <input type="file" id="sa-photo-file" class="sa-input" accept="image/*" onchange="saPreviewPhoto(this)">
+        </div>
+      </div>
+      <div class="sa-modal-footer">
+        <button class="sa-btn sa-btn-ghost" onclick="closeModal('sa-photo-modal')">Cancel</button>
+        <button class="sa-btn sa-btn-primary" id="sa-photo-submit-btn" onclick="saSubmitPhoto()">
+          <i class="bi bi-upload"></i> Upload Photo
+        </button>
+      </div>
+    </div>
+  </div>
+
+    <!-- ── MODAL: Delete Menu Item ── -->
+  <div class="sa-modal-overlay" id="sa-delete-menu-modal">
+    <div class="sa-modal" style="max-width: 480px;">
+      <div class="sa-modal-header" style="border-bottom: 1px solid rgba(239, 68, 68, 0.25); background: rgba(239, 68, 68, 0.06);">
+        <div class="sa-modal-title" style="color: #ef4444; display: flex; align-items: center; gap: 8px;">
+          <i class="bi bi-trash3-fill"></i> Delete Menu Item
+        </div>
+        <button class="sa-modal-close" onclick="closeModal('sa-delete-menu-modal')"><i class="bi bi-x-lg"></i></button>
+      </div>
+      <div class="sa-modal-body">
+        <!-- Item Info Preview -->
+        <div style="background: var(--sa-surface); border: 1px solid var(--sa-border); border-radius: 12px; padding: 14px 16px; margin-bottom: 16px; display: flex; align-items: center; gap: 14px;">
+          <div id="sa-del-modal-img-wrap" style="width: 50px; height: 50px; border-radius: 10px; background: rgba(255,255,255,0.05); display: flex; align-items: center; justify-content: center; font-size: 22px; border: 1px solid var(--sa-border); flex-shrink: 0; overflow: hidden;">
+            ☕
+          </div>
+          <div style="flex: 1; min-width: 0;">
+            <div id="sa-del-modal-item-name" style="font-weight: 700; font-size: 15px; color: var(--sa-text); line-height: 1.3;">Item Name</div>
+            <div style="font-size: 12px; color: var(--sa-muted); margin-top: 3px;">
+              <span id="sa-del-modal-item-cat">Category</span> · <span id="sa-del-modal-item-price" style="font-weight: 600; color: #10b981;">₱0.00</span> · <span id="sa-del-modal-item-stock">0 in stock</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- Warning Callout -->
+        <div style="background: rgba(239,68,68,0.1); border: 1px solid rgba(239,68,68,0.3); border-radius: 10px; padding: 12px 14px; font-size: 12.5px; color: #fca5a5; display: flex; align-items: flex-start; gap: 10px; line-height: 1.5;">
+          <i class="bi bi-exclamation-triangle-fill" style="font-size: 16px; color: #ef4444; flex-shrink: 0; margin-top: 1px;"></i>
+          <div>
+            <strong>Are you sure you want to permanently delete this item?</strong><br>
+            This action will immediately remove the item from both the POS menu and system database. This cannot be undone.
+          </div>
+        </div>
+
+        <div id="sa-del-modal-error" style="display:none; color:#ef4444; font-size:12.5px; margin-top:12px; text-align:center; font-weight:600;"></div>
+      </div>
+      <div class="sa-modal-footer">
+        <button type="button" class="sa-btn sa-btn-ghost" onclick="closeModal('sa-delete-menu-modal')">Cancel</button>
+        <button type="button" class="sa-btn" id="sa-del-confirm-btn" onclick="saConfirmDeleteMenuItem()" style="background: #dc2626; border-color: #dc2626; color: #fff; font-weight: 600;">
+          <i class="bi bi-trash3-fill me-1"></i> Delete Item Permanently
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── CONFIRMATION MODAL ── -->
   <div class="sa-modal-overlay" id="sa-confirm-modal">
     <div class="sa-modal">
       <div class="sa-modal-header">
@@ -2672,12 +2834,22 @@
     ============================================= */
     let pendingReviewId   = null;
     let pendingReviewType = null;
+    let pendingReviewData = null;
+    let pendingRejectId   = null;
+    let pendingRejectType = 'system';
+    let currentRequestsMap = {};
+    let currentAdminRequestsMap = {};
 
     async function loadRequests() {
       const status = document.getElementById('req-status-filter')?.value || 'pending';
       try {
         const res = await saApi(`superadmin.php?action=requests&status=${status}`);
         if (!res.success) return;
+
+        currentRequestsMap = {};
+        if (res.requests) {
+          res.requests.forEach(r => { currentRequestsMap[r.id] = r; });
+        }
 
         updateNavBadge('nav-badge-requests', res.requests.filter(r => r.status === 'pending').length);
 
@@ -2718,7 +2890,7 @@
                   <button class="sa-btn sa-btn-approve" style="padding:5px 10px;font-size:11px;" onclick="openReviewModal('system', ${r.id}, ${JSON.stringify(r).replace(/"/g,'&quot;')})">
                     <i class="bi bi-check-circle-fill"></i> Approve
                   </button>
-                  <button class="sa-btn sa-btn-reject" style="padding:5px 10px;font-size:11px;" onclick="quickReject('system', ${r.id})">
+                  <button class="sa-btn sa-btn-reject" style="padding:5px 10px;font-size:11px;" onclick="openRejectModal('system', ${r.id})" title="Reject Request">
                     <i class="bi bi-x-circle"></i>
                   </button>
                 </div>
@@ -2744,6 +2916,11 @@
         const pending = res.admin_requests.filter(r => r.status === 'pending').length;
         updateNavBadge('nav-badge-admin-reqs', pending);
 
+        currentAdminRequestsMap = {};
+        if (res.admin_requests) {
+          res.admin_requests.forEach(r => { currentAdminRequestsMap[r.id] = r; });
+        }
+
         const tbody = document.getElementById('admin-reqs-tbody');
         if (!res.admin_requests.length) {
           tbody.innerHTML = `<tr><td colspan="7"><div class="sa-empty"><i class="bi bi-person-check"></i><p>No admin requests found</p></div></td></tr>`;
@@ -2768,13 +2945,14 @@
                   <button class="sa-btn sa-btn-approve" style="padding:5px 10px;font-size:11px;" onclick="openReviewModal('admin_reg', ${r.id}, {full_name:'${safeName}',username:'${safeUser}',email:'${safeEmail}'})">
                     <i class="bi bi-check-circle-fill"></i> Approve
                   </button>
-                  <button class="sa-btn sa-btn-reject" style="padding:5px 10px;font-size:11px;" onclick="quickReject('admin_reg', ${r.id})">
+                  <button class="sa-btn sa-btn-reject" style="padding:5px 10px;font-size:11px;" onclick="openRejectModal('admin_reg', ${r.id})" title="Reject Request">
                     <i class="bi bi-x-circle"></i> Reject
                   </button>
-                ` : ''}
-                <button class="sa-btn sa-btn-reject" style="padding:5px 10px;font-size:11px;background:rgba(239,68,68,0.1);color:#ef4444;border-color:rgba(239,68,68,0.3);" onclick="deleteAdminRequest(${r.id}, '${safeName}')" title="Delete request">
-                  <i class="bi bi-trash-fill"></i> Delete
-                </button>
+                ` : (r.status === 'approved' ? `
+                  <button class="sa-btn sa-btn-reject" style="padding:5px 10px;font-size:11px;background:rgba(239,68,68,0.1);color:#ef4444;border-color:rgba(239,68,68,0.3);" onclick="deleteAdminRequest(${r.id}, '${safeName}')" title="Delete request">
+                    <i class="bi bi-trash-fill"></i> Delete
+                  </button>
+                ` : `<span style="font-size:11px;color:var(--sa-muted);">${r.status}</span>`)}
               </div>
             </td>
           </tr>
@@ -2786,6 +2964,7 @@
     function openReviewModal(type, id, data) {
       pendingReviewId   = id;
       pendingReviewType = type;
+      pendingReviewData = data;
       document.getElementById('review-note').value = '';
 
       let details = '';
@@ -2896,9 +3075,14 @@
 
     async function submitReview(action) {
       if (!pendingReviewId) return;
+      if (action === 'reject') {
+        const existingNote = document.getElementById('review-note')?.value || '';
+        openRejectModal(pendingReviewType, pendingReviewId, pendingReviewData, existingNote);
+        return;
+      }
       const note = document.getElementById('review-note').value.trim();
       const type = pendingReviewType === 'admin_reg' ? 'admin_reg' : 'system';
-      const endpoint = action === 'approve' ? 'superadmin.php?action=approve_request' : 'superadmin.php?action=reject_request';
+      const endpoint = 'superadmin.php?action=approve_request';
 
       try {
         const res = await saApi(endpoint, { id: pendingReviewId, type, note });
@@ -2914,16 +3098,134 @@
       }
     }
 
-    async function quickReject(type, id) {
-      if (!confirm('Reject this request?')) return;
-      const saType = type === 'admin_reg' ? 'admin_reg' : 'system';
-      const res = await saApi('superadmin.php?action=reject_request', { id, type: saType, note: 'Rejected by Super Admin' });
-      saToast(res.message, res.success ? 'success' : 'error');
-      if (res.success) {
-        loadDashboard();
-        if (type === 'admin_reg') loadAdminRequests();
-        else loadRequests();
+    function openRejectModal(type, id, data, initialNote = '') {
+      pendingRejectType = type || 'system';
+      pendingRejectId   = id;
+
+      const req = data || (pendingRejectType === 'admin_reg' ? (currentAdminRequestsMap[id] || {}) : (currentRequestsMap[id] || {}));
+
+      const badgeEl = document.getElementById('reject-modal-type-badge');
+      const idEl    = document.getElementById('reject-modal-id');
+      const titleEl = document.getElementById('reject-modal-title-text');
+      const reqEl   = document.getElementById('reject-modal-requester');
+      const descEl  = document.getElementById('reject-modal-desc');
+      const noteEl  = document.getElementById('reject-modal-note');
+      const errEl   = document.getElementById('reject-modal-error');
+
+      if (idEl) idEl.textContent = '#' + id;
+      if (errEl) { errEl.style.display = 'none'; errEl.textContent = ''; }
+      if (noteEl) noteEl.value = initialNote || '';
+
+      if (pendingRejectType === 'admin_reg') {
+        if (badgeEl) {
+          badgeEl.textContent = 'Admin Registration';
+          badgeEl.style.color = '#a855f7';
+          badgeEl.style.borderColor = 'rgba(168,85,247,0.3)';
+          badgeEl.style.background = 'rgba(168,85,247,0.15)';
+        }
+        if (titleEl) titleEl.textContent = req.full_name || 'Admin Registration Request';
+        if (reqEl) reqEl.innerHTML = `Username: <strong style="color:var(--sa-text);">${req.username || '—'}</strong> &nbsp;|&nbsp; Email: <strong style="color:var(--sa-text);">${req.email || '—'}</strong>`;
+        if (descEl) descEl.textContent = 'Registration request for an administrator account.';
+      } else {
+        const REQ_TYPE_LABELS = {
+          admin_approval:  'Admin Approval',
+          void_order:      'Void Order',
+          refund_order:    'Refund Order',
+          menu_change:     'Menu Change',
+          setting_change:  'Setting Change',
+          user_deactivate: 'Deactivate Account',
+          user_activate:   'Activate Account',
+          user_delete:     'Delete Account',
+          other:           'Other Request'
+        };
+        const typeLabel = REQ_TYPE_LABELS[req.type] || (req.type ? req.type.replace(/_/g, ' ') : 'System Request');
+        if (badgeEl) {
+          badgeEl.textContent = typeLabel;
+          badgeEl.style.color = '#ef4444';
+          badgeEl.style.borderColor = 'rgba(239,68,68,0.3)';
+          badgeEl.style.background = 'rgba(239,68,68,0.15)';
+        }
+        if (titleEl) titleEl.textContent = req.title || 'System Request #' + id;
+        if (reqEl) reqEl.innerHTML = `Requested by: <strong style="color:var(--sa-text);">${req.requester_name || 'Staff'}</strong>`;
+        if (descEl) descEl.textContent = req.description || (req.payload ? (typeof req.payload === 'string' ? req.payload : JSON.stringify(req.payload)) : 'No details provided.');
       }
+
+      openModal('reject-request-modal');
+      setTimeout(() => { if (noteEl) noteEl.focus(); }, 100);
+    }
+
+    function setRejectReason(reason) {
+      const noteEl = document.getElementById('reject-modal-note');
+      if (!noteEl) return;
+      if (!noteEl.value.trim()) {
+        noteEl.value = reason;
+      } else {
+        noteEl.value = noteEl.value.trim() + '; ' + reason;
+      }
+      noteEl.focus();
+    }
+
+    async function submitRejectionModal() {
+      if (!pendingRejectId) return;
+      const noteEl = document.getElementById('reject-modal-note');
+      const errEl = document.getElementById('reject-modal-error');
+      const btn = document.getElementById('reject-modal-confirm-btn');
+
+      const note = noteEl ? noteEl.value.trim() : '';
+      if (!note) {
+        if (errEl) {
+          errEl.textContent = 'Please provide a reason for rejecting this request.';
+          errEl.style.display = 'block';
+        }
+        if (noteEl) noteEl.focus();
+        return;
+      }
+
+      if (errEl) errEl.style.display = 'none';
+      if (btn) {
+        btn.disabled = true;
+        btn.innerHTML = '<span class="spinner-border spinner-border-sm me-1"></span> Rejecting...';
+      }
+
+      const saType = (pendingRejectType === 'admin_reg') ? 'admin_reg' : 'system';
+
+      try {
+        const res = await saApi('superadmin.php?action=reject_request', {
+          id: pendingRejectId,
+          type: saType,
+          note: note
+        });
+
+        if (res.success) {
+          closeModal('reject-request-modal');
+          closeModal('review-modal');
+          saToast(res.message || 'Request rejected successfully.', 'success');
+          loadDashboard();
+          if (saType === 'admin_reg') loadAdminRequests();
+          else loadRequests();
+        } else {
+          if (errEl) {
+            errEl.textContent = res.message || 'Failed to reject request.';
+            errEl.style.display = 'block';
+          }
+          saToast(res.message || 'Failed to reject request.', 'error');
+        }
+      } catch (err) {
+        if (errEl) {
+          errEl.textContent = 'Connection error. Please try again.';
+          errEl.style.display = 'block';
+        }
+        saToast('Connection error', 'error');
+      } finally {
+        if (btn) {
+          btn.disabled = false;
+          btn.innerHTML = '<i class="bi bi-x-circle-fill me-1"></i> Confirm Rejection';
+        }
+      }
+    }
+
+    async function quickReject(type, id) {
+      openRejectModal(type, id);
     }
 
     /* =============================================
@@ -3123,16 +3425,21 @@
     function openConfirmModal(title, msg, onConfirm, btnColor = 'var(--sa-primary)') {
       document.getElementById('sa-confirm-title').innerHTML = title;
       document.getElementById('sa-confirm-msg').innerHTML = msg;
-      
+
       const btn = document.getElementById('sa-confirm-btn');
-      btn.style.background = btnColor;
+      btn.style.background  = btnColor;
       btn.style.borderColor = btnColor;
-      
+
       btn.onclick = () => {
         closeModal('sa-confirm-modal');
         onConfirm();
       };
-      
+
+      // Close any other open modal first so the confirm doesn't stack behind it
+      document.querySelectorAll('.sa-modal-overlay.open').forEach(m => {
+        if (m.id !== 'sa-confirm-modal') m.classList.remove('open');
+      });
+
       openModal('sa-confirm-modal');
     }
 
@@ -3230,11 +3537,18 @@
               <span class="badge-sa ${isAvail ? 'badge-active' : 'badge-inactive'}">${isAvail ? 'Available' : 'Unavailable'}</span>
             </td>
             <td>
-              <div style="display:flex;gap:6px;align-items:center;">
+              <div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap;">
                 <button class="sa-btn sa-btn-ghost" style="padding:5px 9px;font-size:11.5px;" onclick="saToggleMenuAvail(${item.id})">
                   ${isAvail ? '<i class="bi bi-eye-slash"></i> Disable' : '<i class="bi bi-eye"></i> Enable'}
                 </button>
-                <button class="sa-btn sa-btn-danger" style="padding:5px 9px;font-size:11.5px;" onclick="saDeleteMenuItem(${item.id}, '${item.name.replace(/'/g, "\\'")}')" title="Delete permanently">
+                <button class="sa-btn sa-btn-ghost" style="padding:5px 9px;font-size:11.5px;color:var(--sa-blue);" onclick="saOpenPhotoModal(${item.id}, '${item.name.replace(/'/g, "\\'")}')" title="Upload / change photo">
+                  <i class="bi bi-camera-fill"></i> Photo
+                </button>
+                ${isPendingDel ? `
+                <button class="sa-btn sa-btn-warning" style="padding:5px 9px;font-size:11.5px;background:rgba(245,158,11,0.15);color:#f59e0b;border:1px solid rgba(245,158,11,0.3);" onclick="saCancelRemovalRequest(${item.id}, '${item.name.replace(/'/g, "\\'")}')" title="Cancel pending removal request">
+                  <i class="bi bi-x-circle"></i> Cancel Removal
+                </button>` : ''}
+                <button class="sa-btn sa-btn-danger" style="padding:5px 9px;font-size:11.5px;" onclick="saDeleteMenuItem(${item.id})" title="Delete permanently">
                   <i class="bi bi-trash-fill"></i>
                 </button>
               </div>
@@ -3242,6 +3556,27 @@
           </tr>
         `;
       }).join('');
+    }
+
+    function saCancelRemovalRequest(id, name) {
+      openConfirmModal(
+        '<i class="bi bi-x-circle-fill" style="color:#d97706;margin-right:8px;"></i>Cancel Removal Request',
+        `Are you sure you want to cancel the pending removal request for <strong>${escapeHtml(name)}</strong>?<br><br><span style="font-size:12px;color:var(--sa-muted);">The item will remain active on the menu and the removal request will be retracted.</span>`,
+        async () => {
+          try {
+            const res = await saApi('menu.php?action=cancel_delete', { id });
+            if (res.success) {
+              saToast(res.message, 'success');
+              saLoadMenu();
+            } else {
+              saToast(res.message || 'Failed to cancel removal request', 'error');
+            }
+          } catch (e) {
+            saToast('Failed to cancel removal request', 'error');
+          }
+        },
+        '#d97706'
+      );
     }
 
     async function saToggleMenuAvail(id) {
@@ -3273,20 +3608,73 @@
       }
     }
 
-    async function saDeleteMenuItem(id, name) {
-      if (!confirm(`Are you sure you want to permanently delete "${name}" from the menu?\n\nThis will take effect immediately without requiring codes.`)) return;
+    let saPendingDeleteItemId = null;
+
+    function saDeleteMenuItem(id) {
+      const item = saMenuItems.find(m => m.id == id);
+      if (!item) {
+        saToast('Item not found', 'error');
+        return;
+      }
+
+      saPendingDeleteItemId = id;
+
+      document.getElementById('sa-del-modal-item-name').textContent = item.name;
+      document.getElementById('sa-del-modal-item-cat').textContent = item.category || 'Category';
+      document.getElementById('sa-del-modal-item-price').textContent = '₱' + parseFloat(item.price || 0).toFixed(2);
+      document.getElementById('sa-del-modal-item-stock').textContent = (item.stock || 0) + ' in stock';
+      document.getElementById('sa-del-modal-error').style.display = 'none';
+
+      const imgWrap = document.getElementById('sa-del-modal-img-wrap');
+      if (item.image) {
+        imgWrap.innerHTML = `<img src="${item.image}" style="width:100%;height:100%;object-fit:cover;border-radius:8px;">`;
+      } else {
+        imgWrap.innerHTML = item.emoji || '☕';
+      }
+
+      const btn = document.getElementById('sa-del-confirm-btn');
+      btn.disabled = false;
+      btn.innerHTML = '<i class="bi bi-trash3-fill me-1"></i> Delete Item Permanently';
+
+      openModal('sa-delete-menu-modal');
+    }
+
+    async function saConfirmDeleteMenuItem() {
+      if (!saPendingDeleteItemId) return;
+      const id = saPendingDeleteItemId;
+      const item = saMenuItems.find(m => m.id == id);
+      const name = item ? item.name : 'Item';
+
+      const btn = document.getElementById('sa-del-confirm-btn');
+      const errEl = document.getElementById('sa-del-modal-error');
+      errEl.style.display = 'none';
+
+      btn.disabled = true;
+      btn.innerHTML = '<span class="spinner-border spinner-border-sm me-1"></span> Deleting...';
+
       try {
         const res = await saApi('menu.php?action=delete', { id });
         if (res.success) {
-          saToast(res.message, 'success');
+          closeModal('sa-delete-menu-modal');
+          saToast(res.message || `'${name}' deleted from menu`, 'success');
+          saPendingDeleteItemId = null;
           saLoadMenu();
         } else {
-          saToast(res.message, 'error');
+          errEl.textContent = res.message || 'Failed to delete item.';
+          errEl.style.display = 'block';
+          btn.disabled = false;
+          btn.innerHTML = '<i class="bi bi-trash3-fill me-1"></i> Delete Item Permanently';
         }
       } catch (e) {
-        saToast('Failed to delete item', 'error');
+        errEl.textContent = 'Connection error while deleting item.';
+        errEl.style.display = 'block';
+        btn.disabled = false;
+        btn.innerHTML = '<i class="bi bi-trash3-fill me-1"></i> Delete Item Permanently';
       }
     }
+
+    // Pizza House category IDs (categories with id >= 10 in the DB)
+    const PIZZA_CATEGORY_IDS = new Set([10, 11, 12, 13, 14, 15, 16]);
 
     function saOpenAddMenuModal() {
       document.getElementById('sa-new-menu-name').value = '';
@@ -3294,7 +3682,87 @@
       document.getElementById('sa-new-menu-stock').value = '20';
       document.getElementById('sa-new-menu-min-stock').value = '5';
       document.getElementById('sa-new-menu-image').value = '';
+
+      // Dynamically build category dropdown from loaded categories
+      const sel = document.getElementById('sa-new-menu-category');
+      const cafeCategories   = saMenuCategories.filter(c => !PIZZA_CATEGORY_IDS.has(c.id));
+      const pizzaCategories  = saMenuCategories.filter(c =>  PIZZA_CATEGORY_IDS.has(c.id));
+
+      let html = '';
+      if (cafeCategories.length) {
+        html += `<optgroup label="☕ ChipiPie Café">`;
+        cafeCategories.forEach(c => { html += `<option value="${c.id}">${c.name}</option>`; });
+        html += `</optgroup>`;
+      }
+      if (pizzaCategories.length) {
+        html += `<optgroup label="🍕 Pizza House">`;
+        pizzaCategories.forEach(c => { html += `<option value="${c.id}">${c.name}</option>`; });
+        html += `</optgroup>`;
+      }
+      // Fallback: if categories not loaded yet, use plain list
+      if (!html) {
+        saMenuCategories.forEach(c => { html += `<option value="${c.id}">${c.name}</option>`; });
+      }
+      sel.innerHTML = html;
+
       openModal('sa-add-item-modal');
+    }
+
+    /* ── Photo Upload Modal ── */
+    let _saPhotoItemId = null;
+
+    function saOpenPhotoModal(id, name) {
+      _saPhotoItemId = id;
+      document.getElementById('sa-photo-item-label').textContent = `Item: ${name}`;
+      document.getElementById('sa-photo-file').value = '';
+      document.getElementById('sa-photo-preview').src = '';
+      document.getElementById('sa-photo-preview-wrap').style.display = 'none';
+      openModal('sa-photo-modal');
+    }
+
+    function saPreviewPhoto(input) {
+      const previewWrap = document.getElementById('sa-photo-preview-wrap');
+      const preview = document.getElementById('sa-photo-preview');
+      if (input.files && input.files[0]) {
+        const reader = new FileReader();
+        reader.onload = ev => {
+          preview.src = ev.target.result;
+          previewWrap.style.display = 'block';
+        };
+        reader.readAsDataURL(input.files[0]);
+      } else {
+        previewWrap.style.display = 'none';
+      }
+    }
+
+    async function saSubmitPhoto() {
+      if (!_saPhotoItemId) return;
+      const fileInput = document.getElementById('sa-photo-file');
+      if (!fileInput.files || !fileInput.files[0]) {
+        saToast('Please select a photo first.', 'error');
+        return;
+      }
+      const btn = document.getElementById('sa-photo-submit-btn');
+      btn.disabled = true;
+      try {
+        const imageSrc = await new Promise(resolve => {
+          const reader = new FileReader();
+          reader.onload = ev => resolve(ev.target.result);
+          reader.readAsDataURL(fileInput.files[0]);
+        });
+        const res = await saApi('menu.php?action=update', { id: _saPhotoItemId, image: imageSrc });
+        if (res.success) {
+          closeModal('sa-photo-modal');
+          saToast('Photo updated successfully!', 'success');
+          saLoadMenu();
+        } else {
+          saToast(res.message || 'Failed to update photo.', 'error');
+        }
+      } catch (err) {
+        saToast('Error uploading photo.', 'error');
+      } finally {
+        btn.disabled = false;
+      }
     }
 
     async function saSubmitAddMenu(e) {
@@ -4024,9 +4492,13 @@
 
         let voidRefundEmails = '';
         let voidRefundAdminIds = '';
+        let superadminEmail = '';
         res.settings.forEach(s => {
           const el = document.getElementById(`setting-${s.setting_key}`);
           if (el) el.value = s.setting_value;
+          if (s.setting_key === 'superadmin_email') {
+            superadminEmail = (s.setting_value || '').trim();
+          }
           if (s.setting_key === 'void_refund_manager_email') {
             voidRefundEmails = s.setting_value || '';
           }
@@ -4035,19 +4507,86 @@
           }
         });
 
+        // Ensure super_admin in _saAdminUsers has the superadmin_email from settings
+        if (superadminEmail) {
+          _saAdminUsers.forEach(adm => {
+            if (adm.role === 'super_admin') {
+              adm.email = superadminEmail;
+            }
+          });
+        }
+
         renderAdminRecipients(_saAdminUsers, voidRefundEmails, voidRefundAdminIds);
         loadRateLimitsTable();
       } catch (e) { console.error('Settings load failed:', e); }
+    }
+
+    function syncSuperadminEmailLive() {
+      const saEmailInput = document.getElementById('setting-superadmin_email');
+      if (!saEmailInput) return;
+      const newEmail = saEmailInput.value.trim();
+
+      // Update in-memory user list
+      if (Array.isArray(_saAdminUsers)) {
+        _saAdminUsers.forEach(adm => {
+          if (adm.role === 'super_admin') {
+            adm.email = newEmail;
+          }
+        });
+      }
+
+      // Update all super admin recipient cards
+      const superCards = document.querySelectorAll('.sa-admin-recipient-card[data-is-super="1"]');
+      superCards.forEach(card => {
+        const chk = card.querySelector('.sa-admin-recipient-chk');
+        if (chk) {
+          chk.value = newEmail;
+          const admId = chk.dataset.id;
+          const emailDisplay = document.getElementById(`email-display-admin-${admId}`);
+          const statusBadge = document.getElementById(`status-badge-admin-${admId}`);
+
+          const domain = (newEmail.split('@')[1] || '').toLowerCase();
+          const isDummy = ['example.com', 'example.org', 'example.net', 'localhost', 'test.com', 'domain.com'].includes(domain);
+
+          if (newEmail && !isDummy) {
+            if (emailDisplay) {
+              emailDisplay.innerHTML = `<i class="bi bi-envelope me-1"></i>${escapeHtml(newEmail)}`;
+              emailDisplay.style.color = 'var(--sa-muted)';
+            }
+            if (statusBadge && statusBadge.textContent.includes('No Email')) {
+              statusBadge.remove();
+            }
+            chk.disabled = false;
+            card.classList.remove('inactive');
+            card.removeAttribute('title');
+          } else {
+            if (emailDisplay) {
+              emailDisplay.innerHTML = isDummy ? '⚠ Placeholder email (example.com) not allowed' : '⚠ No email set in profile';
+              emailDisplay.style.color = '#ef4444';
+            }
+            chk.disabled = true;
+            card.classList.add('inactive');
+            card.setAttribute('title', isDummy ? 'Placeholder email domain cannot receive tokens' : 'No email set — cannot receive tokens');
+          }
+        }
+      });
+
+      updateRecipientSummary();
     }
 
     function renderAdminRecipients(admins, configuredEmailsStr, configuredIdsStr) {
       const container = document.getElementById('sa-admin-recipients-list');
       if (!container) return;
 
+      const dummyDomains = ['example.com', 'example.org', 'example.net', 'localhost', 'test.com', 'domain.com'];
+
       const configuredEmails = (configuredEmailsStr || '')
         .split(',')
         .map(e => e.trim().toLowerCase())
-        .filter(Boolean);
+        .filter(e => {
+          const dom = (e.split('@')[1] || '').toLowerCase();
+          return Boolean(e) && !dummyDomains.includes(dom);
+        });
 
       const configuredIds = (configuredIdsStr || '')
         .split(',')
@@ -4067,25 +4606,34 @@
         return;
       }
 
+      const saInputVal = (document.getElementById('setting-superadmin_email')?.value || '').trim();
+
       container.innerHTML = admins.map(adm => {
-        const email = (adm.email || '').trim();
-        const hasEmail = Boolean(email);
+        let email = (adm.email || '').trim();
+        const isSuper = adm.role === 'super_admin';
+        // For super admin, always prioritize current setting-superadmin_email value
+        if (isSuper && saInputVal) {
+          email = saInputVal;
+        }
+
+        const domain = (email.split('@')[1] || '').toLowerCase();
+        const isDummy = dummyDomains.includes(domain);
+        const hasEmail = Boolean(email) && !isDummy;
         const isActive = parseInt(adm.is_active) === 1;
         const admId = parseInt(adm.id);
 
-        // Inactive account in POS or missing email CANNOT be added to receive a token!
+        // Inactive account in POS or missing/dummy email CANNOT be added to receive a token!
         const canReceive = hasEmail && isActive;
 
         let isChecked = false;
         if (canReceive) {
           if (hasConfig) {
-            isChecked = configuredIds.includes(admId) || configuredEmails.includes(email.toLowerCase());
+            isChecked = configuredIds.includes(admId) || (email && configuredEmails.includes(email.toLowerCase()));
           } else {
             isChecked = true; // default active admins with emails on first setup
           }
         }
 
-        const isSuper = adm.role === 'super_admin';
         const roleLabel = isSuper ? 'Super Admin' : 'Admin';
         const roleBg = isSuper ? 'rgba(245,158,11,0.15)' : 'rgba(124,58,237,0.15)';
         const roleColor = isSuper ? '#f59e0b' : '#a855f7';
@@ -4094,13 +4642,15 @@
         return `
           <div class="sa-admin-recipient-card ${isChecked ? 'selected' : ''} ${!canReceive ? 'inactive' : ''}" 
                id="card-admin-${adm.id}" 
+               data-is-super="${isSuper ? '1' : '0'}" 
                onclick="toggleAdminRecipient(${adm.id}, event)"
-               ${!canReceive ? `title="${!isActive ? 'Inactive in POS — cannot receive tokens' : 'No email set — cannot receive tokens'}"` : ''}>
+               ${!canReceive ? `title="${!isActive ? 'Inactive in POS — cannot receive tokens' : (isDummy ? 'Placeholder email domain (example.com) cannot receive tokens' : 'No email set — cannot receive tokens')}"` : ''}>
             <input type="checkbox" class="sa-admin-recipient-chk" 
                    id="chk-admin-${adm.id}" 
                    data-id="${adm.id}" 
                    data-name="${escapeHtml(adm.full_name || adm.username)}" 
                    data-role="${roleLabel}" 
+                   data-is-super="${isSuper ? '1' : '0'}" 
                    value="${escapeHtml(email)}" 
                    ${isChecked ? 'checked' : ''} 
                    ${!canReceive ? 'disabled' : ''} 
@@ -4112,10 +4662,10 @@
               <div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap;">
                 <span style="font-size:13px;font-weight:700;color:#fff;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${escapeHtml(adm.full_name || adm.username)}</span>
                 <span style="font-size:9.5px;font-weight:700;padding:1px 6px;border-radius:6px;background:${roleBg};color:${roleColor};white-space:nowrap;">${roleLabel}</span>
-                ${!canReceive ? `<span style="font-size:9px;padding:1px 5px;border-radius:4px;background:rgba(239,68,68,0.15);color:#ef4444;">${!isActive ? 'Inactive in POS - cannot receive tokens' : 'No Email - cannot receive tokens'}</span>` : ''}
+                ${!canReceive ? `<span id="status-badge-admin-${adm.id}" style="font-size:9px;padding:1px 5px;border-radius:4px;background:rgba(239,68,68,0.15);color:#ef4444;">${!isActive ? 'Inactive in POS - cannot receive tokens' : (isDummy ? 'Placeholder Domain' : 'No Email - cannot receive tokens')}</span>` : ''}
               </div>
-              <div style="font-size:11.5px;color:${hasEmail ? 'var(--sa-muted)' : '#ef4444'};overflow:hidden;text-overflow:ellipsis;white-space:nowrap;margin-top:3px;">
-                ${hasEmail ? `<i class="bi bi-envelope me-1"></i>${escapeHtml(email)}` : '⚠ No email set in profile'}
+              <div id="email-display-admin-${adm.id}" style="font-size:11.5px;color:${hasEmail ? 'var(--sa-muted)' : '#ef4444'};overflow:hidden;text-overflow:ellipsis;white-space:nowrap;margin-top:3px;">
+                ${hasEmail ? `<i class="bi bi-envelope me-1"></i>${escapeHtml(email)}` : (isDummy ? '⚠ Placeholder email (example.com)' : '⚠ No email set in profile')}
               </div>
             </div>
           </div>
@@ -4161,13 +4711,16 @@
       const recipientList = [];
       const recipientIds = [];
       const recipientMap = new Map();
+      const dummyDomains = ['example.com', 'example.org', 'example.net', 'localhost', 'test.com', 'domain.com'];
 
-      // Collect exclusively checked registered admins and super admin
+      // Collect exclusively checked registered admins and super admin with valid real domains
       const chks = document.querySelectorAll('.sa-admin-recipient-chk:checked:not(:disabled)');
       chks.forEach(c => {
         const email = c.value.trim().toLowerCase();
+        const domain = (email.split('@')[1] || '').toLowerCase();
+        if (!email || dummyDomains.includes(domain)) return;
         const admId = parseInt(c.dataset.id);
-        if (email && !recipientMap.has(email)) {
+        if (!recipientMap.has(email)) {
           const item = {
             id: admId,
             email: email,
@@ -4181,7 +4734,7 @@
         }
       });
 
-      // Sync hidden setting inputs
+      // Sync void & refund recipient email box
       const settingEmailInput = document.getElementById('setting-void_refund_manager_email');
       if (settingEmailInput) {
         settingEmailInput.value = recipientList.map(r => r.email).join(', ');
@@ -4246,7 +4799,11 @@
 
       const res = await saApi('superadmin.php?action=save_settings', { settings });
       saToast(res.message, res.success ? 'success' : 'error');
-      loadRateLimitsTable();
+      if (res.success) {
+        await loadSettings();
+      } else {
+        loadRateLimitsTable();
+      }
     }
 
     async function loadRateLimitsTable() {
@@ -4401,12 +4958,53 @@
       });
     });
 
-    // Escape key
+    // Escape key — close only the topmost open modal
     document.addEventListener('keydown', e => {
       if (e.key === 'Escape') {
-        document.querySelectorAll('.sa-modal-overlay.open').forEach(m => m.classList.remove('open'));
+        // Priority order: confirm > delete-menu > reject > photo > add-item > edit-user > create-user > review
+        const priority = ['sa-confirm-modal','sa-delete-menu-modal','reject-request-modal','sa-photo-modal','sa-add-item-modal','edit-user-modal','create-user-modal','review-modal'];
+        for (const id of priority) {
+          const el = document.getElementById(id);
+          if (el && el.classList.contains('open')) {
+            el.classList.remove('open');
+            break; // only close the topmost one
+          }
+        }
       }
     });
+
+    /* ========== PREVENT DOUBLE-TAP & GESTURE ZOOM ON MOBILE/TABLET ========== */
+    (function initZoomPrevention() {
+      // 1. Prevent native double-click / double-tap zooming
+      document.addEventListener('dblclick', function(e) {
+        e.preventDefault();
+      }, { passive: false });
+
+      // 2. Prevent double-tap zoom on non-interactive areas in iOS Safari / Android Chrome
+      let lastTouchEnd = 0;
+      document.addEventListener('touchend', function(e) {
+        const now = Date.now();
+        if (now - lastTouchEnd <= 300) {
+          const isInteractive = e.target.closest('button, input, select, textarea, a, .sa-btn, .sa-nav-item, [onclick], [role="button"]');
+          if (!isInteractive) {
+            e.preventDefault();
+          }
+        }
+        lastTouchEnd = now;
+      }, { passive: false });
+
+      // 3. Prevent pinch-to-zoom / multi-finger gesture zoom on iOS Safari
+      document.addEventListener('gesturestart', function(e) { e.preventDefault(); }, { passive: false });
+      document.addEventListener('gesturechange', function(e) { e.preventDefault(); }, { passive: false });
+      document.addEventListener('gestureend', function(e) { e.preventDefault(); }, { passive: false });
+
+      // 4. Prevent pinch-to-zoom on multi-touch Android Chrome
+      document.addEventListener('touchmove', function(e) {
+        if (e.touches && e.touches.length > 1) {
+          e.preventDefault();
+        }
+      }, { passive: false });
+    })();
 
     /* =============================================
        INIT — Check Existing Session

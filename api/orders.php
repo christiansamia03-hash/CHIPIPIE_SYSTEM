@@ -15,6 +15,7 @@ if ($method === 'GET' && !$action)                       { handleFetchOrders(); 
 elseif ($method === 'GET' && $action === 'stats')         { handleStats(); }
 elseif ($method === 'GET' && $action === 'print_summary') { handlePrintSummary(); }
 elseif ($method === 'GET' && $action === 'get_adjustments') { handleGetAdjustments(); }
+elseif ($method === 'GET' && $action === 'receipt')         { handleGetReceipt(); }
 elseif ($action === 'checkout')                           { handleCheckout(); }
 elseif ($action === 'void_order')                         { handleVoidOrder(); }
 elseif ($action === 'refund_order')                       { handleRefundOrder(); }
@@ -44,7 +45,7 @@ function getVoidRefundRecipients() {
             foreach ($stmt->fetchAll() as $row) {
                 $em = trim($row['email']);
                 $low = strtolower($em);
-                if (!isset($inactiveSet[$low]) && filter_var($em, FILTER_VALIDATE_EMAIL)) {
+                if (!isset($inactiveSet[$low]) && isValidSendableEmail($em)) {
                     $recipients[$low] = $em;
                 }
             }
@@ -60,7 +61,7 @@ function getVoidRefundRecipients() {
             if (isset($inactiveSet[$cleanEmail])) {
                 continue;
             }
-            if (filter_var($mEmail, FILTER_VALIDATE_EMAIL)) {
+            if (isValidSendableEmail($mEmail)) {
                 $recipients[$cleanEmail] = $mEmail;
             }
         }
@@ -72,7 +73,7 @@ function getVoidRefundRecipients() {
         foreach ($admins as $adm) {
             $em = trim($adm['email']);
             $low = strtolower($em);
-            if (!isset($inactiveSet[$low]) && filter_var($em, FILTER_VALIDATE_EMAIL)) {
+            if (!isset($inactiveSet[$low]) && isValidSendableEmail($em)) {
                 $recipients[$low] = $em;
             }
         }
@@ -282,6 +283,7 @@ function handleGetAdjustments() {
 
 function handleCheckout() {
     requireLogin();
+    session_write_close();
     $input = getJsonInput();
     $cartItems = $input['items'] ?? [];
     $paymentMethod = trim($input['payment_method'] ?? 'Cash');
@@ -306,13 +308,17 @@ function handleCheckout() {
             $clientPrice = isset($ci['unit_price']) ? floatval($ci['unit_price']) : null;
             if (!$itemId || $qty <= 0) continue;
 
-            $stmt = $db->prepare("SELECT id, name, price, size_prices, stock, min_stock FROM menu_items WHERE id = ? FOR UPDATE");
+            $stmt = $db->prepare("SELECT id, name, price, size_prices, stock, min_stock, is_available FROM menu_items WHERE id = ? FOR UPDATE");
             $stmt->execute([$itemId]);
             $item = $stmt->fetch();
 
             if (!$item) {
                 $db->rollBack();
                 jsonResponse(['success' => false, 'message' => "Item ID $itemId not found."], 404);
+            }
+            if (!$item['is_available']) {
+                $db->rollBack();
+                jsonResponse(['success' => false, 'message' => "{$item['name']} is currently marked unavailable."], 400);
             }
             if ($qty > $item['stock']) {
                 $db->rollBack();
@@ -379,6 +385,9 @@ function handleCheckout() {
             return ($li['qty'] > 1 ? $li['qty'] . '× ' : '') . $li['name'] . $sizeLabel;
         }, $lineItems));
 
+        $cashierName = $_SESSION['full_name'] ?? $_SESSION['username'] ?? 'Staff';
+        $formattedDate = date('M d, Y h:i A');
+
         jsonResponse([
             'success' => true,
             'message' => "Order $orderNum placed — ₱" . number_format($total, 2),
@@ -390,6 +399,20 @@ function handleCheckout() {
                 'payment_method' => $paymentMethod,
                 'status' => 'Completed',
                 'time' => date('g:i A'),
+                'date' => date('M d, Y'),
+                'created_at' => date('Y-m-d H:i:s'),
+                'formatted_date' => $formattedDate,
+                'cashier' => $cashierName,
+                'line_items' => array_map(function($li) {
+                    return [
+                        'item_id' => $li['item_id'],
+                        'name' => $li['name'],
+                        'size' => $li['size'],
+                        'qty' => $li['qty'],
+                        'price' => $li['price'],
+                        'subtotal' => $li['subtotal']
+                    ];
+                }, $lineItems)
             ],
             'stock_alerts' => $stockAlerts
         ]);
@@ -398,6 +421,66 @@ function handleCheckout() {
         $db->rollBack();
         jsonResponse(['success' => false, 'message' => 'Checkout failed: ' . $e->getMessage()], 500);
     }
+}
+
+function handleGetReceipt() {
+    requireLogin();
+    $id = intval($_GET['id'] ?? 0);
+    $orderNumber = trim($_GET['order_number'] ?? '');
+    $db = getDB();
+
+    if ($id) {
+        $stmt = $db->prepare("SELECT o.*, u.full_name AS cashier_name, u.username AS cashier_username FROM orders o LEFT JOIN users u ON o.user_id = u.id WHERE o.id = ?");
+        $stmt->execute([$id]);
+    } elseif ($orderNumber) {
+        $stmt = $db->prepare("SELECT o.*, u.full_name AS cashier_name, u.username AS cashier_username FROM orders o LEFT JOIN users u ON o.user_id = u.id WHERE o.order_number = ?");
+        $stmt->execute([$orderNumber]);
+    } else {
+        jsonResponse(['success' => false, 'message' => 'Order ID or order number is required.'], 400);
+    }
+
+    $order = $stmt->fetch();
+    if (!$order) {
+        jsonResponse(['success' => false, 'message' => 'Order not found.'], 404);
+    }
+
+    // Fetch line items with item details
+    $iStmt = $db->prepare("
+        SELECT oi.*, m.name AS item_name, m.emoji
+        FROM order_items oi
+        LEFT JOIN menu_items m ON oi.menu_item_id = m.id
+        WHERE oi.order_id = ?
+        ORDER BY oi.id ASC
+    ");
+    $iStmt->execute([$order['id']]);
+    $items = $iStmt->fetchAll();
+
+    $cashier = $order['cashier_name'] ?: ($order['cashier_username'] ?: 'Staff');
+    $formattedDate = date('M d, Y h:i A', strtotime($order['created_at']));
+
+    jsonResponse([
+        'success' => true,
+        'order' => [
+            'id' => intval($order['id']),
+            'order_number' => $order['order_number'],
+            'total' => floatval($order['total']),
+            'payment_method' => $order['payment_method'],
+            'status' => $order['status'],
+            'created_at' => $order['created_at'],
+            'formatted_date' => $formattedDate,
+            'cashier' => $cashier,
+            'line_items' => array_map(function($it) {
+                return [
+                    'item_id' => intval($it['menu_item_id']),
+                    'name' => $it['item_name'] ?: 'Item',
+                    'size' => $it['size'],
+                    'qty' => intval($it['quantity']),
+                    'price' => floatval($it['unit_price']),
+                    'subtotal' => floatval($it['subtotal'])
+                ];
+            }, $items)
+        ]
+    ]);
 }
 
 function handleFetchOrders() {

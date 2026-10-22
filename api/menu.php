@@ -18,14 +18,17 @@ if ($method === 'GET' && !$action) { handleFetchMenu(); }
 elseif ($action === 'decide_menu_change') { handleDecideMenuChange(); }
 else {
     switch ($action) {
-        case 'add':            handleAddItem(); break;
-        case 'request_add':    handleRequestAddMenu(); break;
-        case 'delete':         handleDeleteItem(); break;
-        case 'request_delete': handleRequestDeleteMenu(); break;
-        case 'update':         handleUpdateItem(); break;
-        case 'adjust_stock':   handleAdjustStock(); break;
-        case 'set_stock':      handleSetStock(); break;
-        case 'toggle':         handleToggleAvail(); break;
+        case 'add':                    handleAddItem(); break;
+        case 'request_add':            handleRequestAddMenu(); break;
+        case 'delete':                 handleDeleteItem(); break;
+        case 'request_delete':         handleRequestDeleteMenu(); break;
+        case 'cancel_delete':          handleCancelDeleteMenu(); break;
+        case 'check_request_status':   handleCheckMenuRequestStatus(); break;
+        case 'execute_add_with_code':  handleExecuteAddWithCode(); break;
+        case 'update':                 handleUpdateItem(); break;
+        case 'adjust_stock':           handleAdjustStock(); break;
+        case 'set_stock':              handleSetStock(); break;
+        case 'toggle':                 handleToggleAvail(); break;
         default: jsonResponse(['success' => false, 'message' => 'Invalid action.'], 400);
     }
 }
@@ -96,7 +99,7 @@ function handleAddItem() {
 }
 
 function handleUpdateItem() {
-    requireAdmin();
+    requireLogin();
     $input = getJsonInput();
     $id = intval($input['id'] ?? 0);
     if (!$id) jsonResponse(['success' => false, 'message' => 'Item ID required.'], 400);
@@ -176,14 +179,27 @@ function handleDeleteItem() {
 
     if (!$item) jsonResponse(['success' => false, 'message' => 'Item not found.'], 404);
 
-    $db->prepare("DELETE FROM menu_items WHERE id = ?")->execute([$id]);
+    try {
+        $db->prepare("DELETE FROM menu_items WHERE id = ?")->execute([$id]);
 
-    // Clean up any pending system_requests for this item
-    $now = date('Y-m-d H:i:s');
-    $db->prepare("UPDATE system_requests SET status = 'approved', reviewed_by = ?, reviewed_at = ?, review_note = 'Deleted from menu' WHERE type = 'menu_change' AND status = 'pending' AND (payload LIKE ? OR payload LIKE ?)")
-       ->execute([$_SESSION['user_id'] ?? 0, $now, '%"item_id":' . $id . '%', '%"item_id":"' . $id . '"%']);
+        // Clean up any pending system_requests for this item
+        $now = date('Y-m-d H:i:s');
+        $db->prepare("UPDATE system_requests SET status = 'approved', reviewed_by = ?, reviewed_at = ?, review_note = 'Deleted from menu' WHERE type = 'menu_change' AND status = 'pending' AND (payload LIKE ? OR payload LIKE ?)")
+           ->execute([$_SESSION['user_id'] ?? 0, $now, '%"item_id":' . $id . '%', '%"item_id":"' . $id . '"%']);
 
-    jsonResponse(['success' => true, 'message' => "'{$item['name']}' deleted from menu."]);
+        // System audit log
+        try {
+            $ip = $_SERVER['REMOTE_ADDR'] ?? null;
+            $actorId = $_SESSION['user_id'] ?? null;
+            $actorUser = $_SESSION['username'] ?? 'system';
+            $db->prepare("INSERT INTO system_logs (actor_id, actor_username, action, target_type, target_id, details, ip_address) VALUES (?, ?, 'menu_item_deleted', 'menu_item', ?, ?, ?)")
+               ->execute([$actorId, $actorUser, $id, "Permanently deleted menu item '{$item['name']}' (ID: {$id})", $ip]);
+        } catch (Exception $logEx) {}
+
+        jsonResponse(['success' => true, 'message' => "'{$item['name']}' deleted from menu."]);
+    } catch (PDOException $e) {
+        jsonResponse(['success' => false, 'message' => 'Database error while deleting item: ' . $e->getMessage()], 500);
+    }
 }
 
 function handleAdjustStock() {
@@ -223,7 +239,7 @@ function handleSetStock() {
 }
 
 function handleToggleAvail() {
-    requireAdmin();
+    requireLogin();
     $input = getJsonInput();
     $id = intval($input['id'] ?? 0);
     if (!$id) jsonResponse(['success' => false, 'message' => 'Item ID required.'], 400);
@@ -243,6 +259,20 @@ function handleToggleAvail() {
 
 function handleRequestAddMenu() {
     requireLogin();
+    $db = getDB();
+    $userId = $_SESSION['user_id'] ?? null;
+    $requester = $_SESSION['full_name'] ?? $_SESSION['username'] ?? '';
+    $userRole = $_SESSION['role'] ?? 'cashier';
+    if ($userId && (!$requester || $requester === 'Staff')) {
+        $uStmt = $db->prepare("SELECT full_name, username, role FROM users WHERE id = ?");
+        $uStmt->execute([$userId]);
+        $uRow = $uStmt->fetch();
+        if ($uRow) {
+            $requester = $uRow['full_name'] ?: $uRow['username'];
+            $userRole = $uRow['role'];
+        }
+    }
+    if (!$requester) $requester = 'Cashier';
     session_write_close();
     $input = getJsonInput();
     $name = trim($input['name'] ?? '');
@@ -297,10 +327,15 @@ function handleRequestAddMenu() {
         $categoryName = $cat ? $cat['name'] : 'Category #' . $categoryId;
     }
 
-    $requester = $_SESSION['full_name'] ?? $_SESSION['username'] ?? 'Staff';
-    $userId = $_SESSION['user_id'] ?? null;
-
+    $pinCode = str_pad(random_int(100000, 999999), 6, '0', STR_PAD_LEFT);
     $approvalToken = bin2hex(random_bytes(32));
+
+    // Store PIN code in admin_tokens for POS authorization
+    $expiryMin = intval(getSetting('token_expiry_minutes') ?: TOKEN_EXPIRY_MINUTES);
+    if ($expiryMin < 5) $expiryMin = 15;
+    $expiresAt = date('Y-m-d H:i:s', strtotime("+$expiryMin minutes"));
+    $stmt = $db->prepare("INSERT INTO admin_tokens (token, user_id, purpose, expires_at) VALUES (?, ?, ?, ?)");
+    $stmt->execute([$pinCode, $userId, $approvalToken, $expiresAt]);
 
     $payload = [
         'action'        => 'add',
@@ -312,25 +347,49 @@ function handleRequestAddMenu() {
         'min_stock'     => $minStock,
         'image'         => $image,
         'size_prices'   => $sizePrices,
+        'pin_code'      => $pinCode,
     ];
 
     $title = "Add Menu Item: {$name}";
-    $desc = "Category: {$categoryName} | Price: ₱" . number_format($price, 2) . " | Initial Stock: {$stock}";
+    $desc = "Category: {$categoryName} | Price: ₱" . number_format($price, 2) . " | Initial Stock: {$stock} | Code: {$pinCode}";
 
     $stmt = $db->prepare("INSERT INTO system_requests (type, requested_by, requester_name, title, description, payload, approval_token, status) VALUES (?, ?, ?, ?, ?, ?, ?, 'pending')");
     $stmt->execute(['menu_change', $userId, $requester, $title, $desc, json_encode($payload), $approvalToken]);
 
-    sendMenuRequestEmail('add', $payload, $requester, $approvalToken);
+    sendMenuRequestEmail('add', $payload, $requester, $approvalToken, $userRole);
 
-    jsonResponse([
+    $isCashier = ($userRole === 'cashier');
+
+    $resp = [
         'success'        => true,
-        'message'        => "Request to add '{$name}' sent to admin email for approval.",
-        'approval_token' => $approvalToken
-    ]);
+        'message'        => $isCashier
+            ? "Request to add '{$name}' submitted for approval."
+            : "Request to add '{$name}' submitted. Authorization code sent to Admin & Super Admin email.",
+        'approval_token' => $approvalToken,
+        'is_cashier'     => $isCashier
+    ];
+    if (DEV_MODE && !$isCashier) {
+        $resp['dev_token'] = $pinCode;
+    }
+    jsonResponse($resp);
 }
 
 function handleRequestDeleteMenu() {
     requireLogin();
+    $db = getDB();
+    $userId = $_SESSION['user_id'] ?? null;
+    $requester = $_SESSION['full_name'] ?? $_SESSION['username'] ?? '';
+    $userRole = $_SESSION['role'] ?? 'cashier';
+    if ($userId && (!$requester || $requester === 'Staff')) {
+        $uStmt = $db->prepare("SELECT full_name, username, role FROM users WHERE id = ?");
+        $uStmt->execute([$userId]);
+        $uRow = $uStmt->fetch();
+        if ($uRow) {
+            $requester = $uRow['full_name'] ?: $uRow['username'];
+            $userRole = $uRow['role'];
+        }
+    }
+    if (!$requester) $requester = 'Staff';
     session_write_close();
     $input = getJsonInput();
     $id = intval($input['id'] ?? 0);
@@ -378,10 +437,15 @@ function handleRequestDeleteMenu() {
         ], 409);
     }
 
-    $requester = $_SESSION['full_name'] ?? $_SESSION['username'] ?? 'Staff';
-    $userId = $_SESSION['user_id'] ?? null;
-
+    $pinCode = str_pad(random_int(100000, 999999), 6, '0', STR_PAD_LEFT);
     $approvalToken = bin2hex(random_bytes(32));
+
+    // Store PIN code in admin_tokens for POS authorization
+    $expiryMin = intval(getSetting('token_expiry_minutes') ?: TOKEN_EXPIRY_MINUTES);
+    if ($expiryMin < 5) $expiryMin = 15;
+    $expiresAt = date('Y-m-d H:i:s', strtotime("+$expiryMin minutes"));
+    $stmt = $db->prepare("INSERT INTO admin_tokens (token, user_id, purpose, expires_at) VALUES (?, ?, ?, ?)");
+    $stmt->execute([$pinCode, $userId, $approvalToken, $expiresAt]);
 
     $payload = [
         'action'   => 'delete',
@@ -390,25 +454,158 @@ function handleRequestDeleteMenu() {
         'category' => $item['category'] ?? 'General',
         'price'    => $item['price'],
         'stock'    => $item['stock'],
-        'reason'   => $reason
+        'reason'   => $reason,
+        'pin_code' => $pinCode
     ];
 
     $title = "Remove Menu Item: {$item['name']}";
-    $desc = "Category: {$item['category']} | Price: ₱" . number_format($item['price'], 2) . " | Stock: {$item['stock']}";
+    $desc = "Category: {$item['category']} | Price: ₱" . number_format($item['price'], 2) . " | Stock: {$item['stock']} | Code: {$pinCode}";
 
     $stmt = $db->prepare("INSERT INTO system_requests (type, requested_by, requester_name, title, description, payload, approval_token, status) VALUES (?, ?, ?, ?, ?, ?, ?, 'pending')");
     $stmt->execute(['menu_change', $userId, $requester, $title, $desc, json_encode($payload), $approvalToken]);
 
-    sendMenuRequestEmail('delete', $payload, $requester, $approvalToken);
+    sendMenuRequestEmail('delete', $payload, $requester, $approvalToken, $userRole);
 
-    jsonResponse([
+    $resp = [
         'success'        => true,
         'message'        => "Request to remove '{$item['name']}' sent to admin email for approval.",
         'approval_token' => $approvalToken
+    ];
+    if (DEV_MODE) {
+        $resp['dev_token'] = $pinCode;
+    }
+    jsonResponse($resp);
+}
+
+function handleCancelDeleteMenu() {
+    ensureSession();
+    $input = getJsonInput();
+    $id = intval($input['id'] ?? 0);
+    if (!$id) {
+        jsonResponse(['success' => false, 'message' => 'Item ID is required.'], 400);
+    }
+
+    $db = getDB();
+    $checkStmt = $db->prepare("
+        SELECT id, requester_name, payload 
+        FROM system_requests 
+        WHERE type = 'menu_change' 
+          AND status = 'pending' 
+          AND (payload LIKE ? OR payload LIKE ?)
+        ORDER BY created_at DESC
+        LIMIT 1
+    ");
+    $checkStmt->execute([
+        '%"item_id":' . $id . '%',
+        '%"item_id":"' . $id . '"%'
+    ]);
+    $req = $checkStmt->fetch();
+
+    if (!$req) {
+        jsonResponse(['success' => false, 'message' => 'No pending removal request found for this item.'], 404);
+    }
+
+    $now = date('Y-m-d H:i:s');
+    $userId = $_SESSION['user_id'] ?? null;
+    $canceller = $_SESSION['full_name'] ?? $_SESSION['username'] ?? 'Staff';
+
+    // Mark request as rejected/cancelled so it is no longer pending
+    $db->prepare("
+        UPDATE system_requests 
+        SET status = 'rejected', reviewed_by = ?, reviewed_at = ?, review_note = ? 
+        WHERE id = ?
+    ")->execute([$userId, $now, "Removal request cancelled by {$canceller}", $req['id']]);
+
+    jsonResponse([
+        'success' => true,
+        'message' => 'Pending removal request has been cancelled.'
     ]);
 }
 
-function sendMenuRequestEmail($actionType, $payload, $requester, $approvalToken) {
+function handleCheckMenuRequestStatus() {
+    requireLogin();
+    session_write_close();
+    $token = trim($_GET['token'] ?? '');
+    if (!$token) {
+        jsonResponse(['success' => false, 'message' => 'Token required.'], 400);
+    }
+    $db = getDB();
+    $stmt = $db->prepare("SELECT id, type, status, review_note, payload FROM system_requests WHERE approval_token = ? LIMIT 1");
+    $stmt->execute([$token]);
+    $row = $stmt->fetch();
+    if (!$row) {
+        jsonResponse(['success' => false, 'message' => 'Request not found.'], 404);
+    }
+    $via = (strpos($row['review_note'] ?? '', 'Email') !== false) ? 'Email Link'
+         : ((strpos($row['review_note'] ?? '', 'PIN') !== false || strpos($row['review_note'] ?? '', 'Code') !== false) ? 'Authorization Code' : 'Super Admin');
+    jsonResponse([
+        'success'        => true,
+        'request_status' => $row['status'],
+        'approved_via'   => $via,
+        'item_name'      => json_decode($row['payload'] ?? '{}', true)['name'] ?? 'Menu Item'
+    ]);
+}
+
+function handleExecuteAddWithCode() {
+    requireLogin();
+    session_write_close();
+    $input = getJsonInput();
+    $token = strtoupper(trim($input['token'] ?? ''));
+    if (!$token) jsonResponse(['success' => false, 'message' => 'Authorization code is required.'], 400);
+
+    $db = getDB();
+    $now = date('Y-m-d H:i:s');
+
+    // Validate PIN in admin_tokens
+    $stmt = $db->prepare("SELECT * FROM admin_tokens WHERE token = ? AND is_used = 0 AND expires_at > ?");
+    $stmt->execute([$token, $now]);
+    $tokenRow = $stmt->fetch();
+
+    if (!$tokenRow) {
+        jsonResponse(['success' => false, 'message' => 'Invalid or expired authorization code.'], 400);
+    }
+
+    $approvalToken = $tokenRow['purpose'];
+
+    // Mark token as used
+    $db->prepare("UPDATE admin_tokens SET is_used = 1, used_at = ? WHERE id = ?")->execute([$now, $tokenRow['id']]);
+
+    // Fetch pending request
+    $stmt = $db->prepare("SELECT * FROM system_requests WHERE approval_token = ? AND status = 'pending'");
+    $stmt->execute([$approvalToken]);
+    $request = $stmt->fetch();
+
+    if (!$request) {
+        jsonResponse(['success' => true, 'message' => 'Request already processed.']);
+    }
+
+    $payload = $request['payload'] ? json_decode($request['payload'], true) : [];
+    $name = trim($payload['name'] ?? '');
+    $categoryId = intval($payload['category_id'] ?? 1);
+    $price = floatval($payload['price'] ?? 0);
+    $image = $payload['image'] ?? null;
+    $stock = intval($payload['stock'] ?? 0);
+    $minStock = intval($payload['min_stock'] ?? 5);
+    $sizePrices = $payload['size_prices'] ?? null;
+    $sizePricesJson = null;
+    if ($sizePrices && is_array($sizePrices)) {
+        $sizePricesJson = json_encode($sizePrices);
+    } elseif ($sizePrices && is_string($sizePrices)) {
+        $sizePricesJson = $sizePrices;
+    }
+
+    if ($name && $categoryId && $price > 0) {
+        $insert = $db->prepare("INSERT INTO menu_items (name, category_id, price, size_prices, image, stock, min_stock, is_available) VALUES (?, ?, ?, ?, ?, ?, ?, ?)");
+        $insert->execute([$name, $categoryId, $price, $sizePricesJson, $image, $stock, $minStock, $stock > 0 ? 1 : 0]);
+    }
+
+    $db->prepare("UPDATE system_requests SET status = 'approved', reviewed_at = ?, review_note = 'Processed via Authorization Code' WHERE id = ?")
+       ->execute([$now, $request['id']]);
+
+    jsonResponse(['success' => true, 'message' => "'{$name}' added to menu successfully via authorization code."]);
+}
+
+function sendMenuRequestEmail($actionType, $payload, $requester, $approvalToken, $userRole = '') {
     $storeName = getSetting('store_name') ?: 'ChipiPie Cafe';
     $ownerEmail = trim(getSetting('owner_email') ?? '');
     $superAdminEmail = trim(getSetting('superadmin_email') ?? '');
@@ -425,6 +622,8 @@ function sendMenuRequestEmail($actionType, $payload, $requester, $approvalToken)
     $categoryName = htmlspecialchars($payload['category_name'] ?? $payload['category'] ?? 'General');
     $price = number_format(floatval($payload['price'] ?? 0), 2);
     $stock = intval($payload['stock'] ?? 0);
+    $pinCode = htmlspecialchars($payload['pin_code'] ?? '');
+    $roleTag = $userRole ? ' (' . ucfirst($userRole) . ')' : '';
 
     $detailRows = "
         <tr><td style='padding: 6px 0; font-weight: 600; color: #aaa;'>Action:</td><td><span style='background: {$badgeColor}22; color: {$badgeColor}; border: 1px solid {$badgeColor}44; padding: 2px 8px; border-radius: 6px; font-size: 11px; font-weight: 700;'>{$badgeText}</span></td></tr>
@@ -432,47 +631,83 @@ function sendMenuRequestEmail($actionType, $payload, $requester, $approvalToken)
         <tr><td style='padding: 6px 0; font-weight: 600; color: #aaa;'>Category:</td><td style='color: #ddd;'>{$categoryName}</td></tr>
         <tr><td style='padding: 6px 0; font-weight: 600; color: #aaa;'>Price:</td><td style='color: #fbbf24; font-weight: 700;'>₱{$price}</td></tr>
         <tr><td style='padding: 6px 0; font-weight: 600; color: #aaa;'>Stock:</td><td style='color: #ddd;'>{$stock} units</td></tr>
-        <tr><td style='padding: 6px 0; font-weight: 600; color: #aaa;'>Requested By:</td><td style='color: #ddd;'>{$requester}</td></tr>";
+        <tr><td style='padding: 6px 0; font-weight: 600; color: #aaa;'>Requested By:</td><td style='color: #ddd;'>{$requester}{$roleTag}</td></tr>";
 
-    $actionBody = "
+    $tokenBlock = "";
+    if ($pinCode) {
+        $tokenBlock = "
+        <div style='text-align:center;margin:20px 0;'>
+            <p style='font-size:12px;color:#aaa;margin-bottom:6px;'>Authorization Token / Code for POS:</p>
+            <span style='background:#3a2f2d;color:#fff;padding:12px 24px;border-radius:10px;font-size:24px;font-weight:700;letter-spacing:4px;font-family:monospace;'>$pinCode</span>
+            <p style='font-size:11px;color:#888;margin-top:6px;'>Use this code in POS to authorize " . ($isAdd ? "adding" : "removing") . " {$itemName}</p>
+        </div>";
+    }
+
+    $saButtons = "
+    <div style='display: flex; gap: 10px; margin-top: 20px; text-align: center;'>
+        <a href='{$approveUrl}' style='flex: 1; display: inline-block; background: #16a34a; color: #fff; padding: 12px 10px; border-radius: 8px; text-decoration: none; font-weight: 600; font-size: 14px;'>&#10003; " . ($isAdd ? 'Approve Add' : 'Approve Removal') . "</a>
+        <a href='{$rejectUrl}' style='flex: 1; display: inline-block; background: #3f3f46; color: #fff; padding: 12px 10px; border-radius: 8px; text-decoration: none; font-weight: 600; font-size: 14px;'>&#10007; Reject</a>
+    </div>";
+
+    $saBody = "
     <div style='font-family: Segoe UI, sans-serif; max-width: 500px; margin: 0 auto; padding: 30px; background: #1a1514; color: #f4f4f4; border-radius: 16px; border: 1px solid #332d2c;'>
         <div style='text-align: center; margin-bottom: 20px;'>
             <div style='display: inline-block; width: 50px; height: 50px; background: {$badgeColor}; color: #fff; border-radius: 12px; line-height: 50px; font-size: 24px;'>" . ($isAdd ? '☕' : '🗑️') . "</div>
             <h2 style='color: #fff; margin: 10px 0 5px;'>{$storeName}</h2>
-            <p style='color: #aaa; font-size: 13px; margin: 0;'>{$actionTitle} &mdash; Action Required</p>
+            <p style='color: #aaa; font-size: 13px; margin: 0;'>{$actionTitle} &mdash; Super Admin Action Required</p>
         </div>
         <div style='background: #2a2423; border-radius: 12px; padding: 24px; border: 1px solid #3d3533;'>
             <table style='width: 100%; font-size: 14px; color: #ddd; margin: 0 0 16px 0;'>{$detailRows}</table>
-            <div style='display: flex; gap: 10px; margin-top: 20px; text-align: center;'>
-                <a href='{$approveUrl}' style='flex: 1; display: inline-block; background: #16a34a; color: #fff; padding: 12px 10px; border-radius: 8px; text-decoration: none; font-weight: 600; font-size: 14px;'>&#10003; " . ($isAdd ? 'Approve Add' : 'Approve Removal') . "</a>
-                <a href='{$rejectUrl}' style='flex: 1; display: inline-block; background: #3f3f46; color: #fff; padding: 12px 10px; border-radius: 8px; text-decoration: none; font-weight: 600; font-size: 14px;'>&#10007; Reject</a>
-            </div>
-            <p style='font-size: 11px; color: #888; text-align: center; margin-top: 16px; margin-bottom: 0;'>Super Admin can also approve or reject this request in the Super Admin Control Center.</p>
+            {$tokenBlock}
+            {$saButtons}
+            <p style='font-size: 11px; color: #888; text-align: center; margin-top: 16px; margin-bottom: 0;'>Super Admin can click Approve above to immediately approve, or authorize via token in POS.</p>
+        </div>
+    </div>";
+
+    $adminBody = "
+    <div style='font-family: Segoe UI, sans-serif; max-width: 500px; margin: 0 auto; padding: 30px; background: #1a1514; color: #f4f4f4; border-radius: 16px; border: 1px solid #332d2c;'>
+        <div style='text-align: center; margin-bottom: 20px;'>
+            <div style='display: inline-block; width: 50px; height: 50px; background: {$badgeColor}; color: #fff; border-radius: 12px; line-height: 50px; font-size: 24px;'>" . ($isAdd ? '☕' : '🗑️') . "</div>
+            <h2 style='color: #fff; margin: 10px 0 5px;'>{$storeName}</h2>
+            <p style='color: #aaa; font-size: 13px; margin: 0;'>{$actionTitle} &mdash; Authorization Token</p>
+        </div>
+        <div style='background: #2a2423; border-radius: 12px; padding: 24px; border: 1px solid #3d3533;'>
+            <table style='width: 100%; font-size: 14px; color: #ddd; margin: 0 0 16px 0;'>{$detailRows}</table>
+            {$tokenBlock}
+            <p style='font-size: 11px; color: #888; text-align: center; margin-top: 16px; margin-bottom: 0;'>Enter the authorization token in the POS modal to confirm this request.</p>
         </div>
     </div>";
 
     $recipients = [];
-    if ($ownerEmail && filter_var($ownerEmail, FILTER_VALIDATE_EMAIL)) {
-        $recipients[strtolower($ownerEmail)] = $ownerEmail;
+    if ($ownerEmail && isValidSendableEmail($ownerEmail)) {
+        $recipients[strtolower($ownerEmail)] = ['email' => $ownerEmail, 'is_super' => true];
     }
-    if ($superAdminEmail && filter_var($superAdminEmail, FILTER_VALIDATE_EMAIL)) {
-        $recipients[strtolower($superAdminEmail)] = $superAdminEmail;
+    if ($superAdminEmail && isValidSendableEmail($superAdminEmail)) {
+        $recipients[strtolower($superAdminEmail)] = ['email' => $superAdminEmail, 'is_super' => true];
     }
 
     try {
         $db = getDB();
-        $adminStmt = $db->query("SELECT email FROM users WHERE role IN ('admin', 'super_admin') AND is_active = 1");
+        $adminStmt = $db->query("SELECT email, role FROM users WHERE role IN ('admin', 'super_admin') AND is_active = 1");
         while ($row = $adminStmt->fetch()) {
             $e = trim($row['email'] ?? '');
-            if ($e && filter_var($e, FILTER_VALIDATE_EMAIL)) {
-                $recipients[strtolower($e)] = $e;
+            if ($e && isValidSendableEmail($e)) {
+                $isSuper = ($row['role'] === 'super_admin');
+                $key = strtolower($e);
+                if (!isset($recipients[$key]) || $isSuper) {
+                    $recipients[$key] = [
+                        'email'    => $e,
+                        'is_super' => $isSuper || ($key === strtolower($superAdminEmail))
+                    ];
+                }
             }
         }
     } catch (Exception $e) {}
 
     $subject = "{$storeName} — {$actionTitle}: {$itemName}";
-    foreach ($recipients as $email) {
-        sendEmail($email, $subject, $actionBody);
+    foreach ($recipients as $r) {
+        $body = $r['is_super'] ? $saBody : $adminBody;
+        sendEmail($r['email'], $subject, $body);
     }
 }
 

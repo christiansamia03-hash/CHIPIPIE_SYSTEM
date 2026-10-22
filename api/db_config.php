@@ -149,11 +149,51 @@ function validatePasswordComplexity($password, &$error = '') {
 }
 
 /**
+ * Check if email address is valid and not a reserved/dummy placeholder domain
+ */
+function isValidSendableEmail($email) {
+    $email = trim($email);
+    if (!filter_var($email, FILTER_VALIDATE_EMAIL)) return false;
+    $parts = explode('@', $email);
+    if (count($parts) !== 2) return false;
+    $domain = strtolower(end($parts));
+
+    // Filter placeholder, reserved, and unroutable default demo domains
+    $dummyDomains = [
+        'chipipiecafe.com',
+        'example.com',
+        'example.org',
+        'example.net',
+        'localhost',
+        'test.com',
+        'domain.com',
+        'sample.com'
+    ];
+    if (in_array($domain, $dummyDomains)) return false;
+    if (str_ends_with($domain, '.chipipiecafe.com') || str_ends_with($domain, '.example.com')) return false;
+
+    // Verify domain has active DNS MX or A records on the internet
+    if (function_exists('checkdnsrr')) {
+        if (!@checkdnsrr($domain, 'MX') && !@checkdnsrr($domain, 'A')) {
+            return false;
+        }
+    }
+
+    return true;
+}
+
+/**
  * Send email via direct SMTP (bypasses sendmail / php mail())
  */
 function sendEmail($to, $subject, $body) {
     $logDir = __DIR__ . '/../logs';
     if (!is_dir($logDir)) mkdir($logDir, 0755, true);
+
+    // Filter out dummy/example addresses to prevent mail bouncebacks
+    if (!isValidSendableEmail($to)) {
+        file_put_contents($logDir . '/email_log.txt', date('Y-m-d H:i:s') . " | To: $to | Skipped sending (invalid or example.com dummy domain) | Sent: NO\n", FILE_APPEND);
+        return false;
+    }
 
     // Always save a local copy of the email
     $emailContent = "<p><strong>To:</strong> $to<br><strong>Subject:</strong> $subject<br><strong>Time:</strong> " . date('Y-m-d H:i:s') . "</p><hr>" . $body;

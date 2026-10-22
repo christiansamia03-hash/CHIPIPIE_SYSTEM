@@ -268,14 +268,15 @@ function handleLogin() {
 
         $managerEmailsStr = getSetting('void_refund_manager_email');
         $managerEmails = array_filter(array_map('trim', explode(',', $managerEmailsStr ?: '')));
+        $managerEmails = array_values(array_filter($managerEmails, 'isValidSendableEmail'));
 
         if (empty($managerEmails)) {
-            $fallback = getSetting('owner_email') ?: $user['email'];
-            if ($fallback) $managerEmails = [$fallback];
+            $fallback = getSetting('superadmin_email') ?: (getSetting('owner_email') ?: $user['email']);
+            if ($fallback && isValidSendableEmail($fallback)) $managerEmails = [$fallback];
         }
 
         if (empty($managerEmails)) {
-            jsonResponse(['success' => false, 'message' => 'Manager email (void/refund notification email) is not configured in settings.'], 500);
+            jsonResponse(['success' => false, 'message' => 'Manager email (void/refund notification email) is not configured with a valid email address in settings.'], 500);
         }
 
         // Generate 6-digit numeric verification token
