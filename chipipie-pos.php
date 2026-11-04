@@ -46,6 +46,12 @@
       --cafe-gold: #838582;
     }
 
+    /* Hide native browser password reveal icons (Edge/IE) to prevent conflict with custom eye button */
+    input::-ms-reveal,
+    input::-ms-clear {
+      display: none !important;
+    }
+
     /* ====== PIZZA HOUSE THEME ====== */
     body.pizza-theme {
       --cafe-brown:   #8b3a0f;   /* deep terracotta */
@@ -226,6 +232,40 @@
       opacity: 1; 
     }
 
+    /* ====== CUSTOM CATEGORY ICONS (Potato, Noodles, Drumstick) ====== */
+    .bi-potato::before, .bi-patatas::before {
+      content: '';
+      display: inline-block;
+      width: 1.15em;
+      height: 1.15em;
+      vertical-align: -0.15em;
+      background-color: currentColor;
+      -webkit-mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath fill-rule='evenodd' d='M8 3.2C12.5 2 17.5 2.8 20.2 5.8C23 9 22.8 14.5 19.8 18C16.8 21.5 11.2 22.2 6.8 20.5C2.5 18.8 1.2 13.8 1.8 9.5C2.4 5.2 4.5 4.1 8 3.2ZM6.5 8C7.3 8 7.3 6.8 6.5 6.8C5.7 6.8 5.7 8 6.5 8ZM12.5 6.5C13.5 6.5 13.5 5.3 12.5 5.3C11.5 5.3 11.5 6.5 12.5 6.5ZM17.2 9.8C18 9.8 18 8.6 17.2 8.6C16.4 8.6 16.4 9.8 17.2 9.8ZM9.2 14.2C10.2 14.2 10.2 13 9.2 13C8.2 13 8.2 14.2 9.2 14.2ZM15.2 15C16.2 15 16.2 13.8 15.2 13.8C14.2 13.8 14.2 15 15.2 15ZM10.5 9.5C11.2 9.5 11.2 8.5 10.5 8.5C9.8 8.5 9.8 9.5 10.5 9.5ZM15 11C15.8 11 15.8 10 15 10C14.2 10 14.2 11 15 11Z' fill='%23000'/%3E%3C/svg%3E") no-repeat center / contain;
+      mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath fill-rule='evenodd' d='M8 3.2C12.5 2 17.5 2.8 20.2 5.8C23 9 22.8 14.5 19.8 18C16.8 21.5 11.2 22.2 6.8 20.5C2.5 18.8 1.2 13.8 1.8 9.5C2.4 5.2 4.5 4.1 8 3.2ZM6.5 8C7.3 8 7.3 6.8 6.5 6.8C5.7 6.8 5.7 8 6.5 8ZM12.5 6.5C13.5 6.5 13.5 5.3 12.5 5.3C11.5 5.3 11.5 6.5 12.5 6.5ZM17.2 9.8C18 9.8 18 8.6 17.2 8.6C16.4 8.6 16.4 9.8 17.2 9.8ZM9.2 14.2C10.2 14.2 10.2 13 9.2 13C8.2 13 8.2 14.2 9.2 14.2ZM15.2 15C16.2 15 16.2 13.8 15.2 13.8C14.2 13.8 14.2 15 15.2 15ZM10.5 9.5C11.2 9.5 11.2 8.5 10.5 8.5C9.8 8.5 9.8 9.5 10.5 9.5ZM15 11C15.8 11 15.8 10 15 10C14.2 10 14.2 11 15 11Z' fill='%23000'/%3E%3C/svg%3E") no-repeat center / contain;
+    }
+
+    .bi-noodles::before, .bi-pasta::before {
+      content: '';
+      display: inline-block;
+      width: 1.15em;
+      height: 1.15em;
+      vertical-align: -0.15em;
+      background-color: currentColor;
+      -webkit-mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath d='M3 13.5h18c0 4.8-3.8 8.5-9 8.5s-9-3.7-9-8.5zM8 22h8v1.5H8z' fill='%23000'/%3E%3Cpath d='M23 2.5a.8.8 0 0 0-1.1-.3L8.5 8.2a.8.8 0 1 0 .6 1.4L22.5 3.6a.8.8 0 0 0 .5-1.1z' fill='%23000'/%3E%3Cpath d='M23 5a.8.8 0 0 0-1-.5L9 9a.8.8 0 1 0 .5 1.5l13.2-4.5a.8.8 0 0 0 .3-1z' fill='%23000'/%3E%3Cpath d='M11.5 9c-.8 1-.8 2 0 3s.8 2 0 3M14 8.5c-.8 1-.8 2 0 3s.8 2 0 3M16.5 8c-.8 1-.8 2 0 3s.8 2 0 3' stroke='%23000' stroke-width='1.5' stroke-linecap='round' fill='none'/%3E%3C/svg%3E") no-repeat center / contain;
+      mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath d='M3 13.5h18c0 4.8-3.8 8.5-9 8.5s-9-3.7-9-8.5zM8 22h8v1.5H8z' fill='%23000'/%3E%3Cpath d='M23 2.5a.8.8 0 0 0-1.1-.3L8.5 8.2a.8.8 0 1 0 .6 1.4L22.5 3.6a.8.8 0 0 0 .5-1.1z' fill='%23000'/%3E%3Cpath d='M23 5a.8.8 0 0 0-1-.5L9 9a.8.8 0 1 0 .5 1.5l13.2-4.5a.8.8 0 0 0 .3-1z' fill='%23000'/%3E%3Cpath d='M11.5 9c-.8 1-.8 2 0 3s.8 2 0 3M14 8.5c-.8 1-.8 2 0 3s.8 2 0 3M16.5 8c-.8 1-.8 2 0 3s.8 2 0 3' stroke='%23000' stroke-width='1.5' stroke-linecap='round' fill='none'/%3E%3C/svg%3E") no-repeat center / contain;
+    }
+
+    .bi-drumstick::before, .bi-chickenpops::before {
+      content: '';
+      display: inline-block;
+      width: 1.15em;
+      height: 1.15em;
+      vertical-align: -0.15em;
+      background-color: currentColor;
+      -webkit-mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath fill-rule='evenodd' d='M16.5 2C13 2 10.8 4 10.2 6.8c-.4 1.7.2 3.3 1.2 4.5l-5.6 5.6c-.4-.2-1-.3-1.6-.3C2.3 16.6.8 18.2.8 20.2c0 1.2.6 2.3 1.5 3 .9.9 2 1.5 3.2 1.5 2 0 3.6-1.5 3.6-3.4 0-.6-.1-1.2-.3-1.6l5.6-5.6c1.2 1 2.8 1.6 4.5 1.2C22 14.7 24 12.5 24 9c0-4-3.5-7-7.5-7zm1.5 4c1.4 0 2.5 1.1 2.5 2.5S19.4 11 18 11s-2.5-1.1-2.5-2.5S16.6 6 18 6z' fill='%23000'/%3E%3C/svg%3E") no-repeat center / contain;
+      mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath fill-rule='evenodd' d='M16.5 2C13 2 10.8 4 10.2 6.8c-.4 1.7.2 3.3 1.2 4.5l-5.6 5.6c-.4-.2-1-.3-1.6-.3C2.3 16.6.8 18.2.8 20.2c0 1.2.6 2.3 1.5 3 .9.9 2 1.5 3.2 1.5 2 0 3.6-1.5 3.6-3.4 0-.6-.1-1.2-.3-1.6l5.6-5.6c1.2 1 2.8 1.6 4.5 1.2C22 14.7 24 12.5 24 9c0-4-3.5-7-7.5-7zm1.5 4c1.4 0 2.5 1.1 2.5 2.5S19.4 11 18 11s-2.5-1.1-2.5-2.5S16.6 6 18 6z' fill='%23000'/%3E%3C/svg%3E") no-repeat center / contain;
+    }
+
     /* ====== SMOOTH THEME TRANSITIONS ====== */
     /* Only color/background properties animate — layout stays instant */
     body,
@@ -312,12 +352,45 @@
       width: 64px;
       height: 64px;
       margin-bottom: 10px;
+      position: relative;
+      border-radius: 50%;
+      overflow: hidden;
+      background: rgba(255, 255, 255, 0.05);
+      box-shadow: 0 4px 14px rgba(0, 0, 0, 0.25);
     }
     .sidebar-brand .brand-icon img {
       width: 100%;
       height: 100%;
-      object-fit: contain;
+      object-fit: cover;
       border-radius: 50%;
+      position: absolute;
+      top: 0;
+      left: 0;
+      transition: opacity 1.2s cubic-bezier(0.4, 0, 0.2, 1), transform 1.2s cubic-bezier(0.4, 0, 0.2, 1);
+    }
+    .sidebar-brand .brand-icon .brand-logo-coffee {
+      object-fit: contain;
+      opacity: 1;
+      transform: scale(1);
+      z-index: 2;
+    }
+    .sidebar-brand .brand-icon .brand-logo-pizza {
+      opacity: 0;
+      transform: scale(0.92);
+      z-index: 1;
+      pointer-events: none;
+    }
+    body.pizza-theme .sidebar-brand .brand-icon .brand-logo-coffee {
+      opacity: 0;
+      transform: scale(0.92);
+      z-index: 1;
+      pointer-events: none;
+    }
+    body.pizza-theme .sidebar-brand .brand-icon .brand-logo-pizza {
+      opacity: 1;
+      transform: scale(1);
+      z-index: 2;
+      pointer-events: auto;
     }
 
     .sidebar-brand h5 {
@@ -325,11 +398,13 @@
       font-size: 17px;
       font-weight: 600;
       margin: 0;
+      transition: color 1.2s ease;
     }
 
     .sidebar-brand small {
       color: rgba(255, 255, 255, 0.45);
       font-size: 11px;
+      transition: color 1.2s ease;
     }
 
     .sidebar-nav {
@@ -522,6 +597,11 @@
       border-radius: 16px;
       border: 1px solid var(--cafe-tan);
       padding: 20px 22px;
+    }
+
+    /* Reports view: equal-height KPI cards */
+    #view-reports .row.align-items-stretch .kpi-card {
+      min-height: 110px;
     }
 
     /* Equal-height dashboard stat cards only */
@@ -1330,6 +1410,21 @@
       font-size: 13px;
       font-weight: 500;
       color: var(--cafe-brown);
+    }
+
+    .required-star {
+      color: #dc2626;
+      font-weight: 700;
+      margin-left: 2px;
+      line-height: 1;
+      display: inline-block;
+    }
+
+    .form-label.required::after,
+    label.required::after {
+      content: ' *';
+      color: #dc2626;
+      font-weight: 700;
     }
 
     .form-control,
@@ -3429,15 +3524,20 @@
       <div id="pos-step-credentials">
         <form onsubmit="handleLogin(event)">
           <div class="mb-3">
-            <label class="form-label">Username</label>
+            <label class="form-label">Username <span class="required-star" title="Required">*</span></label>
             <input type="text" id="login-user" class="form-control" required>
           </div>
           <div class="mb-4">
             <div class="d-flex justify-content-between align-items-center mb-1">
-              <label class="form-label mb-0">Password</label>
+              <label class="form-label mb-0">Password <span class="required-star" title="Required">*</span></label>
               <a href="#" onclick="showPosForgotStep1(); return false;" style="font-size:12px; color:var(--cafe-brown); text-decoration:none;">Forgot Password?</a>
             </div>
-            <input type="password" id="login-pass" class="form-control" required>
+            <div style="position:relative;">
+              <input type="password" id="login-pass" class="form-control" style="padding-right:38px;" required>
+              <button type="button" class="btn btn-sm" onclick="togglePassVisibility('login-pass', this)" style="position:absolute;right:4px;top:50%;transform:translateY(-50%);background:transparent;border:none;color:#888;padding:4px 8px;cursor:pointer;z-index:2;" title="Show/Hide Password">
+                <i class="bi bi-eye"></i>
+              </button>
+            </div>
           </div>
           <button type="submit" id="pos-login-btn" class="btn-cafe-primary btn-lg w-100" style="font-size:16px; padding:12px;">Sign In</button>
         </form>
@@ -3447,16 +3547,16 @@
       <div id="pos-step-2fa" style="display:none;">
         <div style="background:#fdf8f4; border:1px solid #ebd9cc; border-radius:12px; padding:14px; margin-bottom:16px; text-align:center;">
           <div style="font-size:26px; margin-bottom:4px;">🔐</div>
-          <div style="font-size:14px; font-weight:700; color:var(--cafe-dark, #2b1f1d); margin-bottom:3px;">Manager Authorization (2FA)</div>
+          <div style="font-size:14px; font-weight:700; color:var(--cafe-dark, #2b1f1d); margin-bottom:3px;">Two-Factor Authentication (2FA)</div>
           <div style="font-size:12px; color:#777; line-height:1.4;">
-            A confirmation code was sent to the Manager email:<br>
+            A verification code was sent to your registered email:<br>
             <strong id="pos-2fa-email" style="color:var(--cafe-brown, #5c3d2e); word-break:break-all;"></strong>
           </div>
         </div>
 
         <form onsubmit="handlePosVerify2FA(event)">
           <div class="mb-3 text-center">
-            <label class="form-label" style="font-size:12px; font-weight:600; color:#555;">Enter 6-Digit Code</label>
+            <label class="form-label" style="font-size:12px; font-weight:600; color:#555;">Enter 6-Digit Code <span class="required-star" title="Required">*</span></label>
             <input type="text" id="pos-2fa-code" class="form-control text-center" maxlength="6" placeholder="000000" autocomplete="one-time-code" required
                    style="font-family:Consolas, Monaco, monospace; font-size:26px; font-weight:700; letter-spacing:8px; padding:10px; text-transform:uppercase;">
           </div>
@@ -3492,7 +3592,7 @@
 
         <form id="pos-forgot-form" onsubmit="handlePosSendForgotLink(event)">
           <div class="mb-3 text-start">
-            <label class="form-label" style="font-size:12.5px;">Username or Email</label>
+            <label class="form-label" style="font-size:12.5px;">Username or Email <span class="required-star" title="Required">*</span></label>
             <input type="text" id="pos-forgot-user" class="form-control" placeholder="Enter username or email" required>
           </div>
           <button type="submit" id="pos-forgot-send-btn" class="btn-cafe-primary btn-lg w-100" style="font-size:15px; padding:11px;">
@@ -3525,7 +3625,7 @@
 
         <form onsubmit="handlePosResetPasswordViaLink(event)">
           <div class="mb-3 text-start">
-            <label class="form-label mb-1" style="font-size:12.5px;">New Password *</label>
+            <label class="form-label mb-1" style="font-size:12.5px;">New Password <span class="required-star" title="Required">*</span></label>
             <input type="password" id="pos-reset-new-pass" class="form-control" required minlength="8" placeholder="••••••••">
             <div class="form-text" style="font-size:11px; color:#777; margin-top:4px;">
               <i class="bi bi-shield-lock me-1"></i>Min. 8 characters with uppercase, lowercase & number.
@@ -3533,7 +3633,7 @@
           </div>
 
           <div class="mb-3 text-start">
-            <label class="form-label mb-1" style="font-size:12.5px;">Confirm New Password *</label>
+            <label class="form-label mb-1" style="font-size:12.5px;">Confirm New Password <span class="required-star" title="Required">*</span></label>
             <input type="password" id="pos-reset-confirm-pass" class="form-control" required minlength="8" placeholder="••••••••">
           </div>
 
@@ -3560,6 +3660,7 @@
           <a href="#" onclick="showRegisterForm()"
             style="font-size:13px; color:var(--cafe-brown); font-weight:500;">Register New Account</a>
         </div>
+
       </div>
     </div>
   </div>
@@ -3573,28 +3674,28 @@
           <i class="bi bi-person-plus-fill"></i>
         </div>
         <h4 style="font-weight:700;color:var(--cafe-brown);margin-bottom:2px;">Register Account</h4>
-        <p style="color:#888;font-size:12px;margin:0;">ChipiPie Cafe POS</p>
+        <p style="color:#888;font-size:12px;margin:0;">ChipiPie Cafe POS &bull; <span class="required-star">*</span> required fields</p>
       </div>
 
       <form onsubmit="handleRegister(event)">
         <!-- Name Row: 4 fields on 1 line on desktop, clean wrapping on small screens -->
         <div class="row g-2 mb-2">
           <div class="col-md-4 col-7">
-            <label class="form-label mb-1" style="font-size:12px;font-weight:600;">First Name *</label>
+            <label class="form-label mb-1" style="font-size:12px;font-weight:600;">First Name <span class="required-star" title="Required">*</span></label>
             <input type="text" id="reg-first-name" class="form-control" placeholder="Juan" required style="padding:7px 10px;font-size:13px;">
           </div>
           <div class="col-md-2 col-5">
-            <label class="form-label mb-1" style="font-size:12px;font-weight:600;">M.I.</label>
+            <label class="form-label mb-1" style="font-size:12px;font-weight:600;">M.I. <span style="font-size:11px;font-weight:400;color:#888;">(opt)</span></label>
             <input type="text" id="reg-middle-initial" class="form-control" placeholder="D" maxlength="1"
               style="padding:7px 10px;font-size:13px;text-transform:uppercase;"
               oninput="this.value=this.value.replace(/[^a-zA-Z]/g,'').toUpperCase()">
           </div>
           <div class="col-md-4 col-8">
-            <label class="form-label mb-1" style="font-size:12px;font-weight:600;">Last Name *</label>
+            <label class="form-label mb-1" style="font-size:12px;font-weight:600;">Last Name <span class="required-star" title="Required">*</span></label>
             <input type="text" id="reg-last-name" class="form-control" placeholder="Dela Cruz" required style="padding:7px 10px;font-size:13px;">
           </div>
           <div class="col-md-2 col-4">
-            <label class="form-label mb-1" style="font-size:12px;font-weight:600;">Suffix</label>
+            <label class="form-label mb-1" style="font-size:12px;font-weight:600;">Suffix <span style="font-size:11px;font-weight:400;color:#888;">(opt)</span></label>
             <select id="reg-suffix" class="form-select" style="padding:7px 10px;font-size:13px;">
               <option value="">None</option>
               <option value="Jr.">Jr.</option>
@@ -3610,13 +3711,13 @@
         <!-- Contact & Username Row -->
         <div class="row g-2 mb-2">
           <div class="col-md-6 col-12">
-            <label class="form-label mb-1" style="font-size:12px;font-weight:600;">Email *</label>
+            <label class="form-label mb-1" style="font-size:12px;font-weight:600;">Email <span class="required-star" title="Required">*</span></label>
             <input type="email" id="reg-email" class="form-control" placeholder="juan@example.com" required
               style="padding:7px 10px;font-size:13px;"
               oninput="suggestUsernameFromEmail('reg-email','reg-user')">
           </div>
           <div class="col-md-6 col-12">
-            <label class="form-label mb-1" style="font-size:12px;font-weight:600;">Username *</label>
+            <label class="form-label mb-1" style="font-size:12px;font-weight:600;">Username <span class="required-star" title="Required">*</span></label>
             <div style="position:relative;">
               <input type="text" id="reg-user" class="form-control" placeholder="juandc" required style="padding:7px 10px;font-size:13px;">
               <span id="reg-user-hint" style="display:none;position:absolute;right:10px;top:50%;transform:translateY(-50%);font-size:10px;color:#888;pointer-events:none;">auto-filled</span>
@@ -3627,12 +3728,22 @@
         <!-- Password Row -->
         <div class="row g-2 mb-2">
           <div class="col-md-6 col-12">
-            <label class="form-label mb-1" style="font-size:12px;font-weight:600;">Password *</label>
-            <input type="password" id="reg-pass" class="form-control" required minlength="8" placeholder="••••••••" style="padding:7px 10px;font-size:13px;">
+            <label class="form-label mb-1" style="font-size:12px;font-weight:600;">Password <span class="required-star" title="Required">*</span></label>
+            <div style="position:relative;">
+              <input type="password" id="reg-pass" class="form-control" required minlength="8" placeholder="••••••••" style="padding:7px 38px 7px 10px;font-size:13px;">
+              <button type="button" class="btn btn-sm" onclick="togglePassVisibility('reg-pass', this)" style="position:absolute;right:4px;top:50%;transform:translateY(-50%);background:transparent;border:none;color:#888;padding:4px 8px;cursor:pointer;z-index:2;" title="Show/Hide Password">
+                <i class="bi bi-eye"></i>
+              </button>
+            </div>
           </div>
           <div class="col-md-6 col-12">
-            <label class="form-label mb-1" style="font-size:12px;font-weight:600;">Confirm Password *</label>
-            <input type="password" id="reg-pass-confirm" class="form-control" required minlength="8" placeholder="••••••••" style="padding:7px 10px;font-size:13px;">
+            <label class="form-label mb-1" style="font-size:12px;font-weight:600;">Confirm Password <span class="required-star" title="Required">*</span></label>
+            <div style="position:relative;">
+              <input type="password" id="reg-pass-confirm" class="form-control" required minlength="8" placeholder="••••••••" style="padding:7px 38px 7px 10px;font-size:13px;">
+              <button type="button" class="btn btn-sm" onclick="togglePassVisibility('reg-pass-confirm', this)" style="position:absolute;right:4px;top:50%;transform:translateY(-50%);background:transparent;border:none;color:#888;padding:4px 8px;cursor:pointer;z-index:2;" title="Show/Hide Password">
+                <i class="bi bi-eye"></i>
+              </button>
+            </div>
           </div>
           <div class="col-12">
             <div style="font-size:11px;color:#777;margin-top:1px;line-height:1.3;">
@@ -3643,9 +3754,9 @@
 
         <!-- Role Row -->
         <div class="mb-3">
-          <label class="form-label mb-1" style="font-size:12px;font-weight:600;">Role *</label>
+          <label class="form-label mb-1" style="font-size:12px;font-weight:600;">Role <span class="required-star" title="Required">*</span></label>
           <select class="form-select" id="reg-role" style="padding:7px 10px;font-size:13px;">
-            <option value="cashier">Cashier</option>
+            <option value="cashier">Cashier (requires approval)</option>
             <option value="admin">Admin (requires owner approval)</option>
           </select>
         </div>
@@ -3675,9 +3786,10 @@
     <aside class="sidebar">
       <div class="sidebar-brand">
         <div class="brand-icon">
-          <img src="assets/img/logo.png" alt="ChipiPie Logo">
+          <img src="assets/img/logo.png" alt="ChipiPie Cafe Logo" class="brand-logo-coffee">
+          <img src="assets/img/pizza-logo.png" alt="ChipiPie Pizza Logo" class="brand-logo-pizza">
         </div>
-        <h5>ChipiPie Cafe</h5>
+        <h5 class="brand-name">ChipiPie Cafe</h5>
         <small>Point of Sales System</small>
       </div>
 
@@ -3863,12 +3975,8 @@
           <!-- Branch switcher (Coffee / Pizza) -->
           <div class="branch-switcher-container">
             <div id="branch-slider"></div>
-            <button id="branch-btn-coffee" onclick="switchBranch('coffee')">
-              ☕ Coffee
-            </button>
-            <button id="branch-btn-pizza" onclick="switchBranch('pizza')">
-              🍕 Pizza House
-            </button>
+            <button id="branch-btn-coffee" onclick="switchBranch('coffee')">Coffee</button>
+            <button id="branch-btn-pizza" onclick="switchBranch('pizza')">Pizza House</button>
           </div>
 
           <!-- Sticky category shortcut bar -->
@@ -3894,13 +4002,13 @@
                 <i class="bi bi-grid-3x3-gap"></i> Quesadilla
               </button>
               <button class="pos-cat-shortcut-btn" id="scbtn-patatas" onclick="scrollToCategory('patatas')">
-                <i class="bi bi-bag-heart"></i> Patatas
+                <i class="bi bi-potato"></i> Patatas
               </button>
               <button class="pos-cat-shortcut-btn" id="scbtn-pasta" onclick="scrollToCategory('pasta')">
-                <i class="bi bi-stars"></i> Pasta
+                <i class="bi bi-noodles"></i> Pasta
               </button>
               <button class="pos-cat-shortcut-btn" id="scbtn-chickenpops" onclick="scrollToCategory('chickenpops')">
-                <i class="bi bi-lightning"></i> Chickenpops
+                <i class="bi bi-drumstick"></i> Chickenpops
               </button>
               <button class="pos-cat-shortcut-btn" id="scbtn-combo" onclick="scrollToCategory('combo')">
                 <i class="bi bi-collection"></i> Combo & Gipit Meal
@@ -4099,7 +4207,7 @@
               <!-- Staff / Requester name -->
               <div style="flex:1;min-width:180px;">
                 <label style="font-size:11px;font-weight:700;color:#6b7280;text-transform:uppercase;display:block;margin-bottom:3px;">
-                  <i class="bi bi-person-badge me-1"></i>Staff / Requester Name <span style="color:#dc2626;">*</span>
+                  <i class="bi bi-person-badge me-1"></i>Staff / Requester Name <span class="required-star" title="Required">*</span>
                 </label>
                 <input type="text" id="adj-manager-name" placeholder="Cashier or Manager name" maxlength="80"
                   style="width:100%;padding:8px 10px;border:1.5px solid #e5e7eb;border-radius:7px;font-size:13px;font-family:inherit;box-sizing:border-box;"
@@ -4222,33 +4330,33 @@
 
       <!-- REPORTS VIEW -->
       <div id="view-reports" class="view">
-        <div class="row g-3 mb-3">
-          <div class="col-6 col-lg-3">
-            <div class="kpi-card">
+                <div class="row g-3 mb-3 align-items-stretch">
+          <div class="col-6 col-lg-3 d-flex">
+            <div class="kpi-card" style="width:100%;display:flex;flex-direction:column;justify-content:center;">
               <div class="kpi-label">Total Revenue (Month)</div>
               <div class="kpi-stat" id="rep-kpi-month-rev">—</div>
-              <div class="kpi-trend" id="rep-kpi-month-rev-trend">Loading...</div>
+              <div class="kpi-trend" id="rep-kpi-month-rev-trend">—</div>
             </div>
           </div>
-          <div class="col-6 col-lg-3">
-            <div class="kpi-card">
+          <div class="col-6 col-lg-3 d-flex">
+            <div class="kpi-card" style="width:100%;display:flex;flex-direction:column;justify-content:center;">
               <div class="kpi-label">Total Orders (Month)</div>
               <div class="kpi-stat" id="rep-kpi-month-orders">—</div>
-              <div class="kpi-trend" id="rep-kpi-month-orders-trend">Loading...</div>
+              <div class="kpi-trend" id="rep-kpi-month-orders-trend">—</div>
             </div>
           </div>
-          <div class="col-6 col-lg-3">
-            <div class="kpi-card">
+          <div class="col-6 col-lg-3 d-flex">
+            <div class="kpi-card" style="width:100%;display:flex;flex-direction:column;justify-content:center;">
               <div class="kpi-label">Avg Daily Revenue</div>
               <div class="kpi-stat" id="rep-kpi-avg-daily">—</div>
-              <div class="kpi-trend" id="rep-kpi-avg-daily-trend">Based on 30 days</div>
+              <div class="kpi-trend" id="rep-kpi-avg-daily-trend">Based on last 30 days</div>
             </div>
           </div>
-          <div class="col-6 col-lg-3">
-            <div class="kpi-card">
+          <div class="col-6 col-lg-3 d-flex">
+            <div class="kpi-card" style="width:100%;display:flex;flex-direction:column;justify-content:center;">
               <div class="kpi-label">Best Revenue Day</div>
-              <div class="kpi-stat" style="font-size:22px;" id="rep-kpi-best-day">—</div>
-              <div class="kpi-trend" id="rep-kpi-best-day-trend">This month</div>
+              <div class="kpi-stat" id="rep-kpi-best-day">—</div>
+              <div class="kpi-trend" id="rep-kpi-best-day-trend">—</div>
             </div>
           </div>
         </div>
@@ -4287,11 +4395,29 @@
 
         <div class="row g-3">
           <div class="col-lg-8">
-            <div class="kpi-card">
+            <div class="kpi-card" style="display:flex; flex-direction:column;">
               <div style="font-weight:600; color:var(--cafe-brown); font-size:14px; margin-bottom:12px;">Item Sales
                 Performance</div>
               <div class="chart-box" style="height:280px;">
                 <canvas id="itemChart"></canvas>
+              </div>
+              <div style="margin-top:14px; border-top:1px solid rgba(255,255,255,0.08); padding-top:12px;">
+                <div style="font-weight:600; color:var(--cafe-brown); font-size:13px; margin-bottom:10px;">Sales Volume Breakdown</div>
+                <table class="data-table" style="margin-bottom:0;">
+                  <thead>
+                    <tr>
+                      <th>Time Period</th>
+                      <th>Cups Sold (Drinks)</th>
+                      <th>Pastries Sold (Food)</th>
+                    </tr>
+                  </thead>
+                  <tbody id="rep-vol-tbody">
+                    <tr><td style="font-weight:500;">Today</td><td style="font-weight:600; color:var(--cafe-brown);">—</td><td style="font-weight:600; color:var(--cafe-amber);">—</td></tr>
+                    <tr><td style="font-weight:500;">This Week</td><td style="font-weight:600; color:var(--cafe-brown);">—</td><td style="font-weight:600; color:var(--cafe-amber);">—</td></tr>
+                    <tr><td style="font-weight:500;">This Month</td><td style="font-weight:600; color:var(--cafe-brown);">—</td><td style="font-weight:600; color:var(--cafe-amber);">—</td></tr>
+                    <tr><td style="font-weight:500;">This Year</td><td style="font-weight:600; color:var(--cafe-brown);">—</td><td style="font-weight:600; color:var(--cafe-amber);">—</td></tr>
+                  </tbody>
+                </table>
               </div>
             </div>
           </div>
@@ -4304,45 +4430,6 @@
           </div>
         </div>
 
-        <div class="row g-3 mt-1">
-          <div class="col-12">
-            <div class="kpi-card">
-              <div style="font-weight:600; color:var(--cafe-brown); font-size:14px; margin-bottom:12px;">Sales Volume
-                Breakdown</div>
-              <table class="data-table">
-                <thead>
-                  <tr>
-                    <th>Time Period</th>
-                    <th>Cups Sold (Drinks)</th>
-                    <th>Pastries Sold (Food)</th>
-                  </tr>
-                </thead>
-                <tbody id="rep-vol-tbody">
-                  <tr>
-                    <td style="font-weight:500;">Today</td>
-                    <td style="font-weight:600; color:var(--cafe-brown);">31</td>
-                    <td style="font-weight:600; color:var(--cafe-amber);">49</td>
-                  </tr>
-                  <tr>
-                    <td style="font-weight:500;">This Week</td>
-                    <td style="font-weight:600; color:var(--cafe-brown);">215</td>
-                    <td style="font-weight:600; color:var(--cafe-amber);">310</td>
-                  </tr>
-                  <tr>
-                    <td style="font-weight:500;">This Month</td>
-                    <td style="font-weight:600; color:var(--cafe-brown);">980</td>
-                    <td style="font-weight:600; color:var(--cafe-amber);">1,420</td>
-                  </tr>
-                  <tr>
-                    <td style="font-weight:500;">This Year</td>
-                    <td style="font-weight:600; color:var(--cafe-brown);">11,400</td>
-                    <td style="font-weight:600; color:var(--cafe-amber);">16,500</td>
-                  </tr>
-                </tbody>
-              </table>
-            </div>
-          </div>
-        </div>
       </div>
 
       <!-- USERS MANAGEMENT VIEW (Admin only) -->
@@ -4373,16 +4460,15 @@
           </table>
         </div>
 
-        <!-- Pending Admin Requests -->
+        <!-- Pending Registration Requests -->
         <div class="kpi-card">
           <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;">
-            <div style="font-weight:600;color:var(--cafe-brown);font-size:14px;">Pending Admin Requests</div>
+            <div style="font-weight:600;color:var(--cafe-brown);font-size:14px;">Pending Registration Approvals</div>
           </div>
           <div
             style="background:#fff8e6;border:1px solid #ffe08a;border-radius:8px;padding:10px 14px;font-size:12px;color:#856404;margin-bottom:14px;display:flex;align-items:center;gap:8px;">
-            <i class="bi bi-envelope-check" style="font-size:15px;"></i>
-            <span>Approvals are handled <strong>exclusively by the owner</strong> via a secure link sent to their Gmail.
-              Use <em>Resend to Owner</em> if the email was missed.</span>
+            <i class="bi bi-shield-lock" style="font-size:15px;"></i>
+            <span>New cashier and admin registrations require approval before accounts can access the system. Approvals are processed via owner email or Super Admin.</span>
           </div>
           <table class="data-table">
             <thead>
@@ -4390,8 +4476,8 @@
                 <th>Name</th>
                 <th>Username</th>
                 <th>Email</th>
+                <th>Role</th>
                 <th>Status</th>
-                <th>Requested</th>
                 <th>Actions</th>
               </tr>
             </thead>
@@ -4410,7 +4496,7 @@
     <div class="void-modal-card">
       <div class="void-modal-header" id="void-modal-hdr">
         <h5 id="void-modal-title"><i class="bi bi-shield-lock me-2"></i>Enter Authorization Code</h5>
-        <button onclick="closeVoidAuthModal()" style="background:rgba(255,255,255,0.15);border:none;color:#fff;border-radius:8px;width:30px;height:30px;cursor:pointer;font-size:16px;display:flex;align-items:center;justify-content:center;">&#x2715;</button>
+        <button onclick="rejectAndCloseVoidModal('Cancelled in POS', true)" style="background:rgba(255,255,255,0.15);border:none;color:#fff;border-radius:8px;width:30px;height:30px;cursor:pointer;font-size:16px;display:flex;align-items:center;justify-content:center;">&#x2715;</button>
       </div>
       <div class="void-modal-body">
         <div id="void-modal-info" style="font-size:12px;color:#6b7280;margin-bottom:14px;">
@@ -4421,6 +4507,9 @@
           <div style="font-size:11px;color:#92400e;font-weight:600;margin-bottom:4px;">DEV MODE — Token (not emailed):</div>
           <div id="void-dev-token-val" style="font-size:22px;font-weight:800;letter-spacing:4px;font-family:monospace;color:#b45309;"></div>
         </div>
+        <label for="void-token-input" class="form-label" style="display:block;font-size:12px;font-weight:700;margin-bottom:6px;color:var(--cafe-brown);">
+          Authorization Code <span class="required-star" title="Required">*</span>
+        </label>
         <input type="text" id="void-token-input" placeholder="XXXXXX" maxlength="8"
           style="width:100%;padding:14px;font-size:22px;letter-spacing:4px;font-weight:800;font-family:monospace;text-align:center;border:2px solid #e5e7eb;border-radius:10px;margin-bottom:6px;text-transform:uppercase;box-sizing:border-box;"
           oninput="this.value=this.value.toUpperCase()">
@@ -4433,8 +4522,15 @@
           style="width:100%;padding:12px;background:linear-gradient(135deg,#dc2626,#b91c1c);color:#fff;border:none;border-radius:10px;font-size:14px;font-weight:700;cursor:pointer;margin-top:6px;">
           <i class="bi bi-check-circle-fill me-1"></i> Confirm
         </button>
-        <button onclick="closeVoidAuthModal()"
-          style="width:100%;padding:10px;background:transparent;border:none;color:#6b7280;font-size:13px;cursor:pointer;margin-top:6px;">&#8592; Cancel</button>
+        <div style="display:flex;gap:8px;margin-top:6px;">
+          <button onclick="rejectAndCloseVoidModal('Rejected in POS', false)"
+            id="void-reject-btn"
+            style="flex:1;padding:11px;background:#fee2e2;color:#b91c1c;border:1px solid #fecaca;border-radius:10px;font-size:13px;font-weight:700;cursor:pointer;">
+            <i class="bi bi-x-circle me-1"></i> Reject
+          </button>
+          <button onclick="rejectAndCloseVoidModal('Cancelled in POS', true)"
+            style="flex:1;padding:11px;background:transparent;border:1px solid #e5e7eb;border-radius:10px;color:#6b7280;font-size:13px;cursor:pointer;">&#8592; Cancel</button>
+        </div>
       </div>
     </div>
   </div>
@@ -4459,7 +4555,7 @@
             </ul>
           </div>
           <div class="mb-3">
-            <label class="form-label">Purpose</label>
+            <label class="form-label">Purpose <span class="required-star" title="Required">*</span></label>
             <select class="form-select" id="token-purpose">
               <option value="delete_menu_item">Delete Menu Item (→ your email)</option>
               <option value="manage_users">Manage Users (→ your email)</option>
@@ -4589,6 +4685,31 @@
     </div>
   </div>
 
+  <!-- DELETE PENDING ADMIN REQUEST MODAL -->
+  <div class="modal fade" id="deleteAdminRequestModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered" style="max-width:400px;">
+      <div class="modal-content" style="border:none;border-radius:16px;box-shadow:0 15px 35px rgba(0,0,0,0.18);overflow:hidden;">
+        <div class="modal-body p-4 text-center">
+          <div style="width:64px;height:64px;margin:10px auto 16px;border-radius:50%;background:#fee2e2;display:flex;align-items:center;justify-content:center;">
+            <i class="bi bi-trash-fill" style="font-size:28px;color:#dc2626;"></i>
+          </div>
+          <h5 style="color:var(--cafe-brown);font-weight:700;font-size:18px;margin-bottom:8px;">Request to Remove Registration?</h5>
+          <p style="color:#666;font-size:13px;line-height:1.5;margin-bottom:18px;">
+            Submit a request to remove the registration request for <strong id="delete-admin-req-name" style="color:#111;"></strong>?
+            <br><span style="font-size:12px;color:#888;">This request will be sent to the Super Admin for review.</span>
+          </p>
+          <div style="display:flex;gap:10px;justify-content:center;">
+            <button type="button" class="btn btn-outline-secondary btn-sm" style="border-radius:8px;padding:8px 20px;font-weight:600;" data-bs-dismiss="modal">Cancel</button>
+            <button type="button" class="btn btn-sm" id="delete-admin-req-confirm-btn" onclick="confirmDeleteAdminRequest()"
+              style="background:#dc2626;color:#fff;border:none;border-radius:8px;padding:8px 20px;font-weight:600;">
+              <i class="bi bi-send-fill me-1"></i> Submit Request
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
   <!-- REQUEST TOGGLE MODAL -->
   <div class="modal fade" id="requestToggleModal" tabindex="-1">
     <div class="modal-dialog modal-dialog-centered modal-sm">
@@ -4619,24 +4740,25 @@
           <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
         </div>
         <div class="modal-body p-4">
+          <div style="font-size:11.5px;color:#888;margin-bottom:12px;"><span class="required-star">*</span> indicates required field</div>
           <!-- Name Row -->
           <div class="row g-2 mb-2">
             <div class="col-md-4 col-7">
-              <label class="form-label mb-1" style="font-size:12px;font-weight:600;">First Name *</label>
+              <label class="form-label mb-1" style="font-size:12px;font-weight:600;">First Name <span class="required-star" title="Required">*</span></label>
               <input type="text" class="form-control" id="modal-reg-first-name" placeholder="Juan" style="padding:7px 10px;font-size:13px;">
             </div>
             <div class="col-md-2 col-5">
-              <label class="form-label mb-1" style="font-size:12px;font-weight:600;">M.I.</label>
+              <label class="form-label mb-1" style="font-size:12px;font-weight:600;">M.I. <span style="font-size:11px;font-weight:400;color:#888;">(opt)</span></label>
               <input type="text" class="form-control" id="modal-reg-middle-initial" placeholder="D" maxlength="1"
                 style="padding:7px 10px;font-size:13px;text-transform:uppercase;"
                 oninput="this.value=this.value.replace(/[^a-zA-Z]/g,'').toUpperCase()">
             </div>
             <div class="col-md-4 col-8">
-              <label class="form-label mb-1" style="font-size:12px;font-weight:600;">Last Name *</label>
+              <label class="form-label mb-1" style="font-size:12px;font-weight:600;">Last Name <span class="required-star" title="Required">*</span></label>
               <input type="text" class="form-control" id="modal-reg-last-name" placeholder="Dela Cruz" style="padding:7px 10px;font-size:13px;">
             </div>
             <div class="col-md-2 col-4">
-              <label class="form-label mb-1" style="font-size:12px;font-weight:600;">Suffix</label>
+              <label class="form-label mb-1" style="font-size:12px;font-weight:600;">Suffix <span style="font-size:11px;font-weight:400;color:#888;">(opt)</span></label>
               <select class="form-select" id="modal-reg-suffix" style="padding:7px 10px;font-size:13px;">
                 <option value="">None</option>
                 <option value="Jr.">Jr.</option>
@@ -4652,13 +4774,13 @@
           <!-- Contact & Username Row -->
           <div class="row g-2 mb-2">
             <div class="col-md-6 col-12">
-              <label class="form-label mb-1" style="font-size:12px;font-weight:600;">Email *</label>
+              <label class="form-label mb-1" style="font-size:12px;font-weight:600;">Email <span class="required-star" title="Required">*</span></label>
               <input type="email" class="form-control" id="modal-reg-email" placeholder="juan@example.com"
                 style="padding:7px 10px;font-size:13px;"
                 oninput="suggestUsernameFromEmail('modal-reg-email','modal-reg-user')">
             </div>
             <div class="col-md-6 col-12">
-              <label class="form-label mb-1" style="font-size:12px;font-weight:600;">Username *</label>
+              <label class="form-label mb-1" style="font-size:12px;font-weight:600;">Username <span class="required-star" title="Required">*</span></label>
               <div style="position:relative;">
                 <input type="text" class="form-control" id="modal-reg-user" placeholder="juandc" style="padding:7px 10px;font-size:13px;">
                 <span id="modal-reg-user-hint" style="display:none;position:absolute;right:10px;top:50%;transform:translateY(-50%);font-size:10px;color:#888;pointer-events:none;">auto-filled</span>
@@ -4669,12 +4791,22 @@
           <!-- Password Row -->
           <div class="row g-2 mb-2">
             <div class="col-md-6 col-12">
-              <label class="form-label mb-1" style="font-size:12px;font-weight:600;">Password *</label>
-              <input type="password" class="form-control" id="modal-reg-pass" minlength="8" placeholder="••••••••" style="padding:7px 10px;font-size:13px;">
+              <label class="form-label mb-1" style="font-size:12px;font-weight:600;">Password <span class="required-star" title="Required">*</span></label>
+              <div style="position:relative;">
+                <input type="password" class="form-control" id="modal-reg-pass" minlength="8" placeholder="••••••••" style="padding:7px 38px 7px 10px;font-size:13px;">
+                <button type="button" class="btn btn-sm" onclick="togglePassVisibility('modal-reg-pass', this)" style="position:absolute;right:4px;top:50%;transform:translateY(-50%);background:transparent;border:none;color:#888;padding:4px 8px;cursor:pointer;z-index:2;" title="Show/Hide Password">
+                  <i class="bi bi-eye"></i>
+                </button>
+              </div>
             </div>
             <div class="col-md-6 col-12">
-              <label class="form-label mb-1" style="font-size:12px;font-weight:600;">Confirm Password *</label>
-              <input type="password" class="form-control" id="modal-reg-pass-confirm" minlength="8" placeholder="••••••••" style="padding:7px 10px;font-size:13px;">
+              <label class="form-label mb-1" style="font-size:12px;font-weight:600;">Confirm Password <span class="required-star" title="Required">*</span></label>
+              <div style="position:relative;">
+                <input type="password" class="form-control" id="modal-reg-pass-confirm" minlength="8" placeholder="••••••••" style="padding:7px 38px 7px 10px;font-size:13px;">
+                <button type="button" class="btn btn-sm" onclick="togglePassVisibility('modal-reg-pass-confirm', this)" style="position:absolute;right:4px;top:50%;transform:translateY(-50%);background:transparent;border:none;color:#888;padding:4px 8px;cursor:pointer;z-index:2;" title="Show/Hide Password">
+                  <i class="bi bi-eye"></i>
+                </button>
+              </div>
             </div>
             <div class="col-12">
               <div style="font-size:11px;color:#777;margin-top:1px;line-height:1.3;">
@@ -4685,9 +4817,9 @@
 
           <!-- Role Row -->
           <div class="mb-2">
-            <label class="form-label mb-1" style="font-size:12px;font-weight:600;">Role *</label>
+            <label class="form-label mb-1" style="font-size:12px;font-weight:600;">Role <span class="required-star" title="Required">*</span></label>
             <select class="form-select" id="modal-reg-role" style="padding:7px 10px;font-size:13px;">
-              <option value="cashier">Cashier</option>
+              <option value="cashier">Cashier (requires approval)</option>
               <option value="admin">Admin (requires owner approval)</option>
             </select>
           </div>
@@ -4695,8 +4827,33 @@
         </div>
         <div class="modal-footer" style="border-top:1px solid var(--cafe-tan);gap:8px;">
           <button class="btn btn-outline-secondary btn-sm" data-bs-dismiss="modal">Cancel</button>
-          <button class="btn btn-sm" style="background:var(--cafe-brown);color:#fff;"
+          <button class="btn btn-sm" id="modal-reg-submit-btn" style="background:var(--cafe-brown);color:#fff;"
             onclick="submitRegisterUser()">Register</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- REQUEST SENT / REGISTRATION CONFIRMATION MODAL -->
+  <div class="modal fade" id="requestSentSuccessModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered" style="max-width:440px;">
+      <div class="modal-content" style="border:none;border-radius:16px;box-shadow:0 15px 35px rgba(0,0,0,0.18);overflow:hidden;">
+        <div class="modal-body p-4 text-center">
+          <div style="width:70px;height:70px;margin:10px auto 18px;border-radius:50%;background:#e8f5e9;display:flex;align-items:center;justify-content:center;">
+            <i class="bi bi-send-check-fill" style="font-size:36px;color:#2e7d32;"></i>
+          </div>
+          <h4 style="color:var(--cafe-brown);font-weight:700;font-size:20px;margin-bottom:8px;" id="rss-title">Request Has Been Sent!</h4>
+          <p style="color:#555;font-size:14px;line-height:1.6;margin-bottom:20px;" id="rss-message">
+            Admin registration has been submitted. Awaiting owner approval via email.
+          </p>
+          <div id="rss-details" style="background:#faf8f5;border:1px solid #ede7df;border-radius:10px;padding:12px;margin-bottom:20px;font-size:13px;text-align:left;display:none;">
+            <div style="margin-bottom:4px;"><strong>Name:</strong> <span id="rss-user-name"></span></div>
+            <div style="margin-bottom:4px;"><strong>Username:</strong> <code id="rss-username"></code></div>
+            <div><strong>Role:</strong> <span id="rss-role" class="badge-cat"></span></div>
+          </div>
+          <button type="button" class="btn w-100" style="background:var(--cafe-brown);color:#fff;border-radius:10px;padding:10px 18px;font-weight:600;font-size:14px;" data-bs-dismiss="modal" onclick="renderUsers()">
+            OK, Understood
+          </button>
         </div>
       </div>
     </div>
@@ -4715,33 +4872,33 @@
           <!-- STEP 1: Item Details -->
           <div id="add-item-step1">
             <div class="mb-3">
-              <label class="form-label">Item Name</label>
+              <label class="form-label">Item Name <span class="required-star" title="Required">*</span></label>
               <input type="text" class="form-control" id="new-name" placeholder="e.g. Caramel Macchiato">
             </div>
             <div class="mb-3">
-              <label class="form-label">Item Image</label>
+              <label class="form-label">Item Image <span style="font-size:11.5px;color:#888;font-weight:400;">(optional)</span></label>
               <input type="file" class="form-control" id="new-image" accept="image/*">
             </div>
             <div class="mb-3">
-              <label class="form-label">Category</label>
+              <label class="form-label">Category <span class="required-star" title="Required">*</span></label>
               <select class="form-select" id="new-category">
                 <!-- Dynamically populated when modal opens via populateAddItemCategorySelect() -->
               </select>
             </div>
             <div class="mb-3">
-              <label class="form-label">Price (₱)</label>
+              <label class="form-label">Price (₱) <span class="required-star" title="Required">*</span></label>
               <input type="number" class="form-control" id="new-price" min="1" placeholder="0.00">
             </div>
             <div class="row g-2">
               <div class="col-6">
                 <div class="mb-3">
-                  <label class="form-label">Initial Stock</label>
+                  <label class="form-label">Initial Stock <span style="font-size:11.5px;color:#888;font-weight:400;">(default: 20)</span></label>
                   <input type="number" class="form-control" id="new-stock" min="0" value="20">
                 </div>
               </div>
               <div class="col-6">
                 <div class="mb-3">
-                  <label class="form-label">Min Stock (alert)</label>
+                  <label class="form-label">Min Stock (alert) <span style="font-size:11.5px;color:#888;font-weight:400;">(default: 5)</span></label>
                   <input type="number" class="form-control" id="new-min-stock" min="1" value="5">
                 </div>
               </div>
@@ -4784,7 +4941,7 @@
                 <p style="font-size:11px; color:#94a3b8; margin-bottom:6px;">⚙ DEV MODE — Authorization Code:</p>
                 <span id="add-item-dev-token" style="font-size:26px; font-weight:700; letter-spacing:6px; font-family:monospace; color:#fbbf24;"></span>
               </div>
-              <p style="font-size:13px; color:#475569; margin-bottom:8px;">Enter the 6-digit authorization code from the email:</p>
+              <label for="add-item-auth-code" style="display:block;font-size:13px;font-weight:600;color:#475569;margin-bottom:8px;">Authorization Code <span class="required-star" title="Required">*</span></label>
               <input type="text" class="form-control text-center" id="add-item-auth-code"
                 maxlength="6" inputmode="numeric" placeholder="_ _ _ _ _ _"
                 style="font-size:22px; font-weight:700; letter-spacing:6px; font-family:monospace; max-width:200px; margin:0 auto 14px;"
@@ -4820,7 +4977,7 @@
             <img id="pos-photo-preview" src="" style="max-width:100%; max-height:180px; border-radius:10px; border:1px solid var(--cafe-tan); object-fit:cover;">
           </div>
           <div class="mb-3">
-            <label class="form-label">Choose Photo</label>
+            <label class="form-label">Choose Photo <span class="required-star" title="Required">*</span></label>
             <input type="file" class="form-control" id="pos-photo-file" accept="image/*" onchange="posPreviewPhoto(this)">
           </div>
         </div>
@@ -4872,7 +5029,7 @@
         <!-- Cash Panel -->
         <div id="pay-cash-panel">
           <div class="pay-section">
-            <label for="pay-tendered">Cash Tendered (₱)</label>
+            <label for="pay-tendered">Cash Tendered (₱) <span class="required-star" title="Required">*</span></label>
             <input type="text" inputmode="numeric" pattern="[0-9]*" id="pay-tendered" class="pay-input" placeholder="0" autocomplete="off"
               onkeydown="handleTenderedKeydown(event, this);"
               oninput="handleTenderedInput(this);"
@@ -5127,6 +5284,410 @@
 
   <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js"></script>
+  <script src="assets/js/gsap.min.js"></script>
+  <script>
+    /* ========== GSAP CHIPIPIE CAT MORPH & COFFEE SPILL ENTRANCE ANIMATION ========== */
+    /* Cartoon Black Cat (Static Card, Eyes Look at Input, Covers Eyes with Arms & Paws) */
+    function initPeekingCatLogin(cardSelector) {
+      const target = document.querySelector(cardSelector || '#login-wrapper .login-card, #sa-login-screen .sa-login-card');
+      if (!target) return;
+
+      // 1. FIX: Restore correct step visibility inside the card
+      const sCreds     = target.querySelector('#pos-step-credentials, #sa-step-credentials');
+      const s2fa       = target.querySelector('#pos-step-2fa, #sa-step-2fa');
+      const sForgotReq = target.querySelector('#pos-step-forgot-request, #sa-step-forgot');
+      const sForgotRes = target.querySelector('#pos-step-forgot-reset');
+
+      if (sCreds && sCreds.style.display === 'none') {
+        const hasActiveStep = (s2fa && s2fa.style.display === 'block') ||
+                              (sForgotReq && sForgotReq.style.display === 'block') ||
+                              (sForgotRes && sForgotRes.style.display === 'block');
+        if (!hasActiveStep) {
+          sCreds.style.display = 'block';
+        }
+      }
+      if (s2fa && s2fa.style.display !== 'block')             s2fa.style.display = 'none';
+      if (sForgotReq && sForgotReq.style.display !== 'block') sForgotReq.style.display = 'none';
+      if (sForgotRes && sForgotRes.style.display !== 'block') sForgotRes.style.display = 'none';
+
+      // 2. Ensure target card is completely static
+      if (typeof gsap !== 'undefined') {
+        gsap.killTweensOf(target);
+      }
+      target.style.transform  = 'none';
+      target.style.opacity    = '1';
+      target.style.visibility = 'visible';
+      target.style.position   = 'relative';
+      target.style.overflow   = 'visible';
+
+      // Clean up previous test wrappers if any
+      const oldStage = target.querySelector('.peeking-cat-viewport, .cartoon-cat-wrap');
+      if (oldStage) oldStage.remove();
+
+      // 3. Inject Cartoon Cat CSS once (update or create)
+      let sty = document.getElementById('cartoon-cat-css');
+      if (!sty) {
+        sty = document.createElement('style');
+        sty.id = 'cartoon-cat-css';
+        document.head.appendChild(sty);
+      }
+      sty.textContent = `
+        /* Cartoon Cat fully visible resting on card top rim */
+        .cartoon-cat-stage {
+          position: absolute;
+          bottom: 100%;
+          left: 50%;
+          transform: translateX(-50%);
+          width: 240px;
+          height: 195px; /* 471x382 aspect ratio */
+          pointer-events: none;
+          z-index: 25;
+        }
+        .cartoon-cat-head-img {
+          position: absolute;
+          inset: 0;
+          width: 100%;
+          height: 100%;
+          background-image: url('assets/img/cartoon-cat-head.png');
+          background-size: contain;
+          background-repeat: no-repeat;
+          background-position: center bottom;
+          filter: drop-shadow(0 -4px 10px rgba(0,0,0,0.35));
+        }
+        /* Dynamic Eye Sockets: clean yellow background with natural clipping */
+        .cat-eye-socket {
+          position: absolute;
+          border-radius: 50%;
+          overflow: hidden;
+          pointer-events: none;
+          z-index: 4;
+        }
+        .cat-eye-left {
+          left: 20.0%;
+          top: 64.5%;
+          width: 60px;
+          height: 46px;
+        }
+        .cat-eye-right {
+          left: 56.5%;
+          top: 60.2%;
+          width: 62px;
+          height: 47px;
+        }
+        /* Dynamic Pupils: vertical chunky oval with white reflections */
+        .cat-pupil {
+          position: absolute;
+          width: 28px;
+          height: 36px;
+          background: radial-gradient(circle at 35% 35%, #181515 0%, #000000 80%);
+          border-radius: 50%;
+          left: 50%;
+          top: 53%;
+          transform: translate(-50%, -50%);
+          transition: transform 0.16s cubic-bezier(0.25, 1, 0.5, 1);
+          pointer-events: none;
+        }
+        /* Nudge each pupil inward toward center */
+        .cat-pupil-left  { left: 58%; }
+        .cat-pupil-right { left: 42%; }
+        .cat-pupil::before {
+          content: '';
+          position: absolute;
+          top: 4px;
+          left: 5px;
+          width: 9px;
+          height: 9px;
+          background: #ffffff;
+          border-radius: 50%;
+        }
+        .cat-pupil::after {
+          content: '';
+          position: absolute;
+          bottom: 4px;
+          right: 5px;
+          width: 4px;
+          height: 4px;
+          background: rgba(255, 255, 255, 0.65);
+          border-radius: 50%;
+        }
+        /* Natural Dropping Eyelids for Blinking */
+        .cat-eyelid {
+          position: absolute;
+          inset: -1px;
+          background: #000000;
+          border-radius: 50%;
+          transform: translateY(-105%);
+          transition: transform 0.09s ease-in-out;
+          z-index: 10;
+          pointer-events: none;
+        }
+        .cat-blinking .cat-eyelid {
+          transform: translateY(0%) !important;
+        }
+        /* Resting Rim Paws */
+        .rim-paw {
+          position: absolute;
+          width: 56px;
+          height: 34px;
+          bottom: -15px;
+          background-size: contain;
+          background-repeat: no-repeat;
+          z-index: 28;
+          transition: opacity 0.25s ease, transform 0.3s ease;
+          pointer-events: none;
+        }
+        .rim-paw-left {
+          left: 4px;
+          background-image: url('assets/img/cartoon-paw-left.png');
+        }
+        .rim-paw-right {
+          right: 4px;
+          background-image: url('assets/img/cartoon-paw-right.png');
+        }
+        /* Pink Paw Fluffy Arms reaching up to cover eyes */
+        .cat-arms-container {
+          position: absolute;
+          inset: 0;
+          overflow: hidden;
+          pointer-events: none;
+          z-index: 32;
+        }
+        .pink-arm {
+          position: absolute;
+          width: 58px;
+          height: 104px;
+          bottom: -4px;
+          background-size: contain;
+          background-repeat: no-repeat;
+          background-position: center top;
+          opacity: 0;
+          pointer-events: none;
+          filter: drop-shadow(0 2px 5px rgba(0,0,0,0.4));
+          transition: transform 0.42s cubic-bezier(0.34, 1.15, 0.64, 1), opacity 0.22s ease;
+        }
+        .pink-arm-left {
+          left: 14px;
+          background-image: url('assets/img/cat-pink-arm-left.png');
+          transform-origin: 30% 95%;
+          transform: translateY(60px) rotate(-20deg) scale(0.85);
+        }
+        .pink-arm-right {
+          right: 14px;
+          background-image: url('assets/img/cat-pink-arm-right.png');
+          transform-origin: 70% 95%;
+          transform: translateY(60px) rotate(20deg) scale(0.85);
+        }
+        /* Covering eyes active state: both arms cover eyes */
+        .cat-covering-eyes .rim-paw {
+          opacity: 0;
+          transform: translateY(6px) scale(0.8);
+        }
+        .cat-covering-eyes .pink-arm-left {
+          opacity: 1;
+          transform: translateY(22px) rotate(18deg) scale(1.12);
+        }
+        .cat-covering-eyes .pink-arm-right {
+          opacity: 1;
+          transform: translateY(18px) rotate(-18deg) scale(1.12);
+        }
+        /* Show password: ONLY right paw lowers a little to peek! Left paw stays covering! */
+        .cat-covering-eyes .pink-arm-right.arm-peeking {
+          transform: translateY(42px) rotate(-14deg) scale(1.05);
+        }
+      `;
+
+      // 4. Mount Cartoon Cat on target card
+      let catStage = target.querySelector('.cartoon-cat-stage');
+      if (!catStage) {
+        catStage = document.createElement('div');
+        catStage.id = 'cartoon-peeking-cat';
+        catStage.className = 'cartoon-cat-stage';
+        catStage.innerHTML = `
+          <div class="cartoon-cat-head-img">
+            <div class="cat-eye-socket cat-eye-left">
+              <div class="cat-pupil cat-pupil-left"></div>
+              <div class="cat-eyelid"></div>
+            </div>
+            <div class="cat-eye-socket cat-eye-right">
+              <div class="cat-pupil cat-pupil-right"></div>
+              <div class="cat-eyelid"></div>
+            </div>
+          </div>
+          <!-- Resting Rim Paws -->
+          <div class="rim-paw rim-paw-left"></div>
+          <div class="rim-paw rim-paw-right"></div>
+          <!-- Pink Paw Fluffy Arms inside stage-clipped viewport -->
+          <div class="cat-arms-container">
+            <div class="pink-arm pink-arm-left"></div>
+            <div class="pink-arm pink-arm-right"></div>
+          </div>
+        `;
+        target.prepend(catStage);
+      } else {
+        if (!catStage.querySelector('.cat-eye-socket')) {
+          catStage.innerHTML = `
+            <div class="cartoon-cat-head-img">
+              <div class="cat-eye-socket cat-eye-left">
+                <div class="cat-pupil cat-pupil-left"></div>
+                <div class="cat-eyelid"></div>
+              </div>
+              <div class="cat-eye-socket cat-eye-right">
+                <div class="cat-pupil cat-pupil-right"></div>
+                <div class="cat-eyelid"></div>
+              </div>
+            </div>
+            <!-- Resting Rim Paws -->
+            <div class="rim-paw rim-paw-left"></div>
+            <div class="rim-paw rim-paw-right"></div>
+            <!-- Pink Paw Fluffy Arms inside stage-clipped viewport -->
+            <div class="cat-arms-container">
+              <div class="pink-arm pink-arm-left"></div>
+              <div class="pink-arm pink-arm-right"></div>
+            </div>
+          `;
+        }
+      }
+
+      if (catStage.dataset.initialized === 'true') return;
+      catStage.dataset.initialized = 'true';
+
+      const pupilL    = catStage.querySelector('.cat-pupil-left');
+      const pupilR    = catStage.querySelector('.cat-pupil-right');
+      const armRight  = catStage.querySelector('.pink-arm-right');
+      const userInput = target.querySelector('#login-user, #sa-login-user, input[type=text]');
+      const passInput = target.querySelector('#login-pass, #sa-login-pass, input[type=password]');
+      const passToggle= target.querySelector('.sa-pass-toggle, button[onclick*="Pass"], button[title*="Password"]');
+
+      let isCoveringEyes = false;
+      let isPasswordVisible = false;
+
+      // 5. Natural Blinking Loop
+      function scheduleBlink() {
+        const nextBlink = Math.random() * 3000 + 2200;
+        setTimeout(() => {
+          if (!isCoveringEyes || isPasswordVisible) {
+            catStage.classList.add('cat-blinking');
+            setTimeout(() => {
+              catStage.classList.remove('cat-blinking');
+              scheduleBlink();
+            }, 140);
+          } else {
+            scheduleBlink();
+          }
+        }, nextBlink);
+      }
+      scheduleBlink();
+
+      // 6. Lifelike Micro-Glances (Saccades) during idle
+      function scheduleSaccade() {
+        setTimeout(() => {
+          if (!isCoveringEyes && document.activeElement !== userInput) {
+            const microX = (Math.random() - 0.5) * 4.0;
+            const microY = (Math.random() - 0.5) * 3.0;
+            setPupils(microX, microY);
+            setTimeout(() => {
+              if (!isCoveringEyes && document.activeElement !== userInput) {
+                setPupils(0, 0);
+              }
+            }, 800);
+          }
+          scheduleSaccade();
+        }, Math.random() * 3500 + 2500);
+      }
+      scheduleSaccade();
+
+      // 7. Pupil Offset Helper
+      function setPupils(ox, oy) {
+        if (pupilL) pupilL.style.transform = `translate(calc(-50% + ${ox.toFixed(1)}px), calc(-50% + ${oy.toFixed(1)}px))`;
+        if (pupilR) pupilR.style.transform = `translate(calc(-50% + ${ox.toFixed(1)}px), calc(-50% + ${oy.toFixed(1)}px))`;
+      }
+
+      // 8. Eyes look at input box (Follow typing cursor across)
+      if (userInput) {
+        const updateGaze = () => {
+          const len   = userInput.value.length;
+          const lookX = Math.min(Math.max((len - 7) * 0.65, -6.0), 6.0);
+          const lookY = 6.5; // looking down directly at the username input
+          setPupils(lookX, lookY);
+        };
+        userInput.addEventListener('focus', () => {
+          isCoveringEyes = false;
+          isPasswordVisible = false;
+          catStage.classList.remove('cat-covering-eyes');
+          if (armRight) armRight.classList.remove('arm-peeking');
+          updateGaze();
+        });
+        userInput.addEventListener('blur', () => {
+          if (!isCoveringEyes) setPupils(0, 0); // relax forward
+        });
+        userInput.addEventListener('input', updateGaze);
+      }
+
+      // 9. Centralized Password Paw State Controller
+      function updatePasswordPawState() {
+        const isFocused = (document.activeElement === passInput);
+        const isToggleActive = (document.activeElement === passToggle);
+        const isText = (passInput && passInput.type === 'text');
+
+        // If user focused on username, put paws back on rim
+        if (document.activeElement === userInput) {
+          isCoveringEyes = false;
+          isPasswordVisible = false;
+          catStage.classList.remove('cat-covering-eyes');
+          if (armRight) armRight.classList.remove('arm-peeking');
+          return;
+        }
+
+        if (isFocused || isToggleActive || isText) {
+          isCoveringEyes = true;
+          catStage.classList.add('cat-covering-eyes');
+
+          if (isText) {
+            // SHOW PASSWORD: Only 1 paw (right paw) lowers a little to peek! Left paw stays covering!
+            isPasswordVisible = true;
+            if (armRight) armRight.classList.add('arm-peeking');
+            setPupils(3.5, 5.0); // peek down at revealed password
+          } else {
+            // HIDE PASSWORD: Right paw goes back up to cover right eye! Both paws covering!
+            isPasswordVisible = false;
+            if (armRight) armRight.classList.remove('arm-peeking');
+            setPupils(0, 0);
+          }
+        } else {
+          // Blurred away from password without text showing: return paws to rim
+          isCoveringEyes = false;
+          isPasswordVisible = false;
+          catStage.classList.remove('cat-covering-eyes');
+          if (armRight) armRight.classList.remove('arm-peeking');
+          setPupils(0, 0);
+        }
+      }
+
+      // Password input focus / blur handlers
+      if (passInput) {
+        passInput.addEventListener('focus', () => {
+          updatePasswordPawState();
+        });
+        passInput.addEventListener('blur', () => {
+          setTimeout(updatePasswordPawState, 150);
+        });
+      }
+
+      // 10. Password Visibility Toggle: PEEK THROUGH 1 PAW!
+      if (passToggle) {
+        passToggle.addEventListener('mousedown', (e) => {
+          // Prevent clicking the toggle button from stealing focus from password input
+          e.preventDefault();
+        });
+        passToggle.addEventListener('click', () => {
+          setTimeout(updatePasswordPawState, 25);
+        });
+      }
+    }
+
+    const playCatCoffeeLoginAnimation = initPeekingCatLogin;
+    const playWaterDropLoginAnimation = initPeekingCatLogin;
+if (typeof gsap === "undefined") { document.write('<script src="https://cdn.jsdelivr.net/npm/gsap@3.12.5/dist/gsap.min.js"><\/script>'); }</script>
   <script>
 
     /* ========== API HELPERS ========== */
@@ -5134,8 +5695,10 @@
 
     async function api(endpoint, data = null, method = null) {
       const opts = { credentials: 'include' };
-      opts.headers = {};
-      const sid = localStorage.getItem('chipipie_session_id');
+      opts.headers = {
+        'X-Portal': 'pos'
+      };
+      const sid = localStorage.getItem('chipipie_pos_session_id') || localStorage.getItem('chipipie_session_id');
       if (sid) {
         opts.headers['X-Session-Id'] = sid;
       }
@@ -5147,7 +5710,13 @@
         opts.method = method || 'GET';
       }
       const res = await fetch(API + endpoint, opts);
-      return await res.json();
+      const text = await res.text();
+      try {
+        return JSON.parse(text);
+      } catch (err) {
+        console.error('API non-JSON response from ' + endpoint + ':', text);
+        throw new Error('Server returned an invalid response. Please try again.');
+      }
     }
 
     /* ========== DATA ========== */
@@ -5329,9 +5898,9 @@
       const pizzaGroups = [
         { label: 'Pizza',       sgId: 'pizza',       icon: 'bi-circle',         cats: ['Pizza'],                        noSubcat: true },
         { label: 'Quesadilla',  sgId: 'quesadilla',  icon: 'bi-grid-3x3-gap',   cats: ['Quesadilla'],                   noSubcat: true },
-        { label: 'Patatas',     sgId: 'patatas',     icon: 'bi-bag-heart',       cats: ['Patatas'],                      noSubcat: true },
-        { label: 'Pasta',       sgId: 'pasta',       icon: 'bi-stars',           cats: ['Pasta'],                        noSubcat: true },
-        { label: 'Chickenpops', sgId: 'chickenpops', icon: 'bi-lightning',       cats: ['Chickenpops'],                  noSubcat: true },
+        { label: 'Patatas',     sgId: 'patatas',     icon: 'bi-potato',       cats: ['Patatas'],                      noSubcat: true },
+        { label: 'Pasta',       sgId: 'pasta',       icon: 'bi-noodles',           cats: ['Pasta'],                        noSubcat: true },
+        { label: 'Chickenpops', sgId: 'chickenpops', icon: 'bi-drumstick',       cats: ['Chickenpops'],                  noSubcat: true },
         { label: 'Combo',       sgId: 'combo',       icon: 'bi-collection',      cats: ['Combo', 'Gipitmeal'] },
       ];
 
@@ -7142,7 +7711,7 @@
             <span style="font-weight:800;font-size:13px;">${sel.orderNum}</span>
             <span style="font-weight:700;color:${c1};font-size:13px;">₱${sel.total.toLocaleString(undefined,{minimumFractionDigits:2})}</span>
           </div>
-          <label style="font-size:10px;font-weight:700;color:#6b7280;text-transform:uppercase;display:block;margin-bottom:3px;">Reason *</label>
+          <label style="font-size:10px;font-weight:700;color:#6b7280;text-transform:uppercase;display:block;margin-bottom:3px;">Reason <span class="required-star" title="Required">*</span></label>
           <input type="text" id="side-reason-inp-${orderId}" value="${reason.replace(/"/g,'&quot;')}" maxlength="200"
             placeholder="${pholder}"
             style="width:100%;padding:7px 9px;border:1.5px solid #e5e7eb;border-radius:6px;font-size:12px;font-family:inherit;box-sizing:border-box;"
@@ -7189,6 +7758,16 @@
     }
 
     function clearAdjSelection() {
+      // If there's a live pending batch token, cancel it silently before clearing
+      if (_batchApprovalToken) {
+        const _tokenToCancel = _batchApprovalToken;
+        _batchApprovalToken = null;
+        api('orders.php?action=reject_void_batch', {
+          batch_token: _tokenToCancel,
+          reason: 'Selection cleared in POS',
+          is_cancel: true
+        }).catch(e => console.warn('cancel void batch on clear:', e));
+      }
       _adjSelections = {};
       try { localStorage.removeItem(ADJ_STORE_KEY); } catch(e){}
       document.querySelectorAll('.adj-radio').forEach(r => r.classList.remove('adj-void-sel','adj-ref-sel'));
@@ -7290,6 +7869,23 @@
       stopBatchPoll();
     }
 
+    async function rejectAndCloseVoidModal(reason, isCancel = false) {
+      // If there's an active batch token, tell the server to mark it cancelled or rejected
+      if (_batchApprovalToken) {
+        const _tok = _batchApprovalToken;
+        _batchApprovalToken = null; // clear first to prevent clearAdjSelection double-cancel
+        try {
+          await api('orders.php?action=reject_void_batch', {
+            batch_token: _tok,
+            reason: reason || (isCancel ? 'Cancelled in POS' : 'Rejected in POS'),
+            is_cancel: isCancel
+          });
+        } catch(e) { console.warn('rejectVoidBatch error:', e); }
+      }
+      closeVoidAuthModal();
+      showToast(isCancel ? '\uD83D\uDEAB Void/Refund request cancelled.' : '\u274c Void/Refund request rejected.');
+    }
+
     function stopBatchPoll() {
       if (_batchPollInterval) { clearInterval(_batchPollInterval); _batchPollInterval = null; }
     }
@@ -7313,6 +7909,11 @@
           _batchApprovalToken = null;
           closeVoidAuthModal();
           showToast('❌ Request was rejected.');
+        } else if (res.batch_status === 'cancelled') {
+          stopBatchPoll();
+          _batchApprovalToken = null;
+          closeVoidAuthModal();
+          showToast('🚫 Request was cancelled by requester.');
         }
       } catch(e) { /* ignore poll errors silently */ }
     }
@@ -7380,8 +7981,9 @@
           status.textContent   = '⚠ ' + res.message;
         }
       } catch(e) {
+        console.error('requestVoidCode error:', e);
         status.style.display = '';
-        status.textContent   = '⚠ Request failed. Check connection.';
+        status.textContent   = '⚠ ' + (e?.message || 'Request failed. Check connection.');
       } finally {
         btn.disabled = false;
         btn.innerHTML = '<i class="bi bi-envelope-fill me-1"></i>Submit Request for Approval';
@@ -7429,6 +8031,7 @@
           errEl.style.display = ''; _resetBtn(); return;
         }
 
+        _batchApprovalToken = null; // clear before clearAdjSelection to prevent double-cancel
         closeVoidAuthModal();
         clearAdjSelection();
         showToast(`✅ Request approved and ${keys.length} order(s) processed!`);
@@ -7437,7 +8040,8 @@
 
       } catch(e) {
         clearTimeout(tid);
-        errEl.textContent = '⚠ Verification failed. Try again.';
+        console.error('confirmVoidWithCode error:', e);
+        errEl.textContent = '⚠ ' + (e?.message || 'Verification failed. Try again.');
         errEl.style.display = ''; _resetBtn();
       }
     }
@@ -7597,9 +8201,9 @@
       // ── Pizza Branch ──────────────────────────────────────
       { label: 'Pizza',       icon: 'bi-circle',            cats: ['Pizza'] },
       { label: 'Quesadilla',  icon: 'bi-grid-3x3-gap',      cats: ['Quesadilla'] },
-      { label: 'Patatas',     icon: 'bi-bag-heart',         cats: ['Patatas'] },
-      { label: 'Pasta',       icon: 'bi-stars',             cats: ['Pasta'] },
-      { label: 'Chickenpops', icon: 'bi-lightning',         cats: ['Chickenpops'] },
+      { label: 'Patatas',     icon: 'bi-potato',         cats: ['Patatas'] },
+      { label: 'Pasta',       icon: 'bi-noodles',             cats: ['Pasta'] },
+      { label: 'Chickenpops', icon: 'bi-drumstick',         cats: ['Chickenpops'] },
       { label: 'Combo',       icon: 'bi-collection',        cats: ['Combo', 'Gipitmeal'] },
     ];
 
@@ -7767,12 +8371,12 @@
       const pizzaCategories = posMenuCategories.filter(c =>  POS_PIZZA_CAT_IDS.has(c.id));
       let html = '';
       if (cafeCategories.length) {
-        html += `<optgroup label="☕ ChipiPie Café">`;
+        html += `<optgroup label="ChipiPie Café">`;
         cafeCategories.forEach(c => { html += `<option value="${c.id}" data-name="${c.name}">${c.name}</option>`; });
         html += `</optgroup>`;
       }
       if (pizzaCategories.length) {
-        html += `<optgroup label="🍕 Pizza House">`;
+        html += `<optgroup label="Pizza House">`;
         pizzaCategories.forEach(c => { html += `<option value="${c.id}" data-name="${c.name}">${c.name}</option>`; });
         html += `</optgroup>`;
       }
@@ -7965,29 +8569,37 @@
 
         if (el('rep-kpi-month-rev'))    el('rep-kpi-month-rev').textContent    = '₱' + stats.month.revenue.toLocaleString();
         if (el('rep-kpi-month-orders')) el('rep-kpi-month-orders').textContent = stats.month.orders.toLocaleString();
+        // Clear the "Loading..." sub-labels with the current month/year
+        const _now = new Date();
+        const _monthLabel = _now.toLocaleString('en-PH', { month: 'long', year: 'numeric' });
+        if (el('rep-kpi-month-rev-trend'))    el('rep-kpi-month-rev-trend').textContent    = _monthLabel;
+        if (el('rep-kpi-month-orders-trend')) el('rep-kpi-month-orders-trend').textContent = _monthLabel;
 
         // Avg daily = month revenue / 30
         const avgDaily = stats.month.orders > 0 ? Math.round(stats.month.revenue / 30) : 0;
         if (el('rep-kpi-avg-daily'))       el('rep-kpi-avg-daily').textContent       = '₱' + avgDaily.toLocaleString();
         if (el('rep-kpi-avg-daily-trend')) el('rep-kpi-avg-daily-trend').textContent = 'Based on last 30 days';
 
-        // Best day — peak index from weekly chart
-        const weekly = stats.weekly_chart || [0,0,0,0,0,0,0];
-        const weekDayNames = ['Mon','Tue','Wed','Thu','Fri','Sat','Sun'];
-        const peakIdx = weekly.indexOf(Math.max(...weekly));
-        const bestDay = Math.max(...weekly) > 0 ? weekDayNames[peakIdx] : '—';
-        const bestRev = Math.max(...weekly);
-        if (el('rep-kpi-best-day'))       el('rep-kpi-best-day').textContent       = bestDay;
-        if (el('rep-kpi-best-day-trend')) el('rep-kpi-best-day-trend').textContent = bestRev > 0 ? '₱' + bestRev.toLocaleString() + ' this week' : 'No data yet';
+        // Best day — from API (hierarchy: this week → last 30 days → all-time peak)
+        const brd = stats.best_revenue_day;
+        if (brd && brd.revenue > 0) {
+          if (el('rep-kpi-best-day'))       el('rep-kpi-best-day').textContent       = brd.day_name + ', ' + brd.date;
+          if (el('rep-kpi-best-day-trend')) el('rep-kpi-best-day-trend').textContent = '₱' + brd.revenue.toLocaleString() + ' (' + brd.period + ')';
+        } else {
+          if (el('rep-kpi-best-day'))       el('rep-kpi-best-day').textContent       = '—';
+          if (el('rep-kpi-best-day-trend')) el('rep-kpi-best-day-trend').textContent = 'No data yet';
+        }
 
         // Volume table
         const tbody = document.getElementById('rep-vol-tbody');
         if (tbody) {
+          const vol = stats.volume_breakdown || {};
+          const fmtV = v => (v !== undefined && v !== null && v > 0) ? Number(v).toLocaleString() : '0';
           tbody.innerHTML = `
-            <tr><td style="font-weight:500;">Today</td><td style="font-weight:600; color:var(--cafe-brown);">${stats.cups_sold || 0}</td><td style="font-weight:600; color:var(--cafe-amber);">${stats.food_sold || 0}</td></tr>
-            <tr><td style="font-weight:500;">This Week</td><td style="font-weight:600; color:var(--cafe-brown);">—</td><td style="font-weight:600; color:var(--cafe-amber);">—</td></tr>
-            <tr><td style="font-weight:500;">This Month</td><td style="font-weight:600; color:var(--cafe-brown);">—</td><td style="font-weight:600; color:var(--cafe-amber);">—</td></tr>
-            <tr><td style="font-weight:500;">This Year</td><td style="font-weight:600; color:var(--cafe-brown);">—</td><td style="font-weight:600; color:var(--cafe-amber);">—</td></tr>
+            <tr><td style="font-weight:500;">Today</td><td style="font-weight:600; color:var(--cafe-brown);">${fmtV(vol.today?.cups)}</td><td style="font-weight:600; color:var(--cafe-amber);">${fmtV(vol.today?.food)}</td></tr>
+            <tr><td style="font-weight:500;">This Week</td><td style="font-weight:600; color:var(--cafe-brown);">${fmtV(vol.week?.cups)}</td><td style="font-weight:600; color:var(--cafe-amber);">${fmtV(vol.week?.food)}</td></tr>
+            <tr><td style="font-weight:500;">This Month</td><td style="font-weight:600; color:var(--cafe-brown);">${fmtV(vol.month?.cups)}</td><td style="font-weight:600; color:var(--cafe-amber);">${fmtV(vol.month?.food)}</td></tr>
+            <tr><td style="font-weight:500;">This Year</td><td style="font-weight:600; color:var(--cafe-brown);">${fmtV(vol.year?.cups)}</td><td style="font-weight:600; color:var(--cafe-amber);">${fmtV(vol.year?.food)}</td></tr>
           `;
         }
 
@@ -8251,7 +8863,11 @@
       const sName = document.getElementById('sidebar-name');
       if (sName) sName.textContent = user.full_name || 'Admin';
       const sRole = document.getElementById('sidebar-role');
-      if (sRole) sRole.textContent = user.role === 'admin' ? 'Administrator' : 'Cashier';
+      if (sRole) {
+        if (user.role === 'super_admin') sRole.textContent = 'Super Administrator';
+        else if (user.role === 'admin') sRole.textContent = 'Administrator';
+        else sRole.textContent = 'Cashier';
+      }
       const sAvatar = document.getElementById('sidebar-avatar');
       if (sAvatar) sAvatar.textContent = (user.full_name || 'U').charAt(0).toUpperCase();
 
@@ -8279,15 +8895,10 @@
         const res = await api('auth.php?action=login', { username: u, password: p });
 
         if (res.requires_2fa) {
-          // If super admin logged in from POS, redirect them to the superadmin panel where their 2FA is ready
-          if (res.redirect && res.redirect.includes('superadmin')) {
-            window.location.href = res.redirect;
-            return;
-          }
           // Admin 2FA in POS: show POS 2FA screen
           document.getElementById('pos-step-credentials').style.display = 'none';
           document.getElementById('pos-step-2fa').style.display = 'block';
-          document.getElementById('pos-2fa-email').textContent = res.masked_email || 'Manager Email';
+          document.getElementById('pos-2fa-email').textContent = res.masked_email || 'Your Registered Email';
           const codeInput = document.getElementById('pos-2fa-code');
           codeInput.value = '';
           if (res.dev_code) {
@@ -8298,7 +8909,7 @@
             document.getElementById('pos-dev-hint').style.display = 'none';
           }
           if (succEl) {
-            succEl.textContent = res.message || 'Verification code sent to manager email.';
+            succEl.textContent = res.message || 'Verification code sent to your email.';
             succEl.style.display = 'block';
           }
           setTimeout(() => codeInput.focus(), 100);
@@ -8311,19 +8922,18 @@
 
         if (res.success) {
           if (res.session_id) {
+            localStorage.setItem('chipipie_pos_session_id', res.session_id);
             localStorage.setItem('chipipie_session_id', res.session_id);
-          }
-          // Super admin has a dedicated panel — redirect there
-          if (res.redirect) {
-            window.location.href = res.redirect;
-            return;
           }
           currentUser = res.user;
           updateUserInfoUI(res.user);
-          await loadMenuFromDB();
-          activateApp(res.user.role === 'admin');
+          await activateApp(res.user.role === 'admin' || res.user.role === 'super_admin');
         } else {
-          errEl.textContent = res.message || 'Invalid credentials.';
+          if (res.is_super_admin) {
+            errEl.innerHTML = `🛡️ Super Administrator accounts must sign in using the dedicated Super Admin Portal.<br><a href="${res.superadmin_url || 'superadmin-panel.php'}" target="_blank" class="fw-bold" style="color:var(--cafe-brown);text-decoration:underline;margin-top:6px;display:inline-flex;align-items:center;gap:4px;">Open Super Admin Portal <i class="bi bi-box-arrow-up-right" style="font-size:11px;"></i></a>`;
+          } else {
+            errEl.textContent = res.message || 'Invalid credentials.';
+          }
           errEl.style.display = 'block';
         }
       } catch (err) {
@@ -8354,14 +8964,14 @@
         const res = await api('auth.php?action=verify_2fa', { code: code });
         if (res.success && res.user) {
           if (res.session_id) {
+            localStorage.setItem('chipipie_pos_session_id', res.session_id);
             localStorage.setItem('chipipie_session_id', res.session_id);
           }
           currentUser = res.user;
           updateUserInfoUI(res.user);
           document.getElementById('pos-step-2fa').style.display = 'none';
           document.getElementById('pos-step-credentials').style.display = 'block';
-          await loadMenuFromDB();
-          activateApp(res.user.role === 'admin');
+          await activateApp(res.user.role === 'admin' || res.user.role === 'super_admin');
         } else {
           errEl.textContent = res.message || 'Invalid or expired verification code.';
           errEl.style.display = 'block';
@@ -8388,7 +8998,7 @@
       try {
         const res = await api('auth.php?action=resend_2fa', {});
         if (res.success) {
-          succEl.textContent = res.message || 'A new code has been sent to the manager email.';
+          succEl.textContent = res.message || 'A new code has been sent to your email.';
           succEl.style.display = 'block';
           if (res.dev_code) {
             document.getElementById('pos-dev-hint').style.display = 'block';
@@ -8459,18 +9069,20 @@
       const reportsBtn = document.getElementById('nav-reports-btn');
       const usersBtn = document.getElementById('nav-users-btn');
 
-      // Load today's orders from DB to populate dashboard
-      try {
-        const ordRes = await api('orders.php?date=today');
-        if (ordRes.success) {
-          orders = ordRes.orders.map(o => ({
-            id: o.order_number, time: o.time, date: new Date(o.created_at).toDateString(),
-            ts: new Date(o.created_at).getTime(), items: o.items || '',
-            cartData: null, total: parseFloat(o.total),
-            payment: o.payment_method, status: o.status
-          }));
-        }
-      } catch (e) { console.warn('Could not load orders on init:', e); }
+      // Concurrently load menu & today's orders for instant app activation
+      await Promise.all([
+        loadMenuFromDB(),
+        api('orders.php?date=today').then(ordRes => {
+          if (ordRes && ordRes.success && ordRes.orders) {
+            orders = ordRes.orders.map(o => ({
+              id: o.order_number, time: o.time, date: new Date(o.created_at).toDateString(),
+              ts: new Date(o.created_at).getTime(), items: o.items || '',
+              cartData: null, total: parseFloat(o.total),
+              payment: o.payment_method, status: o.status
+            }));
+          }
+        }).catch(e => { console.warn('Could not load orders on init:', e); })
+      ]);
 
       if (!isAdmin) {
         mgmtLabel.style.display = 'none';
@@ -8493,6 +9105,7 @@
 
     async function logout() {
       try { await api('auth.php?action=logout', {}); } catch (e) { }
+      localStorage.removeItem('chipipie_pos_session_id');
       localStorage.removeItem('chipipie_session_id');
       currentUser = null;
       document.getElementById('login-user').value = '';
@@ -8503,16 +9116,25 @@
       if (stepCreds) stepCreds.style.display = 'block';
       document.getElementById('app-wrapper').style.display = 'none';
       document.getElementById('login-wrapper').style.display = 'flex';
+      playWaterDropLoginAnimation('#login-wrapper .login-card');
     }
 
     /* ========== REGISTER (Login page) ========== */
     function showRegisterForm() {
       document.getElementById('login-wrapper').style.display = 'none';
       document.getElementById('register-wrapper').style.display = 'flex';
+      playWaterDropLoginAnimation('#register-wrapper .register-card');
+      const btn = document.getElementById('reg-submit-btn');
+      const sucEl = document.getElementById('reg-success');
+      if (btn && (!sucEl || sucEl.style.display !== 'block')) {
+        btn.disabled = false;
+        btn.innerHTML = 'Register';
+      }
     }
     function showLoginForm() {
       document.getElementById('register-wrapper').style.display = 'none';
       document.getElementById('login-wrapper').style.display = 'flex';
+      playWaterDropLoginAnimation('#login-wrapper .login-card');
     }
 
     /* ========== PASSWORD COMPLEXITY HELPER ========== */
@@ -8720,10 +9342,18 @@
     function showRegisterForm() {
       document.getElementById('login-wrapper').style.display = 'none';
       document.getElementById('register-wrapper').style.display = 'flex';
+      playWaterDropLoginAnimation('#register-wrapper .register-card');
+      const btn = document.getElementById('reg-submit-btn');
+      const sucEl = document.getElementById('reg-success');
+      if (btn && (!sucEl || sucEl.style.display !== 'block')) {
+        btn.disabled = false;
+        btn.innerHTML = 'Register';
+      }
     }
     function showLoginForm() {
       document.getElementById('register-wrapper').style.display = 'none';
       document.getElementById('login-wrapper').style.display = 'flex';
+      playWaterDropLoginAnimation('#login-wrapper .login-card');
       hidePosForgot();
     }
 
@@ -8758,6 +9388,9 @@
         errEl.style.display = 'block'; return;
       }
 
+      const btn = document.getElementById('reg-submit-btn');
+      if (btn && btn.disabled) return;
+
       const data = {
         first_name: firstName,
         middle_initial: middleInitial,
@@ -8770,19 +9403,35 @@
         role: document.getElementById('reg-role').value
       };
 
+      if (btn) {
+        btn.disabled = true;
+        btn.innerHTML = '<span class="spinner-border spinner-border-sm me-2"></span>Please wait...';
+      }
+
       try {
         const res = await api('auth.php?action=register', data);
         if (res.success) {
           sucEl.textContent = res.message;
           sucEl.style.display = 'block';
-          document.getElementById('reg-submit-btn').disabled = true;
+          if (btn) {
+            btn.disabled = true;
+            btn.innerHTML = '<i class="bi bi-check-circle-fill me-1"></i> Submitted';
+          }
         } else {
           errEl.textContent = res.message;
           errEl.style.display = 'block';
+          if (btn) {
+            btn.disabled = false;
+            btn.innerHTML = 'Register';
+          }
         }
       } catch (err) {
-        errEl.textContent = 'Connection error.';
+        errEl.textContent = 'Connection error. Please try again.';
         errEl.style.display = 'block';
+        if (btn) {
+          btn.disabled = false;
+          btn.innerHTML = 'Register';
+        }
       }
     }
 
@@ -8791,58 +9440,129 @@
       try {
         const res = await api('auth.php?action=users');
         if (!res.success) return;
-        const visibleUsers = res.users.filter(u => u.role !== 'super_admin');
+        const visibleUsers = (res.users || []).filter(u => u.role !== 'super_admin' && u.username !== 'superadmin');
         document.getElementById('users-tbody').innerHTML = visibleUsers.map(u => `
           <tr>
             <td style="font-weight:500;">${u.full_name}</td>
             <td><code>${u.username}</code></td>
             <td style="font-size:12px;color:#666;">${u.email || '—'}</td>
-            <td><span class="badge-cat">${u.role}</span></td>
-            <td><span class="${u.is_active == 1 ? 'badge-success' : 'badge-pending'}">${u.is_active == 1 ? 'Active' : 'Inactive'}</span></td>
+            <td><span class="badge-cat" style="display:inline-block;min-width:65px;text-align:center;">${u.role}</span></td>
+            <td><span class="${u.is_active == 1 ? 'badge-success' : 'badge-pending'}" style="display:inline-block;width:70px;text-align:center;box-sizing:border-box;">${u.is_active == 1 ? 'Active' : 'Inactive'}</span></td>
             <td>
-              <div style="display:flex;gap:6px;align-items:center;">
-                <button class="btn btn-sm" style="background:var(--cafe-tan);color:var(--cafe-brown);border:none;border-radius:6px;padding:4px 10px;font-size:12px;line-height:1.4;min-width:110px;text-align:center;" onclick="requestUserToggle(${u.id}, '${u.full_name}', ${u.is_active})">${u.is_active == 1 ? 'Req Deactivate' : 'Req Activate'}</button>
-                <button class="btn btn-sm" style="background:#fee2e2;color:#b91c1c;border:none;border-radius:6px;padding:4px 10px;font-size:12px;line-height:1.4;min-width:95px;text-align:center;" onclick="requestUserDelete(${u.id}, '${u.full_name}')"><i class="bi bi-trash-fill"></i> Req Delete</button>
+              <div style="display:flex;gap:8px;align-items:center;">
+                <button class="btn btn-sm" style="background:var(--cafe-tan);color:var(--cafe-brown);border:none;border-radius:5px;height:26px;width:120px;font-size:11px;white-space:nowrap;display:inline-flex;align-items:center;justify-content:center;box-sizing:border-box;" onclick="requestUserToggle(${u.id}, '${u.full_name}', ${u.is_active})">${u.is_active == 1 ? 'Req Deactivate' : 'Req Activate'}</button>
+                <button class="btn btn-sm" style="background:#fee2e2;color:#b91c1c;border:none;border-radius:5px;height:26px;width:120px;font-size:11px;white-space:nowrap;display:inline-flex;align-items:center;justify-content:center;gap:4px;box-sizing:border-box;" onclick="requestUserDelete(${u.id}, '${u.full_name}')"><i class="bi bi-trash-fill"></i> Req Delete</button>
               </div>
             </td>
           </tr>
         `).join('') || '<tr><td colspan="6" class="text-center text-muted py-3">No users found</td></tr>';
 
-        document.getElementById('pending-tbody').innerHTML = res.pending_admin_requests.map(r => {
+        const visibleRequests = (res.pending_admin_requests || []).filter(r =>
+          r.role !== 'super_admin' &&
+          r.username !== 'superadmin' &&
+          r.username !== 'super_admin' &&
+          !(r.full_name || '').toLowerCase().includes('super admin')
+        );
+
+        document.getElementById('pending-tbody').innerHTML = visibleRequests.map(r => {
           const safeName = (r.full_name || '').replace(/'/g, "\\'");
+          const safeUser = (r.username || '').replace(/'/g, "\\'");
+          const isPending = r.status === 'pending';
+          const isApproved = r.status === 'approved';
+          const reqRole = r.role || 'cashier';
           return `
           <tr>
             <td style="font-weight:500;">${r.full_name}</td>
             <td><code>${r.username}</code></td>
             <td style="font-size:12px;color:#666;">${r.email}</td>
-            <td><span class="badge-${r.status === 'approved' ? 'success' : (r.status === 'pending' ? 'pending' : 'danger')}">${r.status}</span></td>
-            <td style="font-size:12px;color:#888;">${r.created_at}</td>
+            <td><span class="badge-cat" style="text-transform:capitalize;display:inline-block;min-width:65px;text-align:center;">${reqRole}</span></td>
             <td>
-              <div style="display:flex;gap:6px;align-items:center;">
-                ${r.status === 'pending' ? `
-                  <button class="btn btn-sm" style="background:var(--cafe-brown);color:#fff;border:none;border-radius:6px;padding:4px 12px;font-size:12px;" onclick="resendApprovalEmail(${r.id})" title="Re-send the approval link to the owner's Gmail">
-                    <i class="bi bi-envelope"></i> Resend to Owner
+              <span class="${isPending ? 'badge-pending' : (isApproved ? 'badge-success' : 'badge-danger')}" style="display:inline-block;width:70px;text-align:center;box-sizing:border-box;">${r.status}</span>
+              <div style="font-size:11px;color:#888;margin-top:3px;white-space:nowrap;">${r.created_at}</div>
+            </td>
+            <td>
+              ${isPending ? `
+                <div style="display:flex;gap:8px;align-items:center;">
+                  <button class="btn btn-sm" style="background:var(--cafe-brown);color:#fff;border:none;border-radius:5px;height:26px;width:120px;font-size:11px;white-space:nowrap;display:inline-flex;align-items:center;justify-content:center;gap:4px;box-sizing:border-box;" onclick="resendApprovalEmail(${r.id})" title="Re-send the approval link to the owner's Gmail">
+                    <i class="bi bi-envelope"></i> Resend
                   </button>
-                ` : ''}
-                <button class="btn btn-sm" style="background:#fee2e2;color:#b91c1c;border:none;border-radius:6px;padding:4px 10px;font-size:12px;line-height:1.4;" onclick="deleteAdminRequestPos(${r.id}, '${safeName}')" title="Remove request">
-                  <i class="bi bi-trash-fill"></i> Remove
-                </button>
-              </div>
+                  <button class="btn btn-sm" style="background:#fee2e2;color:#b91c1c;border:none;border-radius:5px;height:26px;width:120px;font-size:11px;white-space:nowrap;display:inline-flex;align-items:center;justify-content:center;gap:4px;box-sizing:border-box;" onclick="requestDeleteAdminRequestPos(${r.id}, '${safeName}', '${safeUser}', '${reqRole}')" title="Request to remove registration request">
+                    <i class="bi bi-trash-fill"></i> Request Remove
+                  </button>
+                </div>
+              ` : `<span style="color:#aaa;font-size:12px;">—</span>`}
             </td>
           </tr>
         `;
-        }).join('') || '<tr><td colspan="6" class="text-center text-muted py-3">No pending requests</td></tr>';
+        }).join('') || '<tr><td colspan="6" class="text-center text-muted py-3">No pending registration requests</td></tr>';
       } catch (e) { console.error(e); }
     }
 
-    async function deleteAdminRequestPos(requestId, name) {
-      if (!confirm(`Are you sure you want to remove the admin approval request for "${name}"?`)) return;
+    async function approveRegistrationPos(requestId, name, role) {
+      const roleLabel = (role || 'cashier').charAt(0).toUpperCase() + (role || 'cashier').slice(1);
+      if (!confirm(`Approve registration for ${name} as ${roleLabel}? This will create their active account immediately.`)) {
+        return;
+      }
       try {
-        const res = await api('auth.php?action=delete_admin_request', { request_id: requestId });
-        showToast(res.success ? '🗑 ' + res.message : '⚠ ' + res.message);
+        const res = await api('auth.php?action=approve_registration', { request_id: requestId });
+        showToast(res.success ? '✅ ' + res.message : '⚠ ' + res.message);
         if (res.success) renderUsers();
       } catch (e) {
         showToast('⚠ Connection error');
+      }
+    }
+
+    let currentDeleteReqData = null;
+
+    function requestDeleteAdminRequestPos(requestId, name, username, role) {
+      currentDeleteReqData = { id: requestId, name: name, username: username, role: role };
+      const nameEl = document.getElementById('delete-admin-req-name');
+      if (nameEl) nameEl.textContent = `"${name}"`;
+      new bootstrap.Modal(document.getElementById('deleteAdminRequestModal')).show();
+    }
+
+    function deleteAdminRequestPos(requestId, name) {
+      requestDeleteAdminRequestPos(requestId, name, '', 'cashier');
+    }
+
+    async function confirmDeleteAdminRequest() {
+      if (!currentDeleteReqData) return;
+      const btn = document.getElementById('delete-admin-req-confirm-btn');
+      const origHtml = btn ? btn.innerHTML : '<i class="bi bi-send-fill me-1"></i> Submit Request';
+      if (btn) {
+        btn.disabled = true;
+        btn.innerHTML = '<span class="spinner-border spinner-border-sm me-1"></span>Submitting...';
+      }
+
+      try {
+        const reqBody = {
+          type: 'registration_delete',
+          title: `Request to Remove Registration: ${currentDeleteReqData.name}`,
+          description: `An admin has requested to remove the pending registration request for ${currentDeleteReqData.name} (@${currentDeleteReqData.username || ''}).`,
+          payload: {
+            request_id: currentDeleteReqData.id,
+            name: currentDeleteReqData.name,
+            username: currentDeleteReqData.username,
+            role: currentDeleteReqData.role
+          }
+        };
+        const res = await fetch('api/superadmin.php?action=submit_request', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(reqBody)
+        });
+        const data = await res.json();
+        bootstrap.Modal.getInstance(document.getElementById('deleteAdminRequestModal'))?.hide();
+        showToast(data.success ? '✅ ' + data.message : '⚠ ' + data.message);
+        if (data.success) renderUsers();
+      } catch (e) {
+        showToast('⚠ Connection error');
+      } finally {
+        if (btn) {
+          btn.disabled = false;
+          btn.innerHTML = origHtml;
+        }
+        currentDeleteReqData = null;
       }
     }
 
@@ -8939,6 +9659,17 @@
       new bootstrap.Modal(document.getElementById('registerUserModal')).show();
     }
 
+    function togglePassVisibility(inputId, btn) {
+      const inp = document.getElementById(inputId);
+      if (!inp) return;
+      const isPass = inp.type === 'password';
+      inp.type = isPass ? 'text' : 'password';
+      const icon = btn.querySelector('i');
+      if (icon) {
+        icon.className = isPass ? 'bi bi-eye-slash' : 'bi bi-eye';
+      }
+    }
+
     async function submitRegisterUser() {
       const resEl = document.getElementById('modal-reg-result');
       resEl.style.display = 'none';
@@ -8971,6 +9702,13 @@
         resEl.textContent = pwdErr; return;
       }
 
+      const regBtn = document.getElementById('modal-reg-submit-btn');
+      const origBtnHtml = regBtn ? regBtn.innerHTML : 'Register';
+      if (regBtn) {
+        regBtn.disabled = true;
+        regBtn.innerHTML = '<span class="spinner-border spinner-border-sm me-2"></span>Please wait...';
+      }
+
       const data = {
         first_name: firstName,
         middle_initial: middleInitial,
@@ -8980,15 +9718,61 @@
         email, username, password, role
       };
 
-      const res = await api('auth.php?action=register', data);
-      resEl.style.display = 'block';
-      if (res.success) {
-        resEl.style.color = '#1a5c2e'; resEl.style.background = '#d4edda';
-        resEl.textContent = res.message;
-        renderUsers();
-      } else {
-        resEl.style.color = '#842029'; resEl.style.background = '#f8d7da';
-        resEl.textContent = res.message;
+      try {
+        const res = await api('auth.php?action=register', data);
+        if (res.success) {
+          // Clear inputs
+          document.getElementById('modal-reg-first-name').value = '';
+          document.getElementById('modal-reg-middle-initial').value = '';
+          document.getElementById('modal-reg-last-name').value = '';
+          document.getElementById('modal-reg-suffix').value = '';
+          document.getElementById('modal-reg-email').value = '';
+          document.getElementById('modal-reg-user').value = '';
+          document.getElementById('modal-reg-pass').value = '';
+          document.getElementById('modal-reg-pass-confirm').value = '';
+          document.getElementById('modal-reg-pass').type = 'password';
+          document.getElementById('modal-reg-pass-confirm').type = 'password';
+          resEl.style.display = 'none';
+
+          // Configure confirmation modal message
+          const roleLabel = (role === 'admin') ? 'Admin' : 'Cashier';
+          document.getElementById('rss-title').textContent = 'Request Has Been Sent!';
+          document.getElementById('rss-message').textContent = res.message || `${roleLabel} registration submitted. Awaiting approval before account activation.`;
+          document.getElementById('rss-user-name').textContent = fullName;
+          document.getElementById('rss-username').textContent = username;
+          document.getElementById('rss-role').textContent = `${roleLabel} (Pending Approval)`;
+          document.getElementById('rss-details').style.display = 'block';
+
+          // Hide registration modal and immediately show confirmation modal
+          const regModalEl = document.getElementById('registerUserModal');
+          const regModalInst = bootstrap.Modal.getInstance(regModalEl) || new bootstrap.Modal(regModalEl);
+
+          const onHidden = () => {
+            regModalEl.removeEventListener('hidden.bs.modal', onHidden);
+            const sentModalEl = document.getElementById('requestSentSuccessModal');
+            const sentModalInst = new bootstrap.Modal(sentModalEl);
+            sentModalInst.show();
+          };
+          regModalEl.addEventListener('hidden.bs.modal', onHidden);
+          regModalInst.hide();
+
+          renderUsers();
+        } else {
+          resEl.style.display = 'block';
+          resEl.style.color = '#842029';
+          resEl.style.background = '#f8d7da';
+          resEl.textContent = res.message;
+        }
+      } catch (err) {
+        resEl.style.display = 'block';
+        resEl.style.color = '#842029';
+        resEl.style.background = '#f8d7da';
+        resEl.textContent = 'Connection error. Please try again.';
+      } finally {
+        if (regBtn) {
+          regBtn.disabled = false;
+          regBtn.innerHTML = origBtnHtml;
+        }
       }
     }
 
@@ -9233,24 +10017,22 @@
       }
 
       // Check for existing session
+      playWaterDropLoginAnimation('#login-wrapper .login-card');
       api('auth.php?action=session').then(res => {
         if (res.success && res.loggedIn) {
           if (res.session_id) {
+            localStorage.setItem('chipipie_pos_session_id', res.session_id);
             localStorage.setItem('chipipie_session_id', res.session_id);
-          }
-          // Super admin should use their dedicated panel
-          if (res.user.role === 'super_admin') {
-            window.location.href = 'superadmin-panel.php';
-            return;
           }
           currentUser = res.user;
           updateUserInfoUI(res.user);
-          loadMenuFromDB().then(() => activateApp(res.user.role === 'admin'));
-        } else if (res.pending_2fa && res.role === 'admin') {
+          const isManager = (res.user.role === 'admin' || res.user.role === 'super_admin');
+          activateApp(isManager);
+        } else if (res.pending_2fa && (res.role === 'admin' || res.role === 'super_admin')) {
           // Resume pending 2FA step if page was reloaded
           document.getElementById('pos-step-credentials').style.display = 'none';
           document.getElementById('pos-step-2fa').style.display = 'block';
-          document.getElementById('pos-2fa-email').textContent = res.masked_email || 'Manager Email';
+          document.getElementById('pos-2fa-email').textContent = res.masked_email || 'Your Registered Email';
           const codeInput = document.getElementById('pos-2fa-code');
           if (res.dev_code) {
             document.getElementById('pos-dev-hint').style.display = 'block';

@@ -57,17 +57,40 @@
       touch-action: manipulation;
     }
 
-    html, body {
+    html {
+      width: 100%;
+      height: 100%;
+      margin: 0;
+      padding: 0;
+      background: var(--sa-bg);
+      -webkit-text-size-adjust: 100%;
+      text-size-adjust: 100%;
+    }
+
+    body {
       font-family: 'Inter', system-ui, sans-serif;
       background: var(--sa-bg);
       color: var(--sa-text);
+      width: 100%;
+      min-width: 100vw;
       height: 100vh;
+      margin: 0;
+      padding: 0;
       overflow: hidden;
       display: flex;
       touch-action: manipulation;
       -webkit-touch-callout: none;
       -webkit-text-size-adjust: 100%;
       text-size-adjust: 100%;
+    }
+
+    #sa-app {
+      width: 100%;
+      min-width: 100vw;
+      height: 100vh;
+      display: flex;
+      flex: 1;
+      overflow: hidden;
     }
 
     button, .sa-btn, .sa-nav-item, input, select, textarea {
@@ -245,8 +268,11 @@
     /* ── MAIN CONTENT ── */
     .sa-main {
       flex: 1;
+      min-width: 0;
+      width: calc(100% - var(--sa-sidebar-w));
       display: flex;
       flex-direction: column;
+      height: 100vh;
       overflow: hidden;
       background: var(--sa-bg);
     }
@@ -259,6 +285,7 @@
       align-items: center;
       justify-content: space-between;
       flex-shrink: 0;
+      width: 100%;
     }
 
     .sa-topbar-title {
@@ -274,6 +301,7 @@
 
     .sa-views {
       flex: 1;
+      width: 100%;
       overflow-y: auto;
       padding: 28px;
     }
@@ -306,9 +334,10 @@
     /* ── KPI CARDS ── */
     .kpi-grid {
       display: grid;
-      grid-template-columns: repeat(auto-fill, minmax(190px, 1fr));
+      grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
       gap: 16px;
       margin-bottom: 24px;
+      width: 100%;
     }
 
     .kpi-tile {
@@ -423,7 +452,8 @@
 
     .badge-pending  { background: rgba(245,158,11,0.15);  color: #f59e0b; border: 1px solid rgba(245,158,11,0.3); }
     .badge-approved { background: rgba(16,185,129,0.12);  color: #10b981; border: 1px solid rgba(16,185,129,0.3); }
-    .badge-rejected { background: rgba(239,68,68,0.12);   color: #ef4444; border: 1px solid rgba(239,68,68,0.3); }
+    .badge-rejected   { background: rgba(239,68,68,0.12);   color: #ef4444; border: 1px solid rgba(239,68,68,0.3); }
+    .badge-cancelled  { background: rgba(107,114,128,0.12); color: #9ca3af; border: 1px solid rgba(107,114,128,0.3); }
     .badge-active   { background: rgba(16,185,129,0.12);  color: #10b981; border: 1px solid rgba(16,185,129,0.3); }
     .badge-inactive { background: rgba(100,116,139,0.15); color: #94a3b8; border: 1px solid rgba(100,116,139,0.3); }
     .badge-admin    { background: rgba(109,40,217,0.2);   color: #c084fc; border: 1px solid rgba(109,40,217,0.4); }
@@ -470,13 +500,14 @@
     }
 
     .sa-btn-reject {
-      background: rgba(239,68,68,0.12);
-      color: #ef4444;
-      border-color: rgba(239,68,68,0.35);
+      background: rgba(245, 158, 11, 0.12);
+      color: #f59e0b;
+      border-color: rgba(245, 158, 11, 0.35);
     }
 
     .sa-btn-reject:hover {
-      background: rgba(239,68,68,0.22);
+      background: rgba(245, 158, 11, 0.22);
+      border-color: rgba(245, 158, 11, 0.5);
     }
 
     .sa-btn-ghost {
@@ -517,12 +548,64 @@
       box-shadow: 0 0 0 3px rgba(124,58,237,0.15);
     }
 
+    input[type="password"]::-ms-reveal,
+    input[type="password"]::-ms-clear {
+      display: none !important;
+    }
+
+    .sa-pass-wrap {
+      position: relative;
+      width: 100%;
+    }
+
+    .sa-pass-wrap .sa-input {
+      padding-right: 42px;
+    }
+
+    .sa-pass-toggle {
+      position: absolute;
+      right: 4px;
+      top: 50%;
+      transform: translateY(-50%);
+      background: transparent;
+      border: none;
+      color: var(--sa-muted);
+      padding: 6px 10px;
+      cursor: pointer;
+      font-size: 15px;
+      border-radius: 6px;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      transition: color 0.15s, background-color 0.15s;
+      z-index: 2;
+    }
+
+    .sa-pass-toggle:hover {
+      color: var(--sa-text);
+      background: rgba(255, 255, 255, 0.05);
+    }
+
     .sa-label {
       font-size: 11.5px;
       font-weight: 600;
       color: var(--sa-muted);
       margin-bottom: 6px;
       display: block;
+    }
+
+    .required-star {
+      color: #ef4444;
+      font-weight: 700;
+      margin-left: 2px;
+      line-height: 1;
+      display: inline-block;
+    }
+
+    .sa-label.required::after {
+      content: ' *';
+      color: #ef4444;
+      font-weight: 700;
     }
 
     .sa-select {
@@ -793,6 +876,8 @@
     /* ── RESPONSIVE ── */
     @media (max-width: 768px) {
       .sa-sidebar { display: none; }
+      .sa-main { width: 100%; }
+      .sa-grid-2 { grid-template-columns: 1fr !important; }
       .kpi-grid { grid-template-columns: 1fr 1fr; }
       .sa-form-grid { grid-template-columns: 1fr; }
     }
@@ -1008,15 +1093,20 @@
       <div id="sa-step-credentials">
         <form onsubmit="saHandleLogin(event)">
           <div class="sa-form-row">
-            <label class="sa-label">Username</label>
+            <label class="sa-label">Username <span class="required-star" title="Required">*</span></label>
             <input type="text" id="sa-login-user" class="sa-input" placeholder="superadmin" autocomplete="username" required>
           </div>
           <div class="sa-form-row">
             <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:6px;">
-              <label class="sa-label" style="margin-bottom:0;">Password</label>
+              <label class="sa-label" style="margin-bottom:0;">Password <span class="required-star" title="Required">*</span></label>
               <a href="#" id="sa-forgot-pass-link" onclick="saShowForgot(); return false;" style="font-size:11.5px; color:var(--sa-accent2); text-decoration:none; font-weight:500;">Forgot Password?</a>
             </div>
-            <input type="password" id="sa-login-pass" class="sa-input" placeholder="••••••••" autocomplete="current-password" required>
+            <div class="sa-pass-wrap">
+              <input type="password" id="sa-login-pass" class="sa-input" placeholder="••••••••" autocomplete="current-password" required>
+              <button type="button" class="sa-pass-toggle" onclick="saTogglePass('sa-login-pass', this)" title="Show/Hide Password" aria-label="Show or hide password">
+                <i class="bi bi-eye"></i>
+              </button>
+            </div>
           </div>
           <button type="submit" id="sa-login-btn" class="sa-btn sa-btn-primary w-100" style="width:100%;justify-content:center;padding:13px;font-size:14px;margin-top:8px;">
             <i class="bi bi-shield-lock-fill"></i> Sign In as Super Admin
@@ -1036,7 +1126,7 @@
 
         <form onsubmit="saHandleVerify2FA(event)">
           <div class="sa-form-row">
-            <label class="sa-label" style="text-align:center; display:block; font-size:12px;">Enter 6-Digit Code</label>
+            <label class="sa-label" style="text-align:center; display:block; font-size:12px;">Enter 6-Digit Code <span class="required-star" title="Required">*</span></label>
             <input type="text" id="sa-2fa-code" class="sa-input" maxlength="6" placeholder="000000" autocomplete="one-time-code" required
                    style="text-align:center; font-family:Consolas, Monaco, monospace; font-size:26px; font-weight:700; letter-spacing:8px; padding:12px; text-transform:uppercase;">
           </div>
@@ -1097,13 +1187,23 @@
 
         <form onsubmit="saHandleResetViaLink(event)">
           <div class="sa-form-row">
-            <label class="sa-label">New Password</label>
-            <input type="password" id="sa-reset-new-pass" class="sa-input" placeholder="••••••••" required minlength="8">
+            <label class="sa-label">New Password <span class="required-star" title="Required">*</span></label>
+            <div class="sa-pass-wrap">
+              <input type="password" id="sa-reset-new-pass" class="sa-input" placeholder="••••••••" required minlength="8">
+              <button type="button" class="sa-pass-toggle" onclick="saTogglePass('sa-reset-new-pass', this)" title="Show/Hide Password" aria-label="Show or hide password">
+                <i class="bi bi-eye"></i>
+              </button>
+            </div>
             <div style="font-size:11px; color:var(--sa-muted); margin-top:4px;">Min. 8 characters with uppercase, lowercase, and number.</div>
           </div>
           <div class="sa-form-row">
-            <label class="sa-label">Confirm New Password</label>
-            <input type="password" id="sa-reset-confirm-pass" class="sa-input" placeholder="••••••••" required minlength="8">
+            <label class="sa-label">Confirm New Password <span class="required-star" title="Required">*</span></label>
+            <div class="sa-pass-wrap">
+              <input type="password" id="sa-reset-confirm-pass" class="sa-input" placeholder="••••••••" required minlength="8">
+              <button type="button" class="sa-pass-toggle" onclick="saTogglePass('sa-reset-confirm-pass', this)" title="Show/Hide Password" aria-label="Show or hide password">
+                <i class="bi bi-eye"></i>
+              </button>
+            </div>
           </div>
           <button type="submit" id="sa-reset-submit-btn" class="sa-btn sa-btn-primary w-100" style="width:100%;justify-content:center;padding:13px;font-size:14px;margin-top:6px;">
             <i class="bi bi-shield-check"></i> Save New Password
@@ -1129,7 +1229,7 @@
   </div>
 
   <!-- ── APP WRAPPER ── -->
-  <div id="sa-app" style="display:none; width:100%;">
+  <div id="sa-app" style="display:none; width:100%; min-width:100vw; height:100vh; flex:1; overflow:hidden;">
 
     <!-- SIDEBAR -->
     <aside class="sa-sidebar">
@@ -1153,7 +1253,7 @@
           <span class="badge badge-pulse" id="nav-badge-requests" style="display:none;">0</span>
         </button>
         <button class="sa-nav-btn" id="nav-btn-admin-reqs" onclick="saShowView('admin-reqs', this)">
-          <i class="bi bi-person-badge-fill"></i> Admin Approvals
+          <i class="bi bi-person-badge-fill"></i> Registration Approvals
           <span class="badge badge-pulse" id="nav-badge-admin-reqs" style="display:none;">0</span>
         </button>
 
@@ -1199,6 +1299,9 @@
       <div class="sa-topbar">
         <div class="sa-topbar-title" id="sa-page-title">Dashboard</div>
         <div style="display:flex; align-items:center; gap:16px;">
+          <a href="chipipie-pos.php" target="_blank" class="sa-btn sa-btn-ghost" style="text-decoration:none;display:inline-flex;align-items:center;gap:6px;padding:6px 14px;font-size:12.5px;color:var(--sa-text);border:1px solid rgba(255,255,255,0.12);border-radius:8px;" title="Open POS System in new tab">
+            <i class="bi bi-cup-hot-fill" style="color:#f59e0b;"></i> Open POS <i class="bi bi-box-arrow-up-right" style="font-size:10px;opacity:0.6;"></i>
+          </a>
           <div class="sa-topbar-time" id="sa-live-time"></div>
         </div>
       </div>
@@ -1277,6 +1380,7 @@
                 <option value="pending">Pending</option>
                 <option value="approved">Approved</option>
                 <option value="rejected">Rejected</option>
+                <option value="cancelled">Cancelled</option>
                 <option value="all">All</option>
               </select>
               <button class="sa-btn sa-btn-ghost" onclick="loadRequests()">
@@ -1294,7 +1398,7 @@
                 <thead>
                   <tr>
                     <th>#</th><th>Type</th><th>Requested By</th><th>Title</th>
-                    <th>Status</th><th>Date</th><th>Actions</th>
+                    <th>Status</th><th>Date</th><th style="text-align:center;">Actions</th>
                   </tr>
                 </thead>
                 <tbody id="requests-tbody">
@@ -1305,10 +1409,10 @@
           </div>
         </div>
 
-        <!-- ── ADMIN APPROVALS VIEW ── -->
+        <!-- ── REGISTRATION APPROVALS VIEW ── -->
         <div id="sa-view-admin-reqs" class="sa-view">
           <div class="sa-section-header">
-            <div class="sa-section-title">Admin Registration Requests</div>
+            <div class="sa-section-title">Registration Requests</div>
             <button class="sa-btn sa-btn-ghost" onclick="loadAdminRequests()">
               <i class="bi bi-arrow-clockwise"></i> Refresh
             </button>
@@ -1316,7 +1420,7 @@
 
           <div class="sa-alert sa-alert-info">
             <i class="bi bi-info-circle-fill"></i>
-            <span>These are requests from users wanting to become <strong>Admins</strong>. Approving creates their account immediately.</span>
+            <span>These are requests from users wanting to register as <strong>Cashiers</strong> or <strong>Admins</strong>. Approving creates their active account immediately.</span>
           </div>
 
           <div class="sa-card">
@@ -1324,12 +1428,12 @@
               <table class="sa-table">
                 <thead>
                   <tr>
-                    <th>#</th><th>Full Name</th><th>Username</th><th>Email</th>
-                    <th>Status</th><th>Submitted</th><th>Actions</th>
+                    <th>#</th><th>Full Name</th><th>Username</th><th>Email</th><th>Role</th>
+                    <th>Status</th><th>Submitted</th><th style="text-align:center;">Actions</th>
                   </tr>
                 </thead>
                 <tbody id="admin-reqs-tbody">
-                  <tr><td colspan="7" class="text-center" style="padding:32px;color:var(--sa-muted);">Loading...</td></tr>
+                  <tr><td colspan="8" class="text-center" style="padding:32px;color:var(--sa-muted);">Loading...</td></tr>
                 </tbody>
               </table>
             </div>
@@ -1728,19 +1832,19 @@
             <div class="sa-card-title"><i class="bi bi-gear-fill"></i> Store Configuration</div>
             <div class="settings-grid" id="settings-grid">
               <div class="sa-form-row">
-                <label class="sa-label">Store Name</label>
+                <label class="sa-label">Store Name <span class="required-star" title="Required">*</span></label>
                 <input type="text" class="sa-input" id="setting-store_name" placeholder="ChipiPie Cafe">
               </div>
               <div class="sa-form-row">
-                <label class="sa-label">Owner Email</label>
+                <label class="sa-label">Owner Email <span class="required-star" title="Required">*</span></label>
                 <input type="email" class="sa-input" id="setting-owner_email" placeholder="owner@example.com">
               </div>
               <div class="sa-form-row">
-                <label class="sa-label">Super Admin Email</label>
+                <label class="sa-label">Super Admin Email <span class="required-star" title="Required">*</span></label>
                 <input type="email" class="sa-input" id="setting-superadmin_email" placeholder="superadmin@example.com" oninput="syncSuperadminEmailLive()" onchange="syncSuperadminEmailLive()">
               </div>
               <div class="sa-form-row">
-                <label class="sa-label">Token Expiry (minutes)</label>
+                <label class="sa-label">Token Expiry (minutes) <span class="required-star" title="Required">*</span></label>
                 <input type="number" class="sa-input" id="setting-token_expiry_minutes" min="5" max="60">
               </div>
             </div>
@@ -1796,18 +1900,8 @@
               </div>
             </div>
 
-            <!-- Void & Refund Recipient Email Box -->
-            <div class="sa-form-row" style="margin-top:16px;">
-              <label class="sa-label" style="font-weight:700;color:var(--sa-text);display:flex;align-items:center;gap:6px;">
-                <i class="bi bi-envelope-at-fill" style="color:var(--sa-accent2);"></i> Void &amp; Refund Email Box
-              </label>
-              <input type="text" class="sa-input" id="setting-void_refund_manager_email" readonly style="background:var(--sa-surface);color:var(--sa-text);font-family:monospace;cursor:default;" placeholder="Selected admin and superadmin emails will reflect here...">
-              <div style="font-size:11px;color:var(--sa-muted);margin-top:4px;">
-                Automatically reflects the Super Admin Email and checked administrators in real-time.
-              </div>
-            </div>
-
-            <!-- Hidden input maintaining admin IDs compatibility -->
+            <!-- Hidden inputs maintaining email & admin IDs settings compatibility -->
+            <input type="hidden" id="setting-void_refund_manager_email">
             <input type="hidden" id="setting-void_refund_admin_ids">
 
             <div style="margin-top:18px;">
@@ -1817,125 +1911,25 @@
             </div>
           </div>
 
+          <!-- PayMongo Status Card (No input bars) -->
           <div class="sa-card" style="margin-top:20px;">
-            <div class="sa-card-title"><i class="bi bi-shield-fill"></i> Super Admin Account</div>
-            <div class="sa-form-grid">
-              <div class="sa-form-row">
-                <label class="sa-label">New Password</label>
-                <input type="password" class="sa-input" id="sa-new-pass" placeholder="Min. 8 characters" minlength="8">
-                <div style="font-size:11px; color:var(--sa-muted); margin-top:4px;">Min. 8 characters with uppercase, lowercase, and number.</div>
-              </div>
-              <div class="sa-form-row">
-                <label class="sa-label">Confirm Password</label>
-                <input type="password" class="sa-input" id="sa-new-pass-confirm" placeholder="Repeat password" minlength="8">
-              </div>
-            </div>
-            <button class="sa-btn sa-btn-danger" onclick="changeSAPassword()">
-              <i class="bi bi-key-fill"></i> Change My Password
-            </button>
-          </div>
-
-          <div class="sa-card" style="margin-top:20px;">
-            <div class="sa-card-title"><i class="bi bi-credit-card-fill" style="color:#0070f3;"></i> PayMongo (GCash) Integration</div>
-            <div style="background:#eff6ff;border:1.5px solid #bfdbfe;border-radius:10px;padding:12px 14px;font-size:12px;color:#1e40af;margin-bottom:16px;display:flex;align-items:flex-start;gap:8px;">
-              <i class="bi bi-info-circle-fill" style="font-size:14px;flex-shrink:0;margin-top:1px;"></i>
-              <span>Get your <strong>Secret Key</strong> from <a href="https://dashboard.paymongo.com/developers" target="_blank" style="color:#1d4ed8;font-weight:700;">PayMongo Dashboard → Developers</a>. Use <code style="background:#dbeafe;padding:1px 5px;border-radius:4px;">sk_test_...</code> for testing and <code style="background:#dbeafe;padding:1px 5px;border-radius:4px;">sk_live_...</code> for production.</span>
-            </div>
-            <div style="display:flex;gap:10px;align-items:flex-end;">
-              <div style="flex:1;">
-                <label class="sa-label">Secret Key <span id="sa-pm-key-badge" style="display:inline-block;margin-left:8px;font-size:11px;font-weight:700;padding:2px 8px;border-radius:20px;background:#d1fae5;color:#059669;">&#9679; Configured</span></label>
-                <input type="password" class="sa-input" id="sa-pm-secret-key-input" placeholder="sk_test_xxxxxxxxxxxxxxxxxxxx" style="font-family:monospace;">
-              </div>
-              <button class="sa-btn sa-btn-primary" onclick="saveSAPaymongoKey()" style="white-space:nowrap;flex-shrink:0;">
-                <i class="bi bi-floppy-fill"></i> Save Key
-              </button>
-            </div>
-            <div id="sa-pm-key-status" style="display:none;margin-top:10px;font-size:12px;border-radius:8px;padding:8px 12px;"></div>
-          </div>
-
-          <!-- Rate Limiting & Security Protection Card -->
-          <div class="sa-card" style="margin-top:20px;">
-            <div style="display:flex;align-items:flex-start;justify-content:space-between;margin-bottom:16px;flex-wrap:wrap;gap:12px;">
+            <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:12px;">
               <div>
                 <div class="sa-card-title" style="margin-bottom:4px;display:flex;align-items:center;gap:8px;">
-                  <i class="bi bi-shield-lock-fill" style="color:#f59e0b;"></i> Rate Limiting &amp; Brute-Force Protection
-                  <span id="sa-rate-limit-badge" style="font-size:11px;font-weight:700;padding:2px 8px;border-radius:20px;background:rgba(16,185,129,0.15);color:#10b981;">Active Protection</span>
+                  <i class="bi bi-credit-card-fill" style="color:#0070f3;"></i> PayMongo (GCash) API
                 </div>
-                <div style="font-size:12px;color:var(--sa-muted);max-width:680px;line-height:1.5;">
-                  Safeguards the POS against brute-force password guessing, 2FA code enumeration, email flooding, and DoS request spikes.
+                <div style="font-size:12px;color:var(--sa-muted);">
+                  Online GCash and QR PH payment gateway connection status.
                 </div>
               </div>
-              <div style="display:flex;gap:8px;">
-                <button type="button" class="sa-btn sa-btn-ghost" style="font-size:11.5px;padding:6px 12px;color:#ef4444;" onclick="resetAllRateLimits()">
-                  <i class="bi bi-unlock-fill"></i> Clear All Active Lockouts
-                </button>
-                <button type="button" class="sa-btn sa-btn-ghost" style="font-size:11.5px;padding:6px 12px;" onclick="loadRateLimitsTable()">
-                  <i class="bi bi-arrow-clockwise"></i> Refresh Status
-                </button>
-              </div>
-            </div>
-
-            <div class="settings-grid" style="margin-bottom:16px;">
-              <div class="sa-form-row">
-                <label class="sa-label">Rate Limiting System</label>
-                <select class="sa-select" id="setting-rate_limit_enabled">
-                  <option value="1">Enabled (Recommended)</option>
-                  <option value="0">Disabled</option>
-                </select>
-                <div style="font-size:11px;color:var(--sa-muted);margin-top:4px;">Master switch for all API &amp; authentication rate limits.</div>
-              </div>
-              <div class="sa-form-row">
-                <label class="sa-label">Max Failed Login Attempts</label>
-                <input type="number" class="sa-input" id="setting-rate_limit_login_attempts" min="3" max="20" placeholder="5">
-                <div style="font-size:11px;color:var(--sa-muted);margin-top:4px;">Number of bad passwords before account/IP temporary lock.</div>
-              </div>
-              <div class="sa-form-row">
-                <label class="sa-label">Lockout Duration (Minutes)</label>
-                <input type="number" class="sa-input" id="setting-rate_limit_lockout_minutes" min="1" max="120" placeholder="5">
-                <div style="font-size:11px;color:var(--sa-muted);margin-top:4px;">How long the user/IP is locked out after exceeding limit.</div>
-              </div>
-              <div class="sa-form-row">
-                <label class="sa-label">API Rate Limit (Requests/Min)</label>
-                <input type="number" class="sa-input" id="setting-rate_limit_api_rpm" min="30" max="600" placeholder="120">
-                <div style="font-size:11px;color:var(--sa-muted);margin-top:4px;">Maximum requests per minute per IP across API endpoints.</div>
-              </div>
-              <div class="sa-form-row">
-                <label class="sa-label">Email &amp; 2FA Throttle (Per 10 Mins)</label>
-                <input type="number" class="sa-input" id="setting-rate_limit_email_throttle" min="1" max="10" placeholder="3">
-                <div style="font-size:11px;color:var(--sa-muted);margin-top:4px;">Limits 2FA resends &amp; reset password requests to prevent spam.</div>
-              </div>
-            </div>
-
-            <div style="display:flex;align-items:center;justify-content:space-between;margin-top:8px;margin-bottom:16px;">
-              <button class="sa-btn sa-btn-primary" onclick="saveSettings()">
-                <i class="bi bi-floppy-fill"></i> Save Rate Limit Settings
-              </button>
-            </div>
-
-            <!-- Active Rate Limits / Lockouts Monitor -->
-            <div style="background:var(--sa-surface);border:1px solid var(--sa-border);border-radius:12px;padding:14px 16px;margin-top:14px;">
-              <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;">
-                <span style="font-size:11px;font-weight:700;color:var(--sa-muted);text-transform:uppercase;letter-spacing:0.06em;">
-                  <i class="bi bi-activity me-1" style="color:var(--sa-accent2);"></i> Active Throttled Identifiers &amp; Lockouts
+              <div>
+                <span id="sa-pm-key-badge" style="display:inline-flex;align-items:center;gap:6px;font-size:12px;font-weight:700;padding:6px 14px;border-radius:20px;background:#d1fae5;color:#059669;">
+                  <span style="font-size:8px;">●</span> Checking...
                 </span>
-                <span id="sa-active-lockout-count" style="font-size:11px;color:var(--sa-muted);">Loading active records...</span>
-              </div>
-              <div class="sa-table-wrap" style="max-height:220px;overflow-y:auto;">
-                <table class="sa-table" style="font-size:12px;">
-                  <thead>
-                    <tr>
-                      <th>Action</th><th>Identifier</th><th>Hits</th><th>First Hit</th><th>Status / Lockout</th><th>Action</th>
-                    </tr>
-                  </thead>
-                  <tbody id="sa-rate-limits-tbody">
-                    <tr><td colspan="6" class="text-center" style="padding:16px;color:var(--sa-muted);">No active rate limits recorded.</td></tr>
-                  </tbody>
-                </table>
               </div>
             </div>
           </div>
         </div>
-
       </div> <!-- /sa-views -->
     </div>
   </div>
@@ -2000,7 +1994,7 @@
 
         <!-- Reason / Note -->
         <div class="sa-form-row">
-          <label class="sa-label">Rejection Reason / Note <span style="color: #ef4444;">*</span></label>
+          <label class="sa-label">Rejection Reason / Note <span class="required-star" title="Required">*</span></label>
           <textarea class="sa-input" id="reject-modal-note" rows="3" placeholder="Provide a reason for rejecting this request..."></textarea>
           <div id="reject-modal-error" style="display:none; color:#ef4444; font-size:12px; margin-top:6px; font-weight:600;"></div>
         </div>
@@ -2022,28 +2016,34 @@
         <button class="sa-modal-close" onclick="closeModal('create-user-modal')">&#x2715;</button>
       </div>
       <div class="sa-modal-body">
+        <div style="font-size:11.5px;color:var(--sa-muted);margin-bottom:12px;"><span class="required-star">*</span> indicates required field</div>
         <div class="sa-form-grid">
           <div class="sa-form-row">
-            <label class="sa-label">Full Name *</label>
+            <label class="sa-label">Full Name <span class="required-star" title="Required">*</span></label>
             <input type="text" class="sa-input" id="cu-fullname" placeholder="Juan Dela Cruz">
           </div>
           <div class="sa-form-row">
-            <label class="sa-label">Username *</label>
+            <label class="sa-label">Username <span class="required-star" title="Required">*</span></label>
             <input type="text" class="sa-input" id="cu-username" placeholder="juan">
           </div>
         </div>
         <div class="sa-form-row">
-          <label class="sa-label">Email *</label>
+          <label class="sa-label">Email <span class="required-star" title="Required">*</span></label>
           <input type="email" class="sa-input" id="cu-email" placeholder="juan@example.com">
         </div>
         <div class="sa-form-grid">
           <div class="sa-form-row">
-            <label class="sa-label">Password *</label>
-            <input type="password" class="sa-input" id="cu-pass" placeholder="Min. 8 chars (uppercase, lowercase, number)">
+            <label class="sa-label">Password <span class="required-star" title="Required">*</span></label>
+            <div class="sa-pass-wrap">
+              <input type="password" class="sa-input" id="cu-pass" placeholder="Min. 8 chars (uppercase, lowercase, number)">
+              <button type="button" class="sa-pass-toggle" onclick="saTogglePass('cu-pass', this)" title="Show/Hide Password" aria-label="Show or hide password">
+                <i class="bi bi-eye"></i>
+              </button>
+            </div>
             <div style="font-size:11px; color:var(--sa-muted); margin-top:4px;">Min. 8 characters with uppercase, lowercase, and number.</div>
           </div>
           <div class="sa-form-row">
-            <label class="sa-label">Role *</label>
+            <label class="sa-label">Role <span class="required-star" title="Required">*</span></label>
             <select class="sa-select" id="cu-role">
               <option value="cashier">Cashier</option>
               <option value="admin">Admin</option>
@@ -2054,7 +2054,7 @@
       </div>
       <div class="sa-modal-footer">
         <button class="sa-btn sa-btn-ghost" onclick="closeModal('create-user-modal')">Cancel</button>
-        <button class="sa-btn sa-btn-primary" onclick="submitCreateUser()">
+        <button class="sa-btn sa-btn-primary" id="sa-create-user-btn" onclick="submitCreateUser()">
           <i class="bi bi-person-plus-fill"></i> Create User
         </button>
       </div>
@@ -2072,16 +2072,16 @@
         <input type="hidden" id="eu-id">
         <div class="sa-form-grid">
           <div class="sa-form-row">
-            <label class="sa-label">Full Name</label>
+            <label class="sa-label">Full Name <span class="required-star" title="Required">*</span></label>
             <input type="text" class="sa-input" id="eu-fullname">
           </div>
           <div class="sa-form-row">
-            <label class="sa-label">Email</label>
+            <label class="sa-label">Email <span class="required-star" title="Required">*</span></label>
             <input type="email" class="sa-input" id="eu-email">
           </div>
         </div>
         <div class="sa-form-row">
-          <label class="sa-label">Role</label>
+          <label class="sa-label">Role <span class="required-star" title="Required">*</span></label>
           <select class="sa-select" id="eu-role">
             <option value="cashier">Cashier</option>
             <option value="admin">Admin</option>
@@ -2090,8 +2090,13 @@
         <hr style="border-color:var(--sa-border);margin:16px 0;">
         <div style="font-size:12px;font-weight:700;color:var(--sa-muted);text-transform:uppercase;letter-spacing:0.08em;margin-bottom:12px;">Reset Password</div>
         <div class="sa-form-row">
-          <label class="sa-label">New Password (leave blank to keep current)</label>
-          <input type="password" class="sa-input" id="eu-new-pass" placeholder="Min. 8 chars (uppercase, lowercase, number)">
+          <label class="sa-label">New Password <span style="font-size:11px;color:var(--sa-muted);font-weight:400;">(leave blank to keep current)</span></label>
+          <div class="sa-pass-wrap">
+            <input type="password" class="sa-input" id="eu-new-pass" placeholder="Min. 8 chars (uppercase, lowercase, number)">
+            <button type="button" class="sa-pass-toggle" onclick="saTogglePass('eu-new-pass', this)" title="Show/Hide Password" aria-label="Show or hide password">
+              <i class="bi bi-eye"></i>
+            </button>
+          </div>
           <div style="font-size:11px; color:var(--sa-muted); margin-top:4px;">Min. 8 characters with uppercase, lowercase, and number.</div>
         </div>
         <div id="eu-result" style="display:none;margin-top:10px;font-size:13px;padding:10px 14px;border-radius:9px;"></div>
@@ -2115,31 +2120,31 @@
       <form onsubmit="saSubmitAddMenu(event)">
         <div class="sa-modal-body">
           <div class="sa-form-row">
-            <label class="sa-label">Item Name</label>
+            <label class="sa-label">Item Name <span class="required-star" title="Required">*</span></label>
             <input type="text" id="sa-new-menu-name" class="sa-input" placeholder="e.g. Spanish Latte" required>
           </div>
           <div class="sa-form-row">
-            <label class="sa-label">Category</label>
+            <label class="sa-label">Category <span class="required-star" title="Required">*</span></label>
             <select id="sa-new-menu-category" class="sa-select" required>
               <!-- Dynamically populated by saOpenAddMenuModal() -->
             </select>
           </div>
           <div class="sa-form-row">
-            <label class="sa-label">Base Price (₱)</label>
+            <label class="sa-label">Base Price (₱) <span class="required-star" title="Required">*</span></label>
             <input type="number" id="sa-new-menu-price" class="sa-input" placeholder="e.g. 120" min="1" step="0.5" required>
           </div>
           <div class="sa-form-grid">
             <div class="sa-form-row">
-              <label class="sa-label">Initial Stock</label>
+              <label class="sa-label">Initial Stock <span style="font-size:11px;color:var(--sa-muted);font-weight:400;">(default: 20)</span></label>
               <input type="number" id="sa-new-menu-stock" class="sa-input" value="20" min="0">
             </div>
             <div class="sa-form-row">
-              <label class="sa-label">Min Stock Alert</label>
+              <label class="sa-label">Min Stock Alert <span style="font-size:11px;color:var(--sa-muted);font-weight:400;">(default: 5)</span></label>
               <input type="number" id="sa-new-menu-min-stock" class="sa-input" value="5" min="1">
             </div>
           </div>
           <div class="sa-form-row">
-            <label class="sa-label">Photo (optional)</label>
+            <label class="sa-label">Photo <span style="font-size:11px;color:var(--sa-muted);font-weight:400;">(optional)</span></label>
             <input type="file" id="sa-new-menu-image" class="sa-input" accept="image/*">
           </div>
         </div>
@@ -2166,7 +2171,7 @@
           <img id="sa-photo-preview" src="" style="max-width:100%;max-height:180px;border-radius:10px;border:1px solid var(--sa-border);object-fit:cover;">
         </div>
         <div class="sa-form-row">
-          <label class="sa-label">Choose Photo</label>
+          <label class="sa-label">Choose Photo <span class="required-star" title="Required">*</span></label>
           <input type="file" id="sa-photo-file" class="sa-input" accept="image/*" onchange="saPreviewPhoto(this)">
         </div>
       </div>
@@ -2243,6 +2248,385 @@
   <div class="sa-toast" id="sa-toast"></div>
 
   <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js"></script>
+  <script src="assets/js/gsap.min.js"></script>
+  <script>
+    /* ========== GSAP CHIPIPIE CAT MORPH & COFFEE SPILL ENTRANCE ANIMATION ========== */
+    /* Cartoon Black Cat (Static Card, Eyes Look at Input, Covers Eyes with Arms & Paws) */
+    function initPeekingCatLogin(cardSelector) {
+      const target = document.querySelector(cardSelector || '#login-wrapper .login-card, #sa-login-screen .sa-login-card');
+      if (!target) return;
+
+      // ── 1. FIX: Restore correct step visibility inside the card ──
+      const sCreds     = target.querySelector('#pos-step-credentials, #sa-step-credentials');
+      const s2fa       = target.querySelector('#pos-step-2fa, #sa-step-2fa');
+      const sForgotReq = target.querySelector('#pos-step-forgot-request, #sa-step-forgot');
+      const sForgotRes = target.querySelector('#pos-step-forgot-reset');
+
+      if (sCreds && sCreds.style.display === 'none') {
+        const hasActiveStep = (s2fa && s2fa.style.display === 'block') ||
+                              (sForgotReq && sForgotReq.style.display === 'block') ||
+                              (sForgotRes && sForgotRes.style.display === 'block');
+        if (!hasActiveStep) {
+          sCreds.style.display = 'block';
+        }
+      }
+      if (s2fa && s2fa.style.display !== 'block')             s2fa.style.display = 'none';
+      if (sForgotReq && sForgotReq.style.display !== 'block') sForgotReq.style.display = 'none';
+      if (sForgotRes && sForgotRes.style.display !== 'block') sForgotRes.style.display = 'none';
+
+      // ── 2. Ensure target card is completely static ──
+      if (typeof gsap !== 'undefined') {
+        gsap.killTweensOf(target);
+      }
+      target.style.transform  = 'none';
+      target.style.opacity    = '1';
+      target.style.visibility = 'visible';
+      target.style.position   = 'relative';
+      target.style.overflow   = 'visible';
+
+      // Clean up previous test wrappers if any
+      const oldStage = target.querySelector('.peeking-cat-viewport, .cartoon-cat-wrap');
+      if (oldStage) oldStage.remove();
+
+      // ── 3. Inject Cartoon Cat CSS once (update or create) ──
+      let sty = document.getElementById('cartoon-cat-css');
+      if (!sty) {
+        sty = document.createElement('style');
+        sty.id = 'cartoon-cat-css';
+        document.head.appendChild(sty);
+      }
+      sty.textContent = `
+        /* Cartoon Cat fully visible resting on card top rim */
+        .cartoon-cat-stage {
+          position: absolute;
+          bottom: 100%;
+          left: 50%;
+          transform: translateX(-50%);
+          width: 240px;
+          height: 195px; /* 471x382 aspect ratio */
+          pointer-events: none;
+          z-index: 25;
+        }
+        .cartoon-cat-head-img {
+          position: absolute;
+          inset: 0;
+          width: 100%;
+          height: 100%;
+          background-image: url('assets/img/cartoon-cat-head.png');
+          background-size: contain;
+          background-repeat: no-repeat;
+          background-position: center bottom;
+          filter: drop-shadow(0 -4px 10px rgba(0,0,0,0.35));
+        }
+        /* Dynamic Eye Sockets: clean yellow background with natural clipping */
+        .cat-eye-socket {
+          position: absolute;
+          border-radius: 50%;
+          overflow: hidden;
+          pointer-events: none;
+          z-index: 4;
+        }
+        .cat-eye-left {
+          left: 23.8%;
+          top: 66.2%;
+          width: 41px;
+          height: 39px;
+        }
+        .cat-eye-right {
+          left: 60.1%;
+          top: 62.0%;
+          width: 42px;
+          height: 40px;
+        }
+        /* Dynamic Pupils: glossy black with reflections */
+        .cat-pupil {
+          position: absolute;
+          width: 25px;
+          height: 26px;
+          background: radial-gradient(circle at 35% 35%, #181515 0%, #000000 80%);
+          border-radius: 50%;
+          left: 50%;
+          top: 50%;
+          transform: translate(-50%, -50%);
+          transition: transform 0.16s cubic-bezier(0.25, 1, 0.5, 1);
+          pointer-events: none;
+        }
+        .cat-pupil::before {
+          content: '';
+          position: absolute;
+          top: 3px;
+          left: 4px;
+          width: 7px;
+          height: 7px;
+          background: #ffffff;
+          border-radius: 50%;
+        }
+        .cat-pupil::after {
+          content: '';
+          position: absolute;
+          bottom: 4px;
+          right: 5px;
+          width: 3px;
+          height: 3px;
+          background: rgba(255, 255, 255, 0.65);
+          border-radius: 50%;
+        }
+        /* Natural Dropping Eyelids for Blinking */
+        .cat-eyelid {
+          position: absolute;
+          inset: -1px;
+          background: #000000;
+          border-radius: 50%;
+          transform: translateY(-105%);
+          transition: transform 0.09s ease-in-out;
+          z-index: 10;
+          pointer-events: none;
+        }
+        .cat-blinking .cat-eyelid {
+          transform: translateY(0%) !important;
+        }
+        /* Resting Rim Paws */
+        .rim-paw {
+          position: absolute;
+          width: 56px;
+          height: 34px;
+          bottom: -15px;
+          background-size: contain;
+          background-repeat: no-repeat;
+          z-index: 28;
+          transition: opacity 0.25s ease, transform 0.3s ease;
+          pointer-events: none;
+        }
+        .rim-paw-left {
+          left: 4px;
+          background-image: url('assets/img/cartoon-paw-left.png');
+        }
+        .rim-paw-right {
+          right: 4px;
+          background-image: url('assets/img/cartoon-paw-right.png');
+        }
+        /* Pink Paw Fluffy Arms reaching up to cover eyes - properly sized! */
+        .cat-arms-container {
+          position: absolute;
+          inset: 0;
+          overflow: hidden;
+          pointer-events: none;
+          z-index: 32;
+        }
+        .pink-arm {
+          position: absolute;
+          width: 58px;
+          height: 104px;
+          bottom: -4px;
+          background-size: contain;
+          background-repeat: no-repeat;
+          background-position: center top;
+          opacity: 0;
+          pointer-events: none;
+          filter: drop-shadow(0 2px 5px rgba(0,0,0,0.4));
+          transition: transform 0.36s cubic-bezier(0.34, 1.25, 0.64, 1), opacity 0.2s ease;
+        }
+        .pink-arm-left {
+          left: 14px;
+          background-image: url('assets/img/cat-pink-arm-left.png');
+          transform-origin: 30% 95%;
+          transform: translateY(60px) rotate(-20deg) scale(0.85);
+        }
+        .pink-arm-right {
+          right: 14px;
+          background-image: url('assets/img/cat-pink-arm-right.png');
+          transform-origin: 70% 95%;
+          transform: translateY(60px) rotate(20deg) scale(0.85);
+        }
+        /* Covering eyes active state: perfectly covers eyes with cute proportionate paws */
+        .cat-covering-eyes .rim-paw {
+          opacity: 0;
+          transform: translateY(6px) scale(0.8);
+        }
+        .cat-covering-eyes .pink-arm-left {
+          opacity: 1;
+          transform: translateY(22px) rotate(18deg) scale(1.12);
+        }
+        .cat-covering-eyes .pink-arm-right {
+          opacity: 1;
+          transform: translateY(18px) rotate(-18deg) scale(1.12);
+        }
+        /* Password peek active state (right paw lowers so right eye peeks out) */
+        .cat-peeking-pass .rim-paw {
+          opacity: 0;
+        }
+        .cat-peeking-pass .pink-arm-left {
+          opacity: 1;
+          transform: translateY(22px) rotate(18deg) scale(1.12);
+        }
+        .cat-peeking-pass .pink-arm-right {
+          opacity: 1;
+          transform: translateY(62px) rotate(16deg) scale(0.88);
+        }
+      `;
+
+      // ── 4. Mount Cartoon Cat on target card ──
+      let catStage = target.querySelector('.cartoon-cat-stage');
+      if (!catStage) {
+        catStage = document.createElement('div');
+        catStage.id = 'cartoon-peeking-cat';
+        catStage.className = 'cartoon-cat-stage';
+        catStage.innerHTML = `
+          <div class="cartoon-cat-head-img">
+            <div class="cat-eye-socket cat-eye-left">
+              <div class="cat-pupil cat-pupil-left"></div>
+              <div class="cat-eyelid"></div>
+            </div>
+            <div class="cat-eye-socket cat-eye-right">
+              <div class="cat-pupil cat-pupil-right"></div>
+              <div class="cat-eyelid"></div>
+            </div>
+          </div>
+          <!-- Resting Rim Paws -->
+          <div class="rim-paw rim-paw-left"></div>
+          <div class="rim-paw rim-paw-right"></div>
+          <!-- Pink Paw Fluffy Arms inside stage-clipped viewport -->
+          <div class="cat-arms-container">
+            <div class="pink-arm pink-arm-left"></div>
+            <div class="pink-arm pink-arm-right"></div>
+          </div>
+        `;
+        target.prepend(catStage);
+      } else {
+        if (!catStage.querySelector('.cat-eye-socket')) {
+          catStage.innerHTML = `
+            <div class="cartoon-cat-head-img">
+              <div class="cat-eye-socket cat-eye-left">
+                <div class="cat-pupil cat-pupil-left"></div>
+                <div class="cat-eyelid"></div>
+              </div>
+              <div class="cat-eye-socket cat-eye-right">
+                <div class="cat-pupil cat-pupil-right"></div>
+                <div class="cat-eyelid"></div>
+              </div>
+            </div>
+            <!-- Resting Rim Paws -->
+            <div class="rim-paw rim-paw-left"></div>
+            <div class="rim-paw rim-paw-right"></div>
+            <!-- Pink Paw Fluffy Arms inside stage-clipped viewport -->
+            <div class="cat-arms-container">
+              <div class="pink-arm pink-arm-left"></div>
+              <div class="pink-arm pink-arm-right"></div>
+            </div>
+          `;
+        }
+      }
+
+      if (catStage.dataset.initialized === 'true') return;
+      catStage.dataset.initialized = 'true';
+
+      const pupilL    = catStage.querySelector('.cat-pupil-left');
+      const pupilR    = catStage.querySelector('.cat-pupil-right');
+      const userInput = target.querySelector('#login-user, #sa-login-user, input[type=text]');
+      const passInput = target.querySelector('#login-pass, #sa-login-pass, input[type=password]');
+      const passToggle= target.querySelector('.sa-pass-toggle, button[onclick*="Pass"], button[title*="Password"]');
+
+      let isCoveringEyes = false;
+      let isPasswordVisible = false;
+
+      // ── 5. Natural Blinking Loop ──
+      function scheduleBlink() {
+        const nextBlink = Math.random() * 3000 + 2200;
+        setTimeout(() => {
+          if (!isCoveringEyes || isPasswordVisible) {
+            catStage.classList.add('cat-blinking');
+            setTimeout(() => {
+              catStage.classList.remove('cat-blinking');
+              scheduleBlink();
+            }, 140);
+          } else {
+            scheduleBlink();
+          }
+        }, nextBlink);
+      }
+      scheduleBlink();
+
+      // ── 6. Lifelike Micro-Glances (Saccades) during idle ──
+      function scheduleSaccade() {
+        setTimeout(() => {
+          if (!isCoveringEyes && document.activeElement !== userInput) {
+            const microX = (Math.random() - 0.5) * 4.0;
+            const microY = (Math.random() - 0.5) * 3.0;
+            setPupils(microX, microY);
+            setTimeout(() => {
+              if (!isCoveringEyes && document.activeElement !== userInput) {
+                setPupils(0, 0);
+              }
+            }, 800);
+          }
+          scheduleSaccade();
+        }, Math.random() * 3500 + 2500);
+      }
+      scheduleSaccade();
+
+      // ── 7. Pupil Offset Helper ──
+      function setPupils(ox, oy) {
+        if (pupilL) pupilL.style.transform = `translate(calc(-50% + ${ox.toFixed(1)}px), calc(-50% + ${oy.toFixed(1)}px))`;
+        if (pupilR) pupilR.style.transform = `translate(calc(-50% + ${ox.toFixed(1)}px), calc(-50% + ${oy.toFixed(1)}px))`;
+      }
+
+      // ── 8. Eyes look at input box (Follow typing cursor across) ──
+      if (userInput) {
+        const updateGaze = () => {
+          const len   = userInput.value.length;
+          const lookX = Math.min(Math.max((len - 7) * 0.65, -6.0), 6.0);
+          const lookY = 6.5; // looking down directly at the username input
+          setPupils(lookX, lookY);
+        };
+        userInput.addEventListener('focus', updateGaze);
+        userInput.addEventListener('blur', () => {
+          if (!isCoveringEyes) setPupils(0, 0); // relax forward
+        });
+        userInput.addEventListener('input', updateGaze);
+      }
+
+      // ── 9. Password Focus: CAT COVERS ITS EYES WITH PROPORTIONATE PINK PAWS! ──
+      if (passInput) {
+        passInput.addEventListener('focus', () => {
+          isCoveringEyes = true;
+          if (!isPasswordVisible) {
+            catStage.classList.add('cat-covering-eyes');
+            setPupils(0, 0);
+          }
+        });
+
+        passInput.addEventListener('blur', () => {
+          isCoveringEyes = false;
+          catStage.classList.remove('cat-covering-eyes', 'cat-peeking-pass');
+          setPupils(0, 0);
+        });
+      }
+
+      // ── 10. Password Visibility Toggle: PEEK THROUGH PAW! ──
+      if (passToggle) {
+        passToggle.addEventListener('click', () => {
+          setTimeout(() => {
+            if (passInput && passInput.type === 'text') {
+              isPasswordVisible = true;
+              catStage.classList.remove('cat-covering-eyes');
+              catStage.classList.add('cat-peeking-pass');
+              setPupils(3.5, 6.0); // peek down at revealed password
+            } else {
+              isPasswordVisible = false;
+              catStage.classList.remove('cat-peeking-pass');
+              if (document.activeElement === passInput) {
+                catStage.classList.add('cat-covering-eyes');
+              }
+              setPupils(0, 0);
+            }
+          }, 50);
+        });
+      }
+    }
+
+    const playCatCoffeeLoginAnimation = initPeekingCatLogin;
+    const playWaterDropLoginAnimation = function() { /* cat disabled on SA panel */ };
+if (typeof gsap === "undefined") { document.write('<script src="https://cdn.jsdelivr.net/npm/gsap@3.12.5/dist/gsap.min.js"><\/script>'); }</script>
   <script>
     window.saChartIns = null;
     
@@ -2254,10 +2638,13 @@
       const m = method || (data !== null ? 'POST' : 'GET');
       const opts = {
         method: m,
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 
+          'Content-Type': 'application/json',
+          'X-Portal': 'superadmin'
+        },
         credentials: 'include'
       };
-      const sid = localStorage.getItem('chipipie_session_id');
+      const sid = localStorage.getItem('chipipie_sa_session_id') || localStorage.getItem('chipipie_session_id');
       if (sid) {
         opts.headers['X-Session-Id'] = sid;
       }
@@ -2291,6 +2678,20 @@
     }
     setInterval(updateClock, 1000);
     updateClock();
+
+    /* =============================================
+       PASSWORD VISIBILITY TOGGLE
+    ============================================= */
+    function saTogglePass(inputId, btn) {
+      const inp = document.getElementById(inputId);
+      if (!inp) return;
+      const isPass = inp.type === 'password';
+      inp.type = isPass ? 'text' : 'password';
+      const icon = btn.querySelector('i');
+      if (icon) {
+        icon.className = isPass ? 'bi bi-eye-slash' : 'bi bi-eye';
+      }
+    }
 
     /* =============================================
        AUTH
@@ -2334,6 +2735,7 @@
           btn.innerHTML = '<i class="bi bi-shield-lock-fill"></i> Sign In as Super Admin';
           return;
         } else if (res.success && res.user.role === 'super_admin') {
+          if (res.session_id) localStorage.setItem('chipipie_sa_session_id', res.session_id);
           saCurrentUser = res.user;
           activateSAApp();
         } else if (res.success && res.user.role !== 'super_admin') {
@@ -2368,6 +2770,7 @@
       try {
         const res = await saApi('auth.php?action=verify_2fa', { code: code });
         if (res.success && res.user && res.user.role === 'super_admin') {
+          if (res.session_id) localStorage.setItem('chipipie_sa_session_id', res.session_id);
           saCurrentUser = res.user;
           activateSAApp();
         } else {
@@ -2428,7 +2831,13 @@
       const succEl= document.getElementById('sa-login-success');
       if (errEl) errEl.style.display = 'none';
       if (succEl) succEl.style.display = 'none';
-      document.getElementById('sa-login-pass').value = '';
+      const passEl = document.getElementById('sa-login-pass');
+      if (passEl) {
+        passEl.value = '';
+        passEl.type = 'password';
+        const icon = passEl.parentElement ? passEl.parentElement.querySelector('.sa-pass-toggle i') : null;
+        if (icon) icon.className = 'bi bi-eye';
+      }
     }
 
     /* =============================================
@@ -2597,17 +3006,24 @@
     async function saLogout() {
       // 1. Immediately reset client state and show login UI
       saCurrentUser = null;
+      localStorage.removeItem('chipipie_sa_session_id');
       try {
         const appEl = document.getElementById('sa-app');
         const loginEl = document.getElementById('sa-login-screen');
         if (appEl) appEl.style.display = 'none';
         if (loginEl) {
           loginEl.style.display = 'flex';
+          playWaterDropLoginAnimation('#sa-login-screen .sa-login-card');
           document.getElementById('sa-step-2fa').style.display = 'none';
           document.getElementById('sa-step-credentials').style.display = 'block';
         }
         const passEl = document.getElementById('sa-login-pass');
-        if (passEl) passEl.value = '';
+        if (passEl) {
+          passEl.value = '';
+          passEl.type = 'password';
+          const icon = passEl.parentElement ? passEl.parentElement.querySelector('.sa-pass-toggle i') : null;
+          if (icon) icon.className = 'bi bi-eye';
+        }
       } catch (e) {}
 
       // 2. Clear server session via API
@@ -2625,7 +3041,7 @@
     const VIEW_TITLES = {
       dashboard: 'Dashboard',
       requests: 'System Requests',
-      'admin-reqs': 'Admin Approval Requests',
+      'admin-reqs': 'Registration Approval Requests',
       users: 'All Users',
       menu: 'Menu & Inventory',
       orders: 'Orders',
@@ -2646,6 +3062,11 @@
       settings:    loadSettings,
     };
 
+    let _requestsPollInterval = null;
+    function _clearRequestsPoll() {
+      if (_requestsPollInterval) { clearInterval(_requestsPollInterval); _requestsPollInterval = null; }
+    }
+
     function saShowView(name, btn) {
       document.querySelectorAll('.sa-view').forEach(v => v.classList.remove('active'));
       document.querySelectorAll('.sa-nav-btn').forEach(b => b.classList.remove('active'));
@@ -2653,6 +3074,11 @@
       if (btn) btn.classList.add('active');
       document.getElementById('sa-page-title').textContent = VIEW_TITLES[name] || name;
       if (VIEW_LOADERS[name]) VIEW_LOADERS[name]();
+      // Start live-polling when on requests view, clear when leaving
+      _clearRequestsPoll();
+      if (name === 'requests') {
+        _requestsPollInterval = setInterval(loadRequests, 6000);
+      }
     }
 
     /* =============================================
@@ -2807,26 +3233,26 @@
 
     function renderLogEntry(log) {
       const icons = {
-        approve_admin_registration: { icon: 'bi-check-circle-fill', color: 'rgba(16,185,129,0.15)', iconColor: '#10b981' },
-        reject_admin_registration:  { icon: 'bi-x-circle-fill',     color: 'rgba(239,68,68,0.15)',  iconColor: '#ef4444' },
-        create_user:                { icon: 'bi-person-plus-fill',   color: 'rgba(59,130,246,0.15)', iconColor: '#3b82f6' },
-        delete_user:                { icon: 'bi-trash-fill',         color: 'rgba(239,68,68,0.15)',  iconColor: '#ef4444' },
-        reset_password:             { icon: 'bi-key-fill',           color: 'rgba(245,158,11,0.15)', iconColor: '#f59e0b' },
-        approve_system_request:     { icon: 'bi-check2-all',         color: 'rgba(16,185,129,0.15)', iconColor: '#10b981' },
-        reject_system_request:      { icon: 'bi-slash-circle-fill',  color: 'rgba(239,68,68,0.15)',  iconColor: '#ef4444' },
-        save_system_settings:       { icon: 'bi-gear-fill',          color: 'rgba(109,40,217,0.15)', iconColor: '#a855f7' },
-        superadmin_login:           { icon: 'bi-shield-check',       color: 'rgba(16,185,129,0.15)', iconColor: '#10b981' },
-        admin_login:                { icon: 'bi-shield-lock-fill',   color: 'rgba(5,150,105,0.15)',  iconColor: '#059669' },
-        account_lockout:            { icon: 'bi-shield-slash-fill',  color: 'rgba(239,68,68,0.2)',   iconColor: '#ef4444' },
-        security_warning:           { icon: 'bi-exclamation-triangle-fill', color: 'rgba(245,158,11,0.2)', iconColor: '#f59e0b' },
+        approve_admin_registration: { label: 'Approved Registration', icon: 'bi-check-circle-fill', color: 'rgba(16,185,129,0.15)', iconColor: '#10b981' },
+        reject_admin_registration:  { label: 'Rejected Registration', icon: 'bi-x-circle-fill',     color: 'rgba(239,68,68,0.15)',  iconColor: '#ef4444' },
+        create_user:                { label: 'Create User',           icon: 'bi-person-plus-fill',   color: 'rgba(59,130,246,0.15)', iconColor: '#3b82f6' },
+        delete_user:                { label: 'Delete User',           icon: 'bi-trash-fill',         color: 'rgba(239,68,68,0.15)',  iconColor: '#ef4444' },
+        reset_password:             { label: 'Reset Password',        icon: 'bi-key-fill',           color: 'rgba(245,158,11,0.15)', iconColor: '#f59e0b' },
+        approve_system_request:     { label: 'Request Approved',      icon: 'bi-check2-all',         color: 'rgba(16,185,129,0.15)', iconColor: '#10b981' },
+        reject_system_request:      { label: 'Request Rejected',      icon: 'bi-slash-circle-fill',  color: 'rgba(239,68,68,0.15)',  iconColor: '#ef4444' },
+        save_system_settings:       { label: 'Save Settings',         icon: 'bi-gear-fill',          color: 'rgba(109,40,217,0.15)', iconColor: '#a855f7' },
+        superadmin_login:           { label: 'Super Admin Login',     icon: 'bi-shield-check',       color: 'rgba(16,185,129,0.15)', iconColor: '#10b981' },
+        admin_login:                { label: 'Admin Login',           icon: 'bi-shield-lock-fill',   color: 'rgba(5,150,105,0.15)',  iconColor: '#059669' },
+        account_lockout:            { label: 'Account Locked (Security Alert)', icon: 'bi-shield-slash-fill',  color: 'rgba(239,68,68,0.2)',   iconColor: '#ef4444' },
+        security_warning:           { label: 'Security Warning',      icon: 'bi-exclamation-triangle-fill', color: 'rgba(245,158,11,0.2)', iconColor: '#f59e0b' },
       };
-      const style = icons[log.action] || { icon: 'bi-activity', color: 'rgba(100,116,139,0.15)', iconColor: '#64748b' };
+      const style = icons[log.action] || { label: log.action.replace(/_/g,' '), icon: 'bi-activity', color: 'rgba(100,116,139,0.15)', iconColor: '#64748b' };
       const time  = new Date(log.created_at).toLocaleString('en-PH', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' });
 
       return `<div class="log-entry">
         <div class="log-icon" style="background:${style.color};color:${style.iconColor};"><i class="bi ${style.icon}"></i></div>
         <div class="log-body">
-          <div class="log-action">${log.action.replace(/_/g,' ')}</div>
+          <div class="log-action">${style.label || log.action.replace(/_/g,' ')}</div>
           <div class="log-detail">${log.details || log.actor_username || '—'}</div>
           <div class="log-time">${time}</div>
         </div>
@@ -2872,6 +3298,7 @@
           user_deactivate: { label: 'Deactivate Account',color: '#d97706' },
           user_activate:   { label: 'Activate Account',  color: '#059669' },
           user_delete:     { label: 'Delete Account',    color: '#b91c1c' },
+          registration_delete: { label: 'Remove Registration', color: '#dc2626' },
           other:           { label: 'Other',             color: '#64748b' },
         };
 
@@ -2882,13 +3309,13 @@
             <td style="color:var(--sa-muted);font-size:12px;">${index + 1}</td>
             <td><span style="background:${typeInfo.color}22;color:${typeInfo.color};border:1px solid ${typeInfo.color}44;border-radius:6px;padding:3px 8px;font-size:10.5px;font-weight:600;white-space:nowrap;">${typeInfo.label}</span></td>
             <td style="font-weight:500;">${r.requester_name || '—'}</td>
-            <td>${r.title}</td>
+            <td>${r.title}${(r.resend_count > 1) ? ` <span style="display:inline-flex;align-items:center;gap:3px;background:rgba(245,158,11,0.15);color:#d97706;border:1px solid rgba(245,158,11,0.35);border-radius:12px;padding:1px 7px;font-size:10px;font-weight:700;white-space:nowrap;margin-left:4px;" title="${r.resend_count} request(s) submitted for this order"><i class="bi bi-arrow-repeat"></i> ×${r.resend_count}</span>` : ''}</td>
             <td>
               <span class="badge-sa badge-${r.status}">${r.status}</span>
-              ${(r.status !== 'pending' && r.review_note) ? '<div style=\'font-size:10px;color:var(--sa-muted);margin-top:2px;\'>' + (r.review_note.includes('Email') ? '\uD83D\uDCE7 via Email' : r.review_note.includes('PIN') ? '\uD83D\uDD11 via PIN' : '\uD83D\uDC64 by SA') + '</div>' : ''}
+              ${(r.status !== 'pending' && r.review_note) ? `<div style='font-size:10px;color:var(--sa-muted);margin-top:2px;'>${r.review_note.includes('Email') ? '\uD83D\uDCE7 via Email' : r.review_note.includes('PIN') ? '\uD83D\uDD11 via PIN' : r.status === 'cancelled' ? '\uD83D\uDEAB Cancelled by requester' : '\uD83D\uDC64 by SA'}</div>` : ''}
             </td>
             <td style="color:var(--sa-muted);font-size:12px;">${new Date(r.created_at).toLocaleDateString('en-PH')}</td>
-            <td>
+            <td style="text-align:center;">
               ${r.status === 'pending' ? `
                 <div style="display:flex;gap:6px;">
                   <button class="sa-btn sa-btn-approve" style="padding:5px 10px;font-size:11px;" onclick="openReviewModal('system', ${r.id}, ${JSON.stringify(r).replace(/"/g,'&quot;')})">
@@ -2927,7 +3354,7 @@
 
         const tbody = document.getElementById('admin-reqs-tbody');
         if (!res.admin_requests.length) {
-          tbody.innerHTML = `<tr><td colspan="7"><div class="sa-empty"><i class="bi bi-person-check"></i><p>No admin requests found</p></div></td></tr>`;
+          tbody.innerHTML = `<tr><td colspan="8"><div class="sa-empty"><i class="bi bi-person-check"></i><p>No registration requests found</p></div></td></tr>`;
           return;
         }
 
@@ -2935,28 +3362,31 @@
           const safeName = (r.full_name || '').replace(/'/g, "\\'");
           const safeUser = (r.username || '').replace(/'/g, "\\'");
           const safeEmail = (r.email || '').replace(/'/g, "\\'");
+          const roleDisplay = r.role || 'cashier';
           return `
           <tr>
             <td style="color:var(--sa-muted);font-size:12px;">${index + 1}</td>
             <td style="font-weight:600;">${r.full_name}</td>
             <td><code style="color:#a855f7;background:rgba(109,40,217,0.1);padding:2px 8px;border-radius:5px;">${r.username}</code></td>
             <td style="font-size:12px;color:var(--sa-muted);">${r.email}</td>
+            <td><span class="badge-sa" style="background:rgba(99,102,241,0.12);color:#818cf8;border:1px solid rgba(99,102,241,0.25);text-transform:capitalize;">${roleDisplay}</span></td>
             <td><span class="badge-sa badge-${r.status === 'approved' ? 'approved' : r.status === 'pending' ? 'pending' : 'rejected'}">${r.status}</span></td>
             <td style="color:var(--sa-muted);font-size:12px;">${new Date(r.created_at).toLocaleString('en-PH', {month:'short',day:'numeric',hour:'2-digit',minute:'2-digit'})}</td>
-            <td>
-              <div style="display:flex;gap:6px;align-items:center;">
+            <td style="text-align:center;">
+              <div style="display:inline-grid;grid-template-columns:80px 80px;gap:6px;align-items:center;justify-content:center;">
                 ${r.status === 'pending' ? `
-                  <button class="sa-btn sa-btn-approve" style="padding:5px 10px;font-size:11px;" onclick="openReviewModal('admin_reg', ${r.id}, {full_name:'${safeName}',username:'${safeUser}',email:'${safeEmail}'})">
+                  <button class="sa-btn sa-btn-approve" style="width:100%;padding:5px 0;font-size:11px;display:inline-flex;align-items:center;justify-content:center;gap:4px;" onclick="openReviewModal('admin_reg', ${r.id}, {full_name:'${safeName}',username:'${safeUser}',email:'${safeEmail}',role:'${roleDisplay}'})">
                     <i class="bi bi-check-circle-fill"></i> Approve
                   </button>
-                  <button class="sa-btn sa-btn-reject" style="padding:5px 10px;font-size:11px;" onclick="openRejectModal('admin_reg', ${r.id})" title="Reject Request">
+                  <button class="sa-btn sa-btn-reject" style="width:100%;padding:5px 0;font-size:11px;display:inline-flex;align-items:center;justify-content:center;gap:4px;" onclick="openRejectModal('admin_reg', ${r.id})" title="Reject Request">
                     <i class="bi bi-x-circle"></i> Reject
                   </button>
-                ` : (r.status === 'approved' ? `
-                  <button class="sa-btn sa-btn-reject" style="padding:5px 10px;font-size:11px;background:rgba(239,68,68,0.1);color:#ef4444;border-color:rgba(239,68,68,0.3);" onclick="deleteAdminRequest(${r.id}, '${safeName}')" title="Delete request">
+                ` : `
+                  <div></div>
+                  <button class="sa-btn sa-btn-danger" style="width:100%;padding:5px 0;font-size:11px;display:inline-flex;align-items:center;justify-content:center;gap:4px;" onclick="deleteAdminRequest(${r.id}, '${safeName}')" title="Delete request">
                     <i class="bi bi-trash-fill"></i> Delete
                   </button>
-                ` : `<span style="font-size:11px;color:var(--sa-muted);">${r.status}</span>`)}
+                `}
               </div>
             </td>
           </tr>
@@ -2973,11 +3403,13 @@
 
       let details = '';
       if (type === 'admin_reg') {
-        document.getElementById('review-modal-title').textContent = 'Approve Admin Registration';
+        const roleName = (data.role || 'admin').charAt(0).toUpperCase() + (data.role || 'admin').slice(1);
+        document.getElementById('review-modal-title').textContent = `Approve ${roleName} Registration`;
         details = `<strong>Name:</strong> ${data.full_name || '—'}<br>
                    <strong>Username:</strong> ${data.username || '—'}<br>
                    <strong>Email:</strong> ${data.email || '—'}<br>
-                   <br><em style="color:var(--sa-green);">Approving will create this user's admin account immediately.</em>`;
+                   <strong>Requested Role:</strong> <span style="text-transform:capitalize;font-weight:600;color:var(--sa-primary);">${data.role || 'cashier'}</span><br>
+                   <br><em style="color:var(--sa-green);">Approving will create this user's active ${data.role || 'cashier'} account immediately.</em>`;
       } else if (data.type === 'void_order' || data.type === 'refund_order') {
         const isVoid = data.type === 'void_order';
         const pl = typeof data.payload === 'string' ? JSON.parse(data.payload||'{}') : (data.payload||{});
@@ -3064,13 +3496,23 @@
         document.getElementById('review-reject-btn').innerHTML  = '<i class="bi bi-x-circle-fill"></i> Reject';
         const REQ_LABELS = {
           user_deactivate: 'Deactivate Account', user_activate: 'Activate Account',
-          user_delete: 'Delete Account', menu_change: 'Menu Change',
+          user_delete: 'Delete Account', registration_delete: 'Remove Registration', menu_change: 'Menu Change',
           setting_change: 'Setting Change', admin_approval: 'Admin Approval', other: 'Other'
         };
-        details = `<strong>Type:</strong> ${REQ_LABELS[data.type] || (data.type||'').replace(/_/g,' ')}<br>
+        if (data.type === 'registration_delete') {
+          const pl = typeof data.payload === 'string' ? JSON.parse(data.payload || '{}') : (data.payload || {});
+          details = `<strong>Type:</strong> Remove Registration<br>
+                     <strong>Target Name:</strong> ${pl.name || '—'}<br>
+                     <strong>Username:</strong> <code>${pl.username || '—'}</code><br>
+                     <strong>Role:</strong> <span style="text-transform:capitalize;">${pl.role || 'cashier'}</span><br>
+                     <strong>Requester:</strong> ${data.requester_name || '—'}<br>
+                     <strong>Description:</strong> ${data.description || '—'}`;
+        } else {
+          details = `<strong>Type:</strong> ${REQ_LABELS[data.type] || (data.type||'').replace(/_/g,' ')}<br>
                    <strong>Title:</strong> ${data.title || '—'}<br>
                    <strong>Requester:</strong> ${data.requester_name || '—'}<br>
                    <strong>Description:</strong> ${data.description || '—'}`;
+        }
       }
 
       document.getElementById('review-modal-details').innerHTML = details;
@@ -3140,6 +3582,7 @@
           user_deactivate: 'Deactivate Account',
           user_activate:   'Activate Account',
           user_delete:     'Delete Account',
+          registration_delete: 'Remove Registration',
           other:           'Other Request'
         };
         const typeLabel = REQ_TYPE_LABELS[req.type] || (req.type ? req.type.replace(/_/g, ' ') : 'System Request');
@@ -3293,6 +3736,8 @@
     }
 
     async function submitCreateUser() {
+      const btn = document.getElementById('sa-create-user-btn');
+      if (btn && btn.disabled) return;
       const resEl = document.getElementById('cu-result');
       const data  = {
         full_name: document.getElementById('cu-fullname').value.trim(),
@@ -3321,6 +3766,10 @@
         return;
       }
 
+      if (btn) {
+        btn.disabled = true;
+        btn.innerHTML = '<i class="bi bi-hourglass-split"></i> Please wait...';
+      }
       try {
         const res = await saApi('superadmin.php?action=create_user', data);
         resEl.style.display = 'block';
@@ -3332,6 +3781,11 @@
       } catch (e) {
         resEl.style.display = 'block';
         resEl.textContent   = 'Connection error.';
+      } finally {
+        if (btn) {
+          btn.disabled = false;
+          btn.innerHTML = '<i class="bi bi-person-plus-fill"></i> Create User';
+        }
       }
     }
 
@@ -3383,6 +3837,11 @@
       } catch (e) {
         resEl.style.display = 'block';
         resEl.textContent   = 'Connection error.';
+      } finally {
+        if (btn) {
+          btn.disabled = false;
+          btn.innerHTML = '<i class="bi bi-person-plus-fill"></i> Create User';
+        }
       }
     }
 
@@ -4520,8 +4979,16 @@
           });
         }
 
+        let pmConfigured = false;
+        res.settings.forEach(s => {
+          if (s.setting_key === 'paymongo_secret_key') {
+            pmConfigured = !!(s.setting_value && s.setting_value.trim().length > 0);
+          }
+        });
+
         renderAdminRecipients(_saAdminUsers, voidRefundEmails, voidRefundAdminIds);
-        loadRateLimitsTable();
+        updateSAPaymongoStatus(pmConfigured);
+        checkPaymongoStatusLive();
       } catch (e) { console.error('Settings load failed:', e); }
     }
 
@@ -4780,6 +5247,30 @@
       }
     }
 
+
+    function updateSAPaymongoStatus(configured) {
+      const badge = document.getElementById('sa-pm-key-badge');
+      if (!badge) return;
+      if (configured) {
+        badge.style.background = '#d1fae5';
+        badge.style.color = '#059669';
+        badge.innerHTML = '<span style="font-size:8px;">●</span> Configured';
+      } else {
+        badge.style.background = '#fee2e2';
+        badge.style.color = '#b91c1c';
+        badge.innerHTML = '<span style="font-size:8px;">●</span> Not Configured';
+      }
+    }
+
+    async function checkPaymongoStatusLive() {
+      try {
+        const res = await fetch('api/paymongo.php?action=get_key', { credentials: 'include' });
+        const data = await res.json();
+        if (data && typeof data.configured === 'boolean') {
+          updateSAPaymongoStatus(data.configured);
+        }
+      } catch (e) {}
+    }
     async function saveSettings() {
       updateRecipientSummary();
       const keys   = [
@@ -4788,12 +5279,7 @@
         'superadmin_email',
         'token_expiry_minutes',
         'void_refund_manager_email',
-        'void_refund_admin_ids',
-        'rate_limit_enabled',
-        'rate_limit_login_attempts',
-        'rate_limit_lockout_minutes',
-        'rate_limit_api_rpm',
-        'rate_limit_email_throttle'
+        'void_refund_admin_ids'
       ];
       const settings = {};
       keys.forEach(k => {
@@ -4805,8 +5291,6 @@
       saToast(res.message, res.success ? 'success' : 'error');
       if (res.success) {
         await loadSettings();
-      } else {
-        loadRateLimitsTable();
       }
     }
 
@@ -5025,8 +5509,10 @@
         return;
       }
 
+      playWaterDropLoginAnimation('#sa-login-screen .sa-login-card');
       saApi('auth.php?action=session').then(res => {
         if (res.success && res.loggedIn && res.user && res.user.role === 'super_admin') {
+          if (res.session_id) localStorage.setItem('chipipie_sa_session_id', res.session_id);
           saCurrentUser = res.user;
           activateSAApp();
         } else if (res.pending_2fa) {

@@ -1,4 +1,4 @@
-<?php
+﻿<?php
 /**
  * ChipiPie Cafe — Authentication API
  * 
@@ -54,10 +54,19 @@ switch ($action) {
     case 'approve_admin':
         handleApproveAdmin();
         break;
+    case 'approve_registration':
+    case 'approve_admin_ui':
+        handleApproveAdminUI();
+        break;
+    case 'reject_registration':
+    case 'reject_admin_ui':
+        handleRejectAdminUI();
+        break;
     case 'resend_approval':
         handleResendApproval();
         break;
     case 'delete_admin_request':
+    case 'delete_registration_request':
         handleDeleteAdminRequest();
         break;
     default:
@@ -76,9 +85,10 @@ function handleLogin() {
         jsonResponse(['success' => false, 'message' => 'Username and password are required.'], 400);
     }
 
-    // Rate Limiting Checks
-    $maxAttempts    = intval(getSetting('rate_limit_login_attempts') ?: 5);
-    $lockoutMinutes = intval(getSetting('rate_limit_lockout_minutes') ?: 5);
+    // Rate Limiting Checks (batch-load settings in one DB query via cache)
+    $cfg            = getSettings(['rate_limit_login_attempts', 'rate_limit_lockout_minutes']);
+    $maxAttempts    = intval($cfg['rate_limit_login_attempts'] ?: 5);
+    $lockoutMinutes = intval($cfg['rate_limit_lockout_minutes'] ?: 5);
     $lockoutSeconds = $lockoutMinutes * 60;
     $windowSeconds  = $lockoutMinutes * 60;
     $ip             = getClientIP();
@@ -104,6 +114,19 @@ function handleLogin() {
     // 1. If username is NOT registered in the system:
     // Do NOT add it to the user history or rate_limits table.
     if (!$user) {
+        // Check if there is a pending registration request for this username
+        $chkReq = $db->prepare("SELECT role, status FROM admin_registration_requests WHERE username = ? ORDER BY created_at DESC LIMIT 1");
+        $chkReq->execute([$username]);
+        $pendingReq = $chkReq->fetch();
+        if ($pendingReq && $pendingReq['status'] === 'pending') {
+            $roleLabel = ucfirst($pendingReq['role'] ?? 'cashier');
+            jsonResponse([
+                'success' => false,
+                'pending_approval' => true,
+                'message' => "Your {$roleLabel} registration is still pending approval. You will be able to log in once management approves your account."
+            ], 403);
+        }
+
         recordRateLimitHit('login_ip', $ip, $maxAttempts * 3, $windowSeconds, $lockoutSeconds, false);
         jsonResponse(['success' => false, 'message' => 'Invalid credentials.'], 401);
     }
@@ -137,23 +160,28 @@ function handleLogin() {
         $lockMins  = ceil($lockSecs / 60);
 
         if ($uRec['just_locked']) {
-            // First lockout: Send security email notification to user's registered email
-            if ($lockCount === 1 && !empty($user['email'])) {
-                sendUserLockoutNotification($user, $ip, $lockMins);
-            }
-
-            // Send notification to Super Admin via email
-            sendSuperAdminLockoutNotification($user, $ip, $lockCount, $lockMins);
-
-            // Log security warning in system audit log
+            // Log security warning in system audit log immediately
             $logDetail = "Security Warning: Account '{$user['username']}' locked for {$lockMins}m (Lockout #{$lockCount}) after {$maxAttempts} failed login attempts from IP: {$ip}";
             try {
                 $db->prepare("INSERT INTO system_logs (actor_id, actor_username, action, target_type, target_id, details, ip_address) VALUES (NULL, ?, 'account_lockout', 'user', ?, ?, ?)")
                    ->execute([$user['username'], $user['id'], $logDetail, $ip]);
             } catch (Exception $e) {}
 
-            // Create warning in system requests for Super Admin review
-            createSecurityWarningRequest($user, $ip, $lockCount, $lockMins);
+            // Send instant response to browser so UI updates in <30ms without freezing for SMTP
+            jsonResponseAndContinue([
+                'success'       => false,
+                'rate_limited'  => true,
+                'retry_after'   => $lockSecs,
+                'lockout_count' => $lockCount,
+                'message'       => "Account temporarily locked for {$lockMins} minutes due to multiple failed login attempts." . ($lockCount >= 3 ? " (Extended 20-minute security lockout applied)" : "")
+            ], 429);
+
+            // Deliver security alert emails in background
+            if ($lockCount === 1 && !empty($user['email'])) {
+                sendUserLockoutNotification($user, $ip, $lockMins);
+            }
+            sendSuperAdminLockoutNotification($user, $ip, $lockCount, $lockMins);
+            exit;
         }
 
         if (!$uRec['allowed']) {
@@ -175,25 +203,47 @@ function handleLogin() {
     clearRateLimit('login_user', $user['username']);
     clearRateLimit('login_ip', $ip);
 
+
+    // Transparently upgrade bcrypt cost on successful login
+    // (upgrades cost=10 → cost=9 without any user disruption)
+    if (password_needs_rehash($user['password'], PASSWORD_BCRYPT, ['cost' => 9])) {
+        $newHash = password_hash($password, PASSWORD_BCRYPT, ['cost' => 9]);
+        $db->prepare("UPDATE users SET password = ? WHERE id = ?")->execute([$newHash, $user['id']]);
+        $user['password'] = $newHash;
+    }
+    $portal = getPortalContext();
+
+
+
+    // Guard: Prevent POS cashiers/admins from logging into the Super Admin control portal
+    if ($portal === 'superadmin' && $user['role'] !== 'super_admin') {
+        jsonResponse([
+            'success' => false,
+            'message' => 'Access denied. Only Super Administrators can log in to the Super Admin Portal. Cashiers and Store Admins must sign in via the POS system.'
+        ], 403);
+    }
+
     // Two-Factor Authentication (2FA) for Super Admin
     if ($user['role'] === 'super_admin') {
         ensureSession();
         // Clear any previous fully authenticated session
         unset($_SESSION['user_id'], $_SESSION['username'], $_SESSION['full_name'], $_SESSION['email'], $_SESSION['role']);
 
-        $saEmail = getSetting('superadmin_email') ?: ($user['email'] ?: getSetting('owner_email'));
+        // Batch-load all settings needed for SA 2FA in one cached DB query
+        $saSettings = getSettings(['superadmin_email', 'owner_email', 'token_expiry_minutes', 'store_name']);
+        $saEmail = $saSettings['superadmin_email'] ?: ($user['email'] ?: $saSettings['owner_email']);
         if (!$saEmail) {
             jsonResponse(['success' => false, 'message' => 'Super admin email is not configured in settings.'], 500);
         }
 
         // Generate 6-digit numeric verification token
         $code = sprintf("%06d", mt_rand(100000, 999999));
-        $expiryMin = intval(getSetting('token_expiry_minutes') ?: 10);
+        $expiryMin = intval($saSettings['token_expiry_minutes'] ?: 10);
         if ($expiryMin < 5) $expiryMin = 10;
         $expiresAt = date('Y-m-d H:i:s', strtotime("+$expiryMin minutes"));
 
         // Invalidate any older unused 2FA tokens for this user
-        $db->prepare("UPDATE admin_tokens SET is_used = 1 WHERE user_id = ? AND purpose = 'superadmin_2fa' AND is_used = 0")
+        $db->prepare("UPDATE admin_tokens SET is_used = 1 WHERE user_id = ? AND purpose = 'superadmin_2fa' AND is_used = 0 AND expires_at > NOW() - INTERVAL 1 DAY")
            ->execute([$user['id']]);
 
         // Save new 2FA token to database
@@ -213,8 +263,8 @@ function handleLogin() {
             'attempts'        => 0
         ];
 
-        // Format email
-        $storeName = getSetting('store_name') ?: 'ChipiPie Cafe';
+        // Format email (use already-cached settings)
+        $storeName = $saSettings['store_name'] ?: 'ChipiPie Cafe';
         $subject   = "$storeName — Super Admin 2FA Verification Code";
         $emailBody = "
         <div style='font-family: Segoe UI, -apple-system, BlinkMacSystemFont, Roboto, sans-serif; max-width: 520px; margin: 0 auto; padding: 30px; background: #faf9f7; border-radius: 16px; border: 1px solid #ede8e1;'>
@@ -238,10 +288,6 @@ function handleLogin() {
             </div>
         </div>";
 
-        // Release session lock before SMTP delivery
-        session_write_close();
-        $emailSent = sendEmail($saEmail, $subject, $emailBody);
-
         $masked = maskEmail($saEmail);
         $resp = [
             'success'       => true,
@@ -250,111 +296,112 @@ function handleLogin() {
             'message'       => "Verification code sent to $masked. Please enter the code to continue.",
             'masked_email'  => $masked,
             'expires_in'    => $expiryMin * 60,
-            'email_sent'    => $emailSent
+            'email_sent'    => true
         ];
 
         if (DEV_MODE) {
             $resp['dev_code'] = $code;
         }
 
-        jsonResponse($resp);
+        // Return instant response to browser so 2FA screen displays in ~30ms
+        jsonResponseAndContinue($resp);
+
+        // Deliver 2FA email in background
+        sendEmail($saEmail, $subject, $emailBody);
+        exit;
     }
 
-    // Two-Factor Authentication (2FA) for POS Admin (sent to Manager / void-refund notification email)
+    // Two-Factor Authentication (2FA) for POS Admin (sent directly to the Admin's registered email)
     if ($user['role'] === 'admin') {
         ensureSession();
         // Clear any previous fully authenticated session
         unset($_SESSION['user_id'], $_SESSION['username'], $_SESSION['full_name'], $_SESSION['email'], $_SESSION['role']);
 
-        $managerEmailsStr = getSetting('void_refund_manager_email');
-        $managerEmails = array_filter(array_map('trim', explode(',', $managerEmailsStr ?: '')));
-        $managerEmails = array_values(array_filter($managerEmails, 'isValidSendableEmail'));
-
-        if (empty($managerEmails)) {
-            $fallback = getSetting('superadmin_email') ?: (getSetting('owner_email') ?: $user['email']);
-            if ($fallback && isValidSendableEmail($fallback)) $managerEmails = [$fallback];
-        }
-
-        if (empty($managerEmails)) {
-            jsonResponse(['success' => false, 'message' => 'Manager email (void/refund notification email) is not configured with a valid email address in settings.'], 500);
+        $adminEmail = trim($user['email'] ?? '');
+        // Batch-load all settings needed for Admin 2FA in one cached DB query
+        $adminSettings = getSettings(['superadmin_email', 'owner_email', 'token_expiry_minutes', 'store_name']);
+        if (!$adminEmail || !isValidSendableEmail($adminEmail)) {
+            $fallback = $adminSettings['superadmin_email'] ?: $adminSettings['owner_email'];
+            if ($fallback && isValidSendableEmail($fallback)) {
+                $adminEmail = $fallback;
+            } else {
+                jsonResponse(['success' => false, 'message' => 'No valid email address registered for this administrator account. Please contact Super Admin.'], 400);
+            }
         }
 
         // Generate 6-digit numeric verification token
         $code = sprintf("%06d", mt_rand(100000, 999999));
-        $expiryMin = intval(getSetting('token_expiry_minutes') ?: 10);
+        $expiryMin = intval($adminSettings['token_expiry_minutes'] ?: 10);
         if ($expiryMin < 5) $expiryMin = 10;
         $expiresAt = date('Y-m-d H:i:s', strtotime("+$expiryMin minutes"));
 
         // Invalidate any older unused 2FA tokens for this user
-        $db->prepare("UPDATE admin_tokens SET is_used = 1 WHERE user_id = ? AND purpose = 'admin_2fa' AND is_used = 0")
+        $db->prepare("UPDATE admin_tokens SET is_used = 1 WHERE user_id = ? AND purpose = 'admin_2fa' AND is_used = 0 AND expires_at > NOW() - INTERVAL 1 DAY")
            ->execute([$user['id']]);
 
         // Save new 2FA token to database
         $stmtToken = $db->prepare("INSERT INTO admin_tokens (token, user_id, purpose, expires_at) VALUES (?, ?, 'admin_2fa', ?)");
         $stmtToken->execute([$code, $user['id'], $expiresAt]);
 
-        // Save pending 2FA state in session
+        // Save pending 2FA state in session (recipient is strictly the Admin's registered email)
         $_SESSION['pending_2fa'] = [
             'user_id'         => $user['id'],
             'username'        => $user['username'],
             'full_name'       => $user['full_name'],
             'email'           => $user['email'],
             'role'            => $user['role'],
-            'recipient_email' => implode(', ', $managerEmails),
+            'recipient_email' => $adminEmail,
             'code'            => $code,
             'expires_at'      => time() + ($expiryMin * 60),
             'attempts'        => 0
         ];
 
-        // Format email to Manager
-        $storeName = getSetting('store_name') ?: 'ChipiPie Cafe';
+        // Format email directly to the Admin (use already-cached settings)
+        $storeName = $adminSettings['store_name'] ?: 'ChipiPie Cafe';
         $subject   = "$storeName — Admin Login 2FA Verification Code";
         $emailBody = "
         <div style='font-family: Segoe UI, -apple-system, BlinkMacSystemFont, Roboto, sans-serif; max-width: 520px; margin: 0 auto; padding: 30px; background: #faf9f7; border-radius: 16px; border: 1px solid #ede8e1;'>
             <div style='text-align: center; margin-bottom: 24px;'>
                 <div style='display: inline-block; width: 56px; height: 56px; background: #5c3d2e; color: #f5eedc; border-radius: 14px; line-height: 56px; font-size: 26px; box-shadow: 0 4px 12px rgba(92,61,46,0.2);'>🔐</div>
                 <h2 style='color: #2b1f1d; margin: 12px 0 4px; font-size: 22px; font-weight: 700;'>$storeName</h2>
-                <p style='color: #8c7365; font-size: 13px; margin: 0; text-transform: uppercase; letter-spacing: 1px;'>Manager Authorization Required</p>
+                <p style='color: #8c7365; font-size: 13px; margin: 0; text-transform: uppercase; letter-spacing: 1px;'>Administrator Two-Factor Authentication</p>
             </div>
             <div style='background: #ffffff; border-radius: 14px; padding: 26px; border: 1px solid #e7e2da; box-shadow: 0 2px 8px rgba(0,0,0,0.04);'>
-                <p style='color: #292524; font-size: 15px; margin-top: 0;'>Hello Manager,</p>
-                <p style='color: #57534e; font-size: 14px; line-height: 1.5;'>Admin <strong>" . htmlspecialchars($user['full_name']) . "</strong> (<code>" . htmlspecialchars($user['username']) . "</code>) is attempting to sign in to the <strong>POS System</strong>. If you approve this login, share the two-factor authentication (2FA) code below with them:</p>
+                <p style='color: #292524; font-size: 15px; margin-top: 0;'>Hello <strong>" . htmlspecialchars($user['full_name']) . "</strong>,</p>
+                <p style='color: #57534e; font-size: 14px; line-height: 1.5;'>Here is your two-factor authentication (2FA) verification code to complete your login to the <strong>POS System</strong>:</p>
                 
                 <div style='text-align: center; margin: 24px 0;'>
                     <div style='display: inline-block; background: #2b1f1d; color: #ffffff; padding: 16px 36px; border-radius: 12px; font-size: 32px; font-weight: 800; letter-spacing: 8px; font-family: Consolas, Monaco, monospace; border: 2px solid #5c3d2e; box-shadow: 0 4px 14px rgba(0,0,0,0.15);'>$code</div>
                 </div>
 
                 <div style='background: #fdf8f4; border: 1px solid #ebd9cc; border-radius: 8px; padding: 12px 14px; color: #5c3d2e; font-size: 12px; line-height: 1.4;'>
-                    ⏱ <strong>Security Notice:</strong> This code is single-use and will expire in <strong>$expiryMin minutes</strong> (" . date('g:i A', strtotime($expiresAt)) . "). Do not share this code if you did not authorize this login.
+                    ⏱ <strong>Security Notice:</strong> This code is single-use and will expire in <strong>$expiryMin minutes</strong> (" . date('g:i A', strtotime($expiresAt)) . "). Never share this verification code with anyone.
                 </div>
-                <p style='font-size: 12px; color: #a8a29e; margin-top: 18px; margin-bottom: 0; text-align: center;'>If you did not authorize this administrator login, you can safely ignore this email.</p>
+                <p style='font-size: 12px; color: #a8a29e; margin-top: 18px; margin-bottom: 0; text-align: center;'>If you did not attempt to sign in to your administrator account, please change your password immediately.</p>
             </div>
         </div>";
 
-        // Release session lock before SMTP delivery
-        session_write_close();
-        $emailSent = false;
-        foreach ($managerEmails as $mEmail) {
-            $sent = sendEmail($mEmail, $subject, $emailBody);
-            if ($sent) $emailSent = true;
-        }
-
-        $masked = implode(', ', array_map('maskEmail', $managerEmails));
+        $masked = maskEmail($adminEmail);
         $resp = [
             'success'       => true,
             'requires_2fa'  => true,
             'role'          => 'admin',
-            'message'       => "Verification code sent to manager email ($masked). Please enter the code to continue.",
+            'message'       => "Verification code sent to your email ($masked). Please enter the code to continue.",
             'masked_email'  => $masked,
             'expires_in'    => $expiryMin * 60,
-            'email_sent'    => $emailSent
+            'email_sent'    => true
         ];
 
         if (DEV_MODE) {
             $resp['dev_code'] = $code;
         }
 
-        jsonResponse($resp);
+        // Return instant response to browser so 2FA screen displays in ~30ms
+        jsonResponseAndContinue($resp);
+
+        // Deliver 2FA email in background
+        sendEmail($adminEmail, $subject, $emailBody);
+        exit;
     }
 
     // Standard login for other roles (e.g. cashier)
@@ -420,6 +467,19 @@ function handleLogout() {
 // REGISTER
 // =====================================================
 function handleRegister() {
+    // Anti-spam rate limiting: max 10 registration attempts per 10 minutes per IP
+    $ip = getClientIP();
+    $spamCheck = checkRateLimit('register_ip', $ip, 10, 600, 600);
+    if (!$spamCheck['allowed']) {
+        $mins = ceil($spamCheck['retry_after'] / 60);
+        jsonResponse([
+            'success'      => false,
+            'rate_limited' => true,
+            'retry_after'  => $spamCheck['retry_after'],
+            'message'      => "Too many registration requests. Please wait {$mins} minute" . ($mins > 1 ? 's' : '') . " before trying again."
+        ], 429);
+    }
+
     $input         = getJsonInput();
     $username      = trim($input['username'] ?? '');
     $password      = trim($input['password'] ?? '');
@@ -460,99 +520,88 @@ function handleRegister() {
 
     $db = getDB();
 
-    // Check if username already exists
-    $stmt = $db->prepare("SELECT id FROM users WHERE username = ?");
+    // Check if username or email already exists (single query)
+    $stmt = $db->prepare("SELECT username, email FROM users WHERE username = ? OR email = ? LIMIT 2");
+    $stmt->execute([$username, $email]);
+    while ($existRow = $stmt->fetch()) {
+        if (strtolower($existRow['username']) === strtolower($username)) {
+            jsonResponse(['success' => false, 'message' => 'Username already taken.'], 409);
+        }
+        if (strtolower($existRow['email']) === strtolower($email)) {
+            jsonResponse(['success' => false, 'message' => 'This email address is already registered to an existing account.'], 409);
+        }
+    }
+
+    $hashedPassword = password_hash($password, PASSWORD_BCRYPT, ['cost' => 9]);
+
+    $roleLabel = ucfirst($role);
+
+    // Check if username already exists in pending requests
+    $stmt = $db->prepare("SELECT id FROM admin_registration_requests WHERE username = ? AND status = 'pending'");
     $stmt->execute([$username]);
     if ($stmt->fetch()) {
-        jsonResponse(['success' => false, 'message' => 'Username already taken.'], 409);
+        jsonResponse(['success' => false, 'message' => "A pending registration request for this username already exists."], 409);
     }
 
-    // Check if email already exists in users table
-    $stmt = $db->prepare("SELECT id FROM users WHERE email = ?");
+    // Check if email already used in pending requests
+    $stmt = $db->prepare("SELECT id FROM admin_registration_requests WHERE email = ? AND status = 'pending'");
     $stmt->execute([$email]);
     if ($stmt->fetch()) {
-        jsonResponse(['success' => false, 'message' => 'This email address is already registered to an existing account.'], 409);
+        jsonResponse(['success' => false, 'message' => 'This email address already has a pending registration request.'], 409);
     }
 
-    $hashedPassword = password_hash($password, PASSWORD_BCRYPT);
+    recordRateLimitHit('register_ip', $ip, 10, 600, 600);
+    $approvalToken = generateToken(32);
+    $stmt = $db->prepare("INSERT INTO admin_registration_requests (username, password, first_name, last_name, middle_initial, suffix, full_name, email, role, approval_token) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)");
+    $stmt->execute([$username, $hashedPassword, $firstName, $lastName, $middleInitial, $suffix, $full_name, $email, $role, $approvalToken]);
 
-    if ($role === 'admin') {
-        // Admin registration requires owner approval
-        $stmt = $db->prepare("SELECT id FROM admin_registration_requests WHERE username = ? AND status = 'pending'");
-        $stmt->execute([$username]);
-        if ($stmt->fetch()) {
-            jsonResponse(['success' => false, 'message' => 'A pending admin registration for this username already exists.'], 409);
-        }
+    // Send approval email to owner (batch-load from settings cache)
+    $regSettings = getSettings(['owner_email', 'store_name']);
+    $ownerEmail  = $regSettings['owner_email'];
+    $storeName   = $regSettings['store_name'] ?: 'ChipiPie Cafe';
+    $approveUrl = "http://" . ($_SERVER['HTTP_HOST'] ?? 'localhost') . "/CHIPIPIE_SYSTEM/api/auth.php?action=approve_admin&token=" . $approvalToken;
 
-        // Check if email already used in pending requests
-        $stmt = $db->prepare("SELECT id FROM admin_registration_requests WHERE email = ? AND status = 'pending'");
-        $stmt->execute([$email]);
-        if ($stmt->fetch()) {
-            jsonResponse(['success' => false, 'message' => 'This email address already has a pending admin registration request.'], 409);
-        }
+    $emailBody = "
+    <div style='font-family: Segoe UI, sans-serif; max-width: 500px; margin: 0 auto; padding: 30px; background: #faf9f7; border-radius: 16px;'>
+        <div style='text-align: center; margin-bottom: 20px;'>
+            <div style='display: inline-block; width: 50px; height: 50px; background: #838582; color: #fff; border-radius: 12px; line-height: 50px; font-size: 24px;'>☕</div>
+            <h2 style='color: #3a2f2d; margin: 10px 0 5px;'>$storeName</h2>
+            <p style='color: #888; font-size: 13px; margin: 0;'>$roleLabel Registration Request</p>
+        </div>
+        <div style='background: #fff; border-radius: 12px; padding: 24px; border: 1px solid #e5e0d8;'>
+            <p style='color: #333; font-size: 14px;'>A new <strong>$roleLabel</strong> registration has been requested:</p>
+            <table style='width: 100%; font-size: 14px; color: #444; margin: 16px 0;'>
+                <tr><td style='padding: 6px 0; font-weight: 600; color: #3a2f2d;'>Role:</td><td><strong style='color:#5c3d2e;'>$roleLabel</strong></td></tr>
+                <tr><td style='padding: 6px 0; font-weight: 600; color: #3a2f2d;'>Name:</td><td>$full_name</td></tr>
+                <tr><td style='padding: 6px 0; font-weight: 600; color: #3a2f2d;'>Username:</td><td>$username</td></tr>
+                <tr><td style='padding: 6px 0; font-weight: 600; color: #3a2f2d;'>Email:</td><td>$email</td></tr>
+            </table>
+            <a href='$approveUrl' style='display: block; text-align: center; background: #3a2f2d; color: #fff; padding: 12px 24px; border-radius: 10px; text-decoration: none; font-weight: 600; font-size: 14px; margin-top: 16px;'>
+                ✅ Approve $roleLabel Registration
+            </a>
+            <p style='font-size: 11px; color: #aaa; text-align: center; margin-top: 14px;'>If you did not expect this request, you can safely ignore this email.</p>
+        </div>
+    </div>";
 
-        $approvalToken = generateToken(32);
-        $stmt = $db->prepare("INSERT INTO admin_registration_requests (username, password, first_name, last_name, middle_initial, suffix, full_name, email, approval_token) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)");
-        $stmt->execute([$username, $hashedPassword, $firstName, $lastName, $middleInitial, $suffix, $full_name, $email, $approvalToken]);
+    $response = [
+        'success' => true,
+        'message' => "$roleLabel registration submitted. Awaiting approval before account activation.",
+        'role' => $role,
+        'email_sent_to' => $ownerEmail,
+        'email_delivered' => true
+    ];
 
-        // Send approval email to owner
-        $ownerEmail = getSetting('owner_email');
-        $storeName  = getSetting('store_name') ?: 'ChipiPie Cafe';
-        $approveUrl = "http://" . ($_SERVER['HTTP_HOST'] ?? 'localhost') . "/CHIPIPIE_SYSTEM/api/auth.php?action=approve_admin&token=" . $approvalToken;
-
-        $emailBody = "
-        <div style='font-family: Segoe UI, sans-serif; max-width: 500px; margin: 0 auto; padding: 30px; background: #faf9f7; border-radius: 16px;'>
-            <div style='text-align: center; margin-bottom: 20px;'>
-                <div style='display: inline-block; width: 50px; height: 50px; background: #838582; color: #fff; border-radius: 12px; line-height: 50px; font-size: 24px;'>☕</div>
-                <h2 style='color: #3a2f2d; margin: 10px 0 5px;'>$storeName</h2>
-                <p style='color: #888; font-size: 13px; margin: 0;'>Admin Registration Request</p>
-            </div>
-            <div style='background: #fff; border-radius: 12px; padding: 24px; border: 1px solid #e5e0d8;'>
-                <p style='color: #333; font-size: 14px;'>A new admin registration has been requested:</p>
-                <table style='width: 100%; font-size: 14px; color: #444; margin: 16px 0;'>
-                    <tr><td style='padding: 6px 0; font-weight: 600; color: #3a2f2d;'>Name:</td><td>$full_name</td></tr>
-                    <tr><td style='padding: 6px 0; font-weight: 600; color: #3a2f2d;'>Username:</td><td>$username</td></tr>
-                    <tr><td style='padding: 6px 0; font-weight: 600; color: #3a2f2d;'>Email:</td><td>$email</td></tr>
-                </table>
-                <a href='$approveUrl' style='display: block; text-align: center; background: #3a2f2d; color: #fff; padding: 12px 24px; border-radius: 10px; text-decoration: none; font-weight: 600; font-size: 14px; margin-top: 16px;'>
-                    ✅ Approve Admin Registration
-                </a>
-                <p style='font-size: 11px; color: #aaa; text-align: center; margin-top: 14px;'>If you did not expect this request, you can safely ignore this email.</p>
-            </div>
-        </div>";
-
-        $emailSent = sendEmail($ownerEmail, "$storeName — Admin Registration Approval Needed", $emailBody);
-
-        $response = [
-            'success' => true,
-            'message' => 'Admin registration submitted. Awaiting owner approval via email.',
-            'email_sent_to' => $ownerEmail,
-            'email_delivered' => $emailSent
-        ];
-
-        // In dev mode, include the approval link for testing
-        if (DEV_MODE) {
-            $response['dev_approve_url'] = $approveUrl;
-            $response['dev_token'] = $approvalToken;
-        }
-
-        jsonResponse($response);
-    } else {
-        // Cashier registration — immediate activation (admin or superadmin must be logged in)
-        ensureSession();
-        if (!isset($_SESSION['user_id']) || !in_array($_SESSION['role'], ['admin', 'super_admin'])) {
-            jsonResponse(['success' => false, 'message' => 'Only admins can register new cashiers.'], 403);
-        }
-
-        $stmt = $db->prepare("INSERT INTO users (username, password, first_name, last_name, middle_initial, suffix, full_name, email, role, is_active) VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'cashier', 1)");
-        $stmt->execute([$username, $hashedPassword, $firstName, $lastName, $middleInitial, $suffix, $full_name, $email]);
-
-        jsonResponse([
-            'success' => true,
-            'message' => "Cashier '$full_name' registered successfully.",
-            'user_id' => $db->lastInsertId()
-        ]);
+    if (DEV_MODE) {
+        $response['dev_approve_url'] = $approveUrl;
+        $response['dev_token'] = $approvalToken;
     }
+
+    // Return instant response to browser so UI updates immediately
+    jsonResponseAndContinue($response);
+
+    // Deliver owner approval notification in background
+    sendEmail($ownerEmail, "$storeName — $roleLabel Registration Approval Needed", $emailBody);
+    exit;
 }
 
 // =====================================================
@@ -593,8 +642,11 @@ function handleApproveAdmin() {
         exit;
     }
 
-    // Create the admin account
-    $stmt = $db->prepare("INSERT INTO users (username, password, first_name, last_name, middle_initial, suffix, full_name, email, role, is_active) VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'admin', 1)");
+    // Create the account with requested role
+    $role = !empty($request['role']) ? $request['role'] : 'admin';
+    $roleLabel = ucfirst($role);
+
+    $stmt = $db->prepare("INSERT INTO users (username, password, first_name, last_name, middle_initial, suffix, full_name, email, role, is_active) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 1)");
     $stmt->execute([
         $request['username'], 
         $request['password'], 
@@ -603,13 +655,14 @@ function handleApproveAdmin() {
         $request['middle_initial'] ?? null, 
         $request['suffix'] ?? null, 
         $request['full_name'], 
-        $request['email']
+        $request['email'],
+        $role
     ]);
 
     // Mark request as approved
     $db->prepare("UPDATE admin_registration_requests SET status = 'approved', approved_at = NOW() WHERE id = ?")->execute([$request['id']]);
 
-    // Send confirmation email to the new admin
+    // Send confirmation email to the new user
     $storeName = getSetting('store_name') ?: 'ChipiPie Cafe';
     $confirmBody = "
     <div style='font-family: Segoe UI, sans-serif; max-width: 500px; margin: 0 auto; padding: 30px; background: #faf9f7; border-radius: 16px;'>
@@ -617,18 +670,18 @@ function handleApproveAdmin() {
             <h2 style='color: #3a2f2d;'>$storeName</h2>
         </div>
         <div style='background: #fff; border-radius: 12px; padding: 24px; border: 1px solid #e5e0d8;'>
-            <p style='font-size: 14px; color: #333;'>🎉 <strong>{$request['full_name']}</strong>, your admin account has been approved!</p>
-            <p style='font-size: 14px; color: #555;'>You can now log in with your username: <strong>{$request['username']}</strong></p>
+            <p style='font-size: 14px; color: #333;'>🎉 <strong>{$request['full_name']}</strong>, your {$roleLabel} account has been approved!</p>
+            <p style='font-size: 14px; color: #555;'>You can now log in to the POS system with your username: <strong>{$request['username']}</strong></p>
         </div>
     </div>";
-    sendEmail($request['email'], "$storeName — Admin Account Approved", $confirmBody);
+    sendEmail($request['email'], "$storeName — {$roleLabel} Account Approved", $confirmBody);
 
     echo "
     <div style='font-family:Segoe UI,sans-serif;text-align:center;margin-top:80px;max-width:500px;margin-left:auto;margin-right:auto;'>
         <div style='background:#d4edda;border-radius:16px;padding:40px 30px;border:1px solid #b7e2c4;'>
             <div style='font-size:48px;margin-bottom:16px;'>✅</div>
-            <h2 style='color:#1a5c2e;margin-bottom:8px;'>Admin Approved!</h2>
-            <p style='color:#333;font-size:15px;'><strong>{$request['full_name']}</strong> has been registered as an admin.</p>
+            <h2 style='color:#1a5c2e;margin-bottom:8px;'>{$roleLabel} Approved!</h2>
+            <p style='color:#333;font-size:15px;'><strong>{$request['full_name']}</strong> has been registered as {$role}.</p>
             <p style='color:#666;font-size:13px;margin-top:12px;'>They can now log in at the POS system.</p>
         </div>
     </div>";
@@ -656,6 +709,8 @@ function handleResendApproval() {
         jsonResponse(['success' => false, 'message' => 'Request not found or already processed.'], 404);
     }
 
+    $role = !empty($request['role']) ? $request['role'] : 'admin';
+    $roleLabel = ucfirst($role);
     $ownerEmail = getSetting('owner_email');
     $storeName  = getSetting('store_name') ?: 'ChipiPie Cafe';
     $approveUrl = "http://" . ($_SERVER['HTTP_HOST'] ?? 'localhost') . "/CHIPIPIE_SYSTEM/api/auth.php?action=approve_admin&token=" . $request['approval_token'];
@@ -665,43 +720,40 @@ function handleResendApproval() {
         <div style='text-align: center; margin-bottom: 20px;'>
             <div style='display: inline-block; width: 50px; height: 50px; background: #838582; color: #fff; border-radius: 12px; line-height: 50px; font-size: 24px;'>☕</div>
             <h2 style='color: #3a2f2d; margin: 10px 0 5px;'>$storeName</h2>
-            <p style='color: #888; font-size: 13px; margin: 0;'>Admin Registration Request (Resent)</p>
+            <p style='color: #888; font-size: 13px; margin: 0;'>$roleLabel Registration Request (Resent)</p>
         </div>
         <div style='background: #fff; border-radius: 12px; padding: 24px; border: 1px solid #e5e0d8;'>
-            <p style='color: #333; font-size: 14px;'>A pending admin registration awaits your approval:</p>
+            <p style='color: #333; font-size: 14px;'>A pending <strong>$roleLabel</strong> registration awaits your approval:</p>
             <table style='width: 100%; font-size: 14px; color: #444; margin: 16px 0;'>
+                <tr><td style='padding: 6px 0; font-weight: 600; color: #3a2f2d;'>Role:</td><td><strong style='color:#5c3d2e;'>$roleLabel</strong></td></tr>
                 <tr><td style='padding: 6px 0; font-weight: 600; color: #3a2f2d;'>Name:</td><td>{$request['full_name']}</td></tr>
                 <tr><td style='padding: 6px 0; font-weight: 600; color: #3a2f2d;'>Username:</td><td>{$request['username']}</td></tr>
                 <tr><td style='padding: 6px 0; font-weight: 600; color: #3a2f2d;'>Email:</td><td>{$request['email']}</td></tr>
             </table>
             <a href='$approveUrl' style='display: block; text-align: center; background: #3a2f2d; color: #fff; padding: 12px 24px; border-radius: 10px; text-decoration: none; font-weight: 600; font-size: 14px; margin-top: 16px;'>
-                ✅ Approve Admin Registration
+                ✅ Approve $roleLabel Registration
             </a>
             <p style='font-size: 11px; color: #aaa; text-align: center; margin-top: 14px;'>If you did not expect this request, you can safely ignore this email.</p>
         </div>
     </div>";
 
-    $sent = sendEmail($ownerEmail, "$storeName — Admin Registration Approval Needed (Resent)", $emailBody);
-
-    if ($sent) {
-        jsonResponse(['success' => true, 'message' => "Approval email resent to owner ({$ownerEmail})."]);
-    } else {
-        jsonResponse(['success' => false, 'message' => 'Failed to send email. Check SMTP settings.'], 500);
-    }
+    jsonResponseAndContinue(['success' => true, 'message' => "Approval notification resent to owner."]);
+    sendEmail($ownerEmail, "$storeName - $roleLabel Registration Approval Needed (Resent)", $emailBody);
+    exit;
 }
 
 function handleListUsers() {
     requireAdmin();
 
     $db = getDB();
-    $stmt = $db->query("SELECT id, username, full_name, email, role, is_active, created_at FROM users ORDER BY created_at DESC");
+    $stmt = $db->query("SELECT id, username, full_name, email, role, is_active, created_at FROM users WHERE role != 'super_admin' AND username NOT IN ('superadmin', 'super_admin') ORDER BY created_at DESC");
     $users = $stmt->fetchAll();
 
     // Clean up any approved admin requests where the admin no longer exists in users
     $db->exec("DELETE FROM admin_registration_requests WHERE status='approved' AND username NOT IN (SELECT username FROM users)");
 
-    // Also get pending admin requests
-    $stmt2 = $db->query("SELECT id, username, full_name, email, status, approval_token, created_at FROM admin_registration_requests ORDER BY created_at DESC");
+    // Exclude super admin from registration requests
+    $stmt2 = $db->query("SELECT id, username, full_name, email, COALESCE(role, 'cashier') AS role, status, approval_token, created_at FROM admin_registration_requests WHERE username NOT IN ('superadmin', 'super_admin') AND LOWER(full_name) NOT LIKE '%super admin%' ORDER BY created_at DESC");
     $pendingRequests = $stmt2->fetchAll();
 
     // In dev mode, include approval URLs for pending requests
@@ -756,8 +808,11 @@ function handleApproveAdminUI() {
         jsonResponse(['success' => false, 'message' => 'Username already taken. Request auto-rejected.'], 409);
     }
 
-    // Create the admin account
-    $stmt = $db->prepare("INSERT INTO users (username, password, first_name, last_name, middle_initial, suffix, full_name, email, role, is_active) VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'admin', 1)");
+    // Create the account with requested role
+    $role = !empty($request['role']) ? $request['role'] : 'cashier';
+    $roleLabel = ucfirst($role);
+
+    $stmt = $db->prepare("INSERT INTO users (username, password, first_name, last_name, middle_initial, suffix, full_name, email, role, is_active) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 1)");
     $stmt->execute([
         $request['username'], 
         $request['password'], 
@@ -766,21 +821,36 @@ function handleApproveAdminUI() {
         $request['middle_initial'] ?? null, 
         $request['suffix'] ?? null, 
         $request['full_name'], 
-        $request['email']
+        $request['email'],
+        $role
     ]);
 
     // Mark as approved
     $now = date('Y-m-d H:i:s');
     $db->prepare("UPDATE admin_registration_requests SET status = 'approved', approved_at = ? WHERE id = ?")->execute([$now, $requestId]);
 
-    jsonResponse([
+    // Send confirmation email to user
+    $storeName = getSetting('store_name') ?: 'ChipiPie Cafe';
+    $confirmBody = "
+    <div style='font-family: Segoe UI, sans-serif; max-width: 500px; margin: 0 auto; padding: 30px; background: #faf9f7; border-radius: 16px;'>
+        <div style='text-align: center; margin-bottom: 20px;'>
+            <h2 style='color: #3a2f2d;'>$storeName</h2>
+        </div>
+        <div style='background: #fff; border-radius: 12px; padding: 24px; border: 1px solid #e5e0d8;'>
+            <p style='font-size: 14px; color: #333;'>🎉 <strong>{$request['full_name']}</strong>, your {$roleLabel} account has been approved!</p>
+            <p style='font-size: 14px; color: #555;'>You can now log in to the POS system with your username: <strong>{$request['username']}</strong></p>
+        </div>
+    </div>";
+    jsonResponseAndContinue([
         'success' => true,
-        'message' => "Admin '{$request['full_name']}' approved and account created!"
+        'message' => "{$roleLabel} '{$request['full_name']}' approved and account created!"
     ]);
+    sendEmail($request['email'], "$storeName — {$roleLabel} Account Approved", $confirmBody);
+    exit;
 }
 
 // =====================================================
-// REJECT ADMIN FROM UI (Admin only)
+// REJECT REGISTRATION FROM UI (Admin only)
 // =====================================================
 function handleRejectAdminUI() {
     requireAdmin();
@@ -800,11 +870,14 @@ function handleRejectAdminUI() {
         jsonResponse(['success' => false, 'message' => 'Request not found or already processed.'], 404);
     }
 
+    $role = !empty($request['role']) ? $request['role'] : 'cashier';
+    $roleLabel = ucfirst($role);
+
     $db->prepare("UPDATE admin_registration_requests SET status = 'rejected' WHERE id = ?")->execute([$requestId]);
 
     jsonResponse([
         'success' => true,
-        'message' => "Admin request from '{$request['full_name']}' has been rejected."
+        'message' => "{$roleLabel} registration request from '{$request['full_name']}' has been rejected."
     ]);
 }
 
@@ -880,7 +953,15 @@ function handleToggleUser() {
 // =====================================================
 function handleCheckSession() {
     ensureSession();
+    $portal = getPortalContext();
+
     if (isset($_SESSION['user_id'])) {
+        // Enforce portal isolation: POS ignores superadmin sessions; Super Admin ignores POS cashier/admin sessions
+
+        if ($portal === 'superadmin' && $_SESSION['role'] !== 'super_admin') {
+            jsonResponse(['success' => true, 'loggedIn' => false]);
+        }
+
         jsonResponse([
             'success'    => true,
             'loggedIn'   => true,
@@ -894,6 +975,11 @@ function handleCheckSession() {
             ]
         ]);
     } else if (isset($_SESSION['pending_2fa']) && time() <= $_SESSION['pending_2fa']['expires_at']) {
+        $pending = $_SESSION['pending_2fa'];
+
+        if ($portal === 'superadmin' && $pending['role'] !== 'super_admin') {
+            jsonResponse(['success' => true, 'loggedIn' => false]);
+        }
         $pending = $_SESSION['pending_2fa'];
         $emails = array_filter(array_map('trim', explode(',', $pending['recipient_email'] ?? '')));
         $maskedList = array_map('maskEmail', $emails);
@@ -1003,9 +1089,17 @@ function handleVerify2FA() {
     $_SESSION['role']      = $pending['role'];
     unset($_SESSION['pending_2fa']);
 
+    // When super_admin logs in, synchronize companion session so both Super Admin & POS are logged in at the same time
+    if ($pending['role'] === 'super_admin') {
+    
+    $portal = getPortalContext();
+        $companionPortal = ($portal === 'superadmin') ? 'pos' : 'superadmin';
+        syncCompanionSession($pending, $companionPortal);
+    }
+
     // Log login to audit trail
     $actionName   = ($pending['role'] === 'super_admin' ? 'superadmin_login' : 'admin_login');
-    $actionDetail = ($pending['role'] === 'super_admin' ? 'Super admin logged in via 2FA verification code' : 'Admin logged in via Manager 2FA verification code');
+    $actionDetail = ($pending['role'] === 'super_admin' ? 'Super admin logged in via 2FA verification code' : 'Admin logged in via 2FA verification code');
     try {
         $ip = $_SERVER['REMOTE_ADDR'] ?? null;
         $db->prepare("INSERT INTO system_logs (actor_id, actor_username, action, target_type, target_id, details, ip_address) VALUES (?,?,?,?,?,?,?)")
@@ -1040,7 +1134,8 @@ function handleResend2FA() {
         jsonResponse(['success' => false, 'message' => 'No pending 2FA login session found. Please sign in again.'], 400);
     }
 
-    $emailThrottle = intval(getSetting('rate_limit_email_throttle') ?: 3);
+    $resendCfg     = getSettings(['rate_limit_email_throttle', 'token_expiry_minutes', 'store_name']);
+    $emailThrottle = intval($resendCfg['rate_limit_email_throttle'] ?: 3);
     $ip = getClientIP();
     $throttleCheck = checkRateLimit('email_resend_2fa', $ip, $emailThrottle, 600, 600);
     if (!$throttleCheck['allowed']) {
@@ -1058,13 +1153,13 @@ function handleResend2FA() {
     $db = getDB();
 
     $code = sprintf("%06d", mt_rand(100000, 999999));
-    $expiryMin = intval(getSetting('token_expiry_minutes') ?: 10);
+    $expiryMin = intval($resendCfg['token_expiry_minutes'] ?: 10);
     if ($expiryMin < 5) $expiryMin = 10;
     $expiresAt = date('Y-m-d H:i:s', strtotime("+$expiryMin minutes"));
     $purpose   = ($pending['role'] === 'super_admin' ? 'superadmin_2fa' : 'admin_2fa');
 
-    // Invalidate old tokens for this user
-    $db->prepare("UPDATE admin_tokens SET is_used = 1 WHERE user_id = ? AND purpose = ? AND is_used = 0")
+    // Invalidate old tokens for this user (scoped to recent rows using idx_expires_at)
+    $db->prepare("UPDATE admin_tokens SET is_used = 1 WHERE user_id = ? AND purpose = ? AND is_used = 0 AND expires_at > NOW() - INTERVAL 1 DAY")
        ->execute([$pending['user_id'], $purpose]);
 
     // Insert new token
@@ -1076,7 +1171,7 @@ function handleResend2FA() {
 
     $recipientStr = $pending['recipient_email'];
     $recipients   = array_filter(array_map('trim', explode(',', $recipientStr)));
-    $storeName    = getSetting('store_name') ?: 'ChipiPie Cafe';
+    $storeName    = $resendCfg['store_name'] ?: 'ChipiPie Cafe';
 
     if ($pending['role'] === 'super_admin') {
         $subject = "$storeName — Super Admin 2FA Verification Code (Resent)";
@@ -1107,11 +1202,11 @@ function handleResend2FA() {
             <div style='text-align: center; margin-bottom: 24px;'>
                 <div style='display: inline-block; width: 56px; height: 56px; background: #5c3d2e; color: #f5eedc; border-radius: 14px; line-height: 56px; font-size: 26px; box-shadow: 0 4px 12px rgba(92,61,46,0.2);'>🔐</div>
                 <h2 style='color: #2b1f1d; margin: 12px 0 4px; font-size: 22px; font-weight: 700;'>$storeName</h2>
-                <p style='color: #8c7365; font-size: 13px; margin: 0; text-transform: uppercase; letter-spacing: 1px;'>Manager Authorization (Resent Code)</p>
+                <p style='color: #8c7365; font-size: 13px; margin: 0; text-transform: uppercase; letter-spacing: 1px;'>Two-Factor Authentication (Resent Code)</p>
             </div>
             <div style='background: #ffffff; border-radius: 14px; padding: 26px; border: 1px solid #e7e2da; box-shadow: 0 2px 8px rgba(0,0,0,0.04);'>
-                <p style='color: #292524; font-size: 15px; margin-top: 0;'>Hello Manager,</p>
-                <p style='color: #57534e; font-size: 14px; line-height: 1.5;'>Here is the resent two-factor verification code for Admin <strong>" . htmlspecialchars($pending['full_name']) . "</strong> (<code>" . htmlspecialchars($pending['username']) . "</code>):</p>
+                <p style='color: #292524; font-size: 15px; margin-top: 0;'>Hello <strong>" . htmlspecialchars($pending['full_name']) . "</strong>,</p>
+                <p style='color: #57534e; font-size: 14px; line-height: 1.5;'>Here is your new two-factor verification code for Admin POS login:</p>
                 
                 <div style='text-align: center; margin: 24px 0;'>
                     <div style='display: inline-block; background: #2b1f1d; color: #ffffff; padding: 16px 36px; border-radius: 12px; font-size: 32px; font-weight: 800; letter-spacing: 8px; font-family: Consolas, Monaco, monospace; border: 2px solid #5c3d2e; box-shadow: 0 4px 14px rgba(0,0,0,0.15);'>$code</div>
@@ -1124,13 +1219,6 @@ function handleResend2FA() {
         </div>";
     }
 
-    session_write_close();
-    $emailSent = false;
-    foreach ($recipients as $toEmail) {
-        $sent = sendEmail($toEmail, $subject, $emailBody);
-        if ($sent) $emailSent = true;
-    }
-
     $maskedList = array_map('maskEmail', $recipients);
     $maskedStr  = implode(', ', $maskedList);
 
@@ -1138,12 +1226,20 @@ function handleResend2FA() {
         'success'    => true,
         'message'    => "A new verification code was sent to $maskedStr.",
         'expires_in' => $expiryMin * 60,
-        'email_sent' => $emailSent
+        'email_sent' => true
     ];
     if (DEV_MODE) {
         $resp['dev_code'] = $code;
     }
-    jsonResponse($resp);
+
+    // Return instant response to browser
+    jsonResponseAndContinue($resp);
+
+    // Deliver resent email in background
+    foreach ($recipients as $toEmail) {
+        sendEmail($toEmail, $subject, $emailBody);
+    }
+    exit;
 }
 
 // =====================================================
@@ -1262,9 +1358,9 @@ function handleForgotPassword() {
         </div>
     </div>";
 
+    jsonResponseAndContinue($genericSuccess);
     sendEmail($targetEmail, $subject, $emailBody);
-
-    jsonResponse($genericSuccess);
+    exit;
 }
 
 // =====================================================
@@ -1295,7 +1391,7 @@ function handleResetPasswordLink() {
     }
 
     $userId = $tokenRow['user_id'];
-    $hashed = password_hash($newPass, PASSWORD_BCRYPT);
+    $hashed = password_hash($newPass, PASSWORD_BCRYPT, ['cost' => 9]);
 
     $db->prepare("UPDATE users SET password = ? WHERE id = ?")->execute([$hashed, $userId]);
     $db->prepare("UPDATE admin_tokens SET is_used = 1, used_at = NOW() WHERE id = ?")->execute([$tokenRow['id']]);
@@ -1348,7 +1444,7 @@ function handleResetPasswordCode() {
     }
 
     $userId = $tokenRow['user_id'];
-    $hashed = password_hash($newPass, PASSWORD_BCRYPT);
+    $hashed = password_hash($newPass, PASSWORD_BCRYPT, ['cost' => 9]);
 
     $db->prepare("UPDATE users SET password = ? WHERE id = ?")->execute([$hashed, $userId]);
     $db->prepare("UPDATE admin_tokens SET is_used = 1, used_at = NOW() WHERE id = ?")->execute([$tokenRow['id']]);
@@ -1456,21 +1552,6 @@ function sendSuperAdminLockoutNotification($user, $ip, $lockCount, $lockMins) {
  * Create a system warning request in database for Super Admin
  */
 function createSecurityWarningRequest($user, $ip, $lockCount, $lockMins) {
-    try {
-        $db = getDB();
-        $title = "Security Warning: Account Locked — {$user['username']}";
-        $desc = "User '{$user['full_name']}' ({$user['username']}) was temporarily locked for {$lockMins}m (Lockout #{$lockCount}) after consecutive failed sign-in attempts from IP {$ip}.";
-        $payload = json_encode([
-            'type'          => 'account_lockout',
-            'username'      => $user['username'],
-            'user_id'       => $user['id'],
-            'ip'            => $ip,
-            'lockout_count' => $lockCount,
-            'lockout_mins'  => $lockMins
-        ]);
-
-        $db->prepare("INSERT INTO system_requests (type, requested_by, requester_name, title, description, payload, status) VALUES ('other', ?, ?, ?, ?, ?, 'pending')")
-           ->execute([$user['id'], $user['full_name'], $title, $desc, $payload]);
-    } catch (Exception $e) {}
+    // Security warnings are recorded in system_logs (audit log), not system_requests
+    return;
 }
-

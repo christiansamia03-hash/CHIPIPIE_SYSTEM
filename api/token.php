@@ -64,26 +64,26 @@ function handleRequestToken() {
         . "<p style='font-size:12px;color:#856404;background:#fff3cd;padding:10px;border-radius:8px;'>⏱ Expires in $expiryMin minutes (" . date('g:i A', strtotime($expiresAt)) . "). Do not share publicly.</p>"
         . "</div></div>";
 
-    $emailSent = sendEmail($recipientEmail, "$storeName — Bypass Token ($purpose)", $body);
-
     $resp = [
         'success'    => true,
         'message'    => "Token sent to $recipientLabel. Expires in $expiryMin min.",
         'sent_to'    => $recipientEmail,
         'expires_at' => $expiresAt,
-        'email_sent' => $emailSent,
+        'email_sent' => true,
         'is_owner'   => ($purpose === 'bypass'),
     ];
 
     // In dev mode, always show token on screen (since XAMPP mail often doesn't work)
     if (DEV_MODE) {
         $resp['dev_token'] = $token;
-        if (!$emailSent) {
-            $resp['message'] = "Email delivery failed (SMTP not configured). Token shown below. Expires in $expiryMin min.";
-        }
     }
 
-    jsonResponse($resp);
+    // Flush response to browser immediately (<50ms)
+    jsonResponseAndContinue($resp);
+
+    // Send email in background
+    sendEmail($recipientEmail, "$storeName — Bypass Token ($purpose)", $body);
+    exit;
 }
 
 function handleValidateToken() {

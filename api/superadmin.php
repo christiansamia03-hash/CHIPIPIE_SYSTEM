@@ -1,4 +1,4 @@
-<?php
+﻿<?php
 /**
  * ChipiPie Cafe — Super Admin API
  *
@@ -131,9 +131,9 @@ function handleSAForgotPassword() {
       </div>
     </div>";
 
+    jsonResponseAndContinue(['success' => true, 'message' => 'A password reset link has been sent to your email.']);
     sendEmail($email, "$storeName — Super Admin Password Reset Link", $body);
-
-    jsonResponse(['success' => true, 'message' => 'A password reset link has been sent to your email.']);
+    exit;
 }
 
 /** POST ?action=reset_password_link — Validates the link token and resets the SA password */
@@ -188,7 +188,21 @@ function handleSADashboard() {
     $totalRevenue  = $db->query("SELECT COALESCE(SUM(total),0) FROM orders WHERE status='Completed'")->fetchColumn();
     $todayRevenue  = $db->query("SELECT COALESCE(SUM(total),0) FROM orders WHERE status='Completed' AND DATE(created_at)=CURDATE()")->fetchColumn();
 
-    $pendingRequests    = $db->query("SELECT COUNT(*) FROM system_requests WHERE status='pending'")->fetchColumn();
+    // Deduplicated pending count — mirrors handleSARequests() dedup logic
+    // void_order / refund_order: count one per distinct order_id
+    $pendingRequests = (int)$db->query("
+        SELECT COUNT(*) FROM (
+            SELECT MAX(id) as id
+            FROM system_requests
+            WHERE status='pending'
+            GROUP BY
+                CASE
+                    WHEN type IN ('void_order','refund_order')
+                    THEN CONCAT(type, '__', JSON_UNQUOTE(JSON_EXTRACT(payload, '$.order_id')))
+                    ELSE CONCAT('_', CAST(id AS CHAR))
+                END
+        ) deduped
+    ")->fetchColumn();
     $pendingAdminReqs   = $db->query("SELECT COUNT(*) FROM admin_registration_requests WHERE status='pending'")->fetchColumn();
     $totalMenuItems     = $db->query("SELECT COUNT(*) FROM menu_items")->fetchColumn();
     $lowStockItems      = $db->query("SELECT COUNT(*) FROM menu_items WHERE stock <= min_stock AND stock > 0")->fetchColumn();
@@ -341,6 +355,23 @@ function handleSARequests() {
     requireSuperAdmin();
     $db = getDB();
 
+    // Auto-sync: resolve any pending void/refund requests whose orders are already Voided/Refunded
+    // This handles cases where POS approved the void before we tracked it in system_requests
+    try {
+        $db->exec("
+            UPDATE system_requests sr
+            JOIN orders o ON JSON_UNQUOTE(JSON_EXTRACT(sr.payload, '\$.order_id')) = CAST(o.id AS CHAR)
+            SET sr.status = 'approved',
+                sr.reviewed_at = COALESCE(sr.reviewed_at, NOW()),
+                sr.review_note = COALESCE(NULLIF(sr.review_note, ''), 'Approved in POS')
+            WHERE sr.status = 'pending'
+              AND sr.type IN ('void_order', 'refund_order')
+              AND o.status IN ('Voided', 'Refunded')
+        ");
+    } catch (Throwable $_e) {
+        error_log('SA auto-sync error: ' . $_e->getMessage());
+    }
+
     $status = $_GET['status'] ?? 'all';
     $type   = $_GET['type']   ?? 'all';
 
@@ -358,18 +389,56 @@ function handleSARequests() {
         FROM system_requests r
         LEFT JOIN users u ON u.id = r.reviewed_by
         $whereClause
-        ORDER BY r.created_at ASC
+        ORDER BY r.created_at DESC
         LIMIT 200
     ");
     $stmt->execute($params);
     $requests = $stmt->fetchAll();
 
+    // PHP-side deduplication: for pending void/refund requests, collapse duplicates
+    // into one row (the latest) and expose a resend_count so the UI can show a badge
+    if (empty($type) || $type === 'all' || in_array($type, ['void_order','refund_order'])) {
+        $deduped  = [];
+        $countMap = [];
+        foreach ($requests as $req) {
+            if ($req['status'] === 'pending' && in_array($req['type'], ['void_order','refund_order'])) {
+                $pl  = json_decode($req['payload'] ?? '{}', true);
+                $key = $req['type'] . '__' . strval($pl['order_id'] ?? '');
+                if (!isset($deduped[$key])) {
+                    $countMap[$key] = 0;
+                    $deduped[$key]  = $req;
+                }
+                $countMap[$key]++;
+                // keep the highest-id (most recent) row
+                if ($req['id'] > $deduped[$key]['id']) {
+                    $deduped[$key] = $req;
+                }
+            } else {
+                $deduped['_' . $req['id']] = $req;
+            }
+        }
+        $finalRequests = [];
+        foreach ($deduped as $key => $req) {
+            $req['resend_count'] = $countMap[$key] ?? 1;
+            $finalRequests[] = $req;
+        }
+        // sort newest first
+        usort($finalRequests, fn($a, $b) => strcmp($b['created_at'], $a['created_at']));
+        $requests = $finalRequests;
+    } else {
+        // For non-dedup views just inject resend_count = 1
+        $requests = array_map(fn($r) => array_merge(['resend_count' => 1], $r), $requests);
+    }
+
+    // Clean up security warnings from system requests (they belong in audit logs)
+    $db->exec("DELETE FROM system_requests WHERE title LIKE 'Security Warning%' OR JSON_UNQUOTE(JSON_EXTRACT(payload, '\$.type')) = 'account_lockout'");
+
     // Clean up any approved admin requests where the admin was deleted from users
     $db->exec("DELETE FROM admin_registration_requests WHERE status='approved' AND username NOT IN (SELECT username FROM users)");
 
-    // Also get pending admin registration requests
+    // Also get pending registration requests
     $adminReqs = $db->query("
-        SELECT id, username, full_name, email, status, created_at, approved_at
+        SELECT id, username, full_name, email, COALESCE(role, 'cashier') AS role, status, created_at, approved_at
         FROM admin_registration_requests
         ORDER BY created_at DESC
         LIMIT 100
@@ -392,7 +461,7 @@ function handleSAApproveRequest() {
     $db = getDB();
 
     if ($type === 'admin_reg') {
-        // Approve an admin registration request
+        // Approve a registration request (admin or cashier)
         $stmt = $db->prepare("SELECT * FROM admin_registration_requests WHERE id=? AND status='pending'");
         $stmt->execute([$id]);
         $req = $stmt->fetch();
@@ -408,7 +477,10 @@ function handleSAApproveRequest() {
             jsonResponse(['success' => false, 'message' => 'Username already taken — request auto-rejected.'], 409);
         }
 
-        $db->prepare("INSERT INTO users (username,password,first_name,last_name,middle_initial,suffix,full_name,email,role,is_active) VALUES (?,?,?,?,?,?,?,?,'admin',1)")
+        $role = !empty($req['role']) ? $req['role'] : 'admin';
+        $roleLabel = ucfirst($role);
+
+        $db->prepare("INSERT INTO users (username,password,first_name,last_name,middle_initial,suffix,full_name,email,role,is_active) VALUES (?,?,?,?,?,?,?,?,?,1)")
            ->execute([
                $req['username'],
                $req['password'],
@@ -417,19 +489,45 @@ function handleSAApproveRequest() {
                $req['middle_initial'] ?? null,
                $req['suffix'] ?? null,
                $req['full_name'],
-               $req['email']
+               $req['email'],
+               $role
            ]);
         $db->prepare("UPDATE admin_registration_requests SET status='approved', approved_at=NOW() WHERE id=?")
            ->execute([$id]);
 
-        logAction('approve_admin_registration', 'admin_registration_request', $id, "Approved: {$req['full_name']} ({$req['username']})");
+        logAction('approve_registration', 'admin_registration_request', $id, "Approved: {$req['full_name']} ({$req['username']}, role: {$role})");
 
         // Send confirmation email
         $storeName   = getSetting('store_name') ?: 'ChipiPie Cafe';
-        $confirmBody = "<p>🎉 <strong>{$req['full_name']}</strong>, your admin account has been approved by the Super Administrator! You can now log in.</p>";
-        sendEmail($req['email'], "$storeName — Admin Account Approved", $confirmBody);
+        $posUrl      = "http://" . ($_SERVER['HTTP_HOST'] ?? 'localhost') . "/CHIPIPIE_SYSTEM/chipipie-pos.php";
+        $confirmBody = "
+        <div style='font-family: Segoe UI, -apple-system, BlinkMacSystemFont, Roboto, sans-serif; max-width: 520px; margin: 0 auto; padding: 30px; background: #faf9f7; border-radius: 16px; border: 1px solid #ede8e1;'>
+            <div style='text-align: center; margin-bottom: 24px;'>
+                <div style='display: inline-block; width: 56px; height: 56px; background: #1a5c2e; color: #f5eedc; border-radius: 14px; line-height: 56px; font-size: 26px; box-shadow: 0 4px 12px rgba(26,92,46,0.2);'>🎉</div>
+                <h2 style='color: #2b1f1d; margin: 12px 0 4px; font-size: 22px; font-weight: 700;'>$storeName</h2>
+                <p style='color: #1a5c2e; font-size: 13px; margin: 0; font-weight: 600; text-transform: uppercase; letter-spacing: 1px;'>Account Approved</p>
+            </div>
+            <div style='background: #ffffff; border-radius: 14px; padding: 26px; border: 1px solid #e7e2da; box-shadow: 0 2px 8px rgba(0,0,0,0.04);'>
+                <p style='color: #292524; font-size: 15px; margin-top: 0;'>Hello <strong>" . htmlspecialchars($req['full_name']) . "</strong>,</p>
+                <p style='color: #57534e; font-size: 14px; line-height: 1.5;'>Great news! Your <strong>{$roleLabel}</strong> account registration has been reviewed and <strong style='color:#1a5c2e;'>approved</strong> by the Super Administrator.</p>
+                
+                <div style='background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 10px; padding: 14px 18px; margin: 20px 0;'>
+                    <div style='font-size: 13px; color: #64748b; margin-bottom: 4px;'>Assigned Role: <strong style='color:#0f172a;'>{$roleLabel}</strong></div>
+                    <div style='font-size: 13px; color: #64748b; margin-bottom: 4px;'>Username: <strong style='color:#0f172a; font-family: monospace;'>{$req['username']}</strong></div>
+                    <div style='font-size: 13px; color: #64748b;'>Registered Email: <strong style='color:#0f172a;'>{$req['email']}</strong></div>
+                </div>
 
-        jsonResponse(['success' => true, 'message' => "Admin '{$req['full_name']}' approved and account created!"]);
+                <p style='color: #57534e; font-size: 14px; line-height: 1.5;'>You can now log in to the POS system using your registered credentials:</p>
+                <div style='text-align: center; margin: 24px 0 10px;'>
+                    <a href='$posUrl' style='display: inline-block; background: #5c3d2e; color: #ffffff; padding: 12px 28px; border-radius: 10px; text-decoration: none; font-weight: 600; font-size: 14px; box-shadow: 0 4px 12px rgba(92,61,46,0.25);'>
+                        ☕ Open POS System & Sign In
+                    </a>
+                </div>
+            </div>
+        </div>";
+        jsonResponseAndContinue(['success' => true, 'message' => "{$roleLabel} '{$req['full_name']}' approved and account created!"]);
+        sendEmail($req['email'], "$storeName — {$roleLabel} Account Approved", $confirmBody);
+        exit;
     } else {
         // Approve a system_requests entry
         $stmt = $db->prepare("SELECT * FROM system_requests WHERE id=? AND status='pending'");
@@ -535,6 +633,20 @@ function handleSAApproveRequest() {
                 }
                 break;
 
+            case 'registration_delete':
+                $requestId = intval($payload['request_id'] ?? 0);
+                if ($requestId) {
+                    $targetReq = $db->prepare("SELECT full_name, username FROM admin_registration_requests WHERE id=?");
+                    $targetReq->execute([$requestId]);
+                    $reg = $targetReq->fetch();
+                    $db->prepare("DELETE FROM admin_registration_requests WHERE id=?")->execute([$requestId]);
+                    $nameStr = $reg ? $reg['full_name'] : ($payload['name'] ?? "ID #$requestId");
+                    $message = "Registration request for '{$nameStr}' permanently removed.";
+                } else {
+                    $message = "Registration request removed.";
+                }
+                break;
+
             case 'menu_change':
                 $act = $payload['action'] ?? ($payload['item_id'] ? 'delete' : 'add');
                 if ($act === 'add') {
@@ -600,9 +712,32 @@ function handleSARejectRequest() {
         $req = $stmt->fetch();
         if (!$req) jsonResponse(['success' => false, 'message' => 'Not found.'], 404);
 
+        $role = !empty($req['role']) ? $req['role'] : 'cashier';
+        $roleLabel = ucfirst($role);
+
         $db->prepare("UPDATE admin_registration_requests SET status='rejected' WHERE id=?")->execute([$id]);
-        logAction('reject_admin_registration', 'admin_registration_request', $id, "Rejected: {$req['full_name']}");
-        jsonResponse(['success' => true, 'message' => "Admin request from '{$req['full_name']}' rejected."]);
+        logAction('reject_registration', 'admin_registration_request', $id, "Rejected {$role}: {$req['full_name']}");
+
+        // Send polite rejection notice email to applicant
+        $storeName  = getSetting('store_name') ?: 'ChipiPie Cafe';
+        $reasonText = $note ? "<div style='background: #fffbeb; border: 1px solid #fef3c7; border-radius: 8px; padding: 10px 14px; color: #92400e; font-size: 13px; margin: 16px 0;'><strong>Reviewer Note:</strong> " . htmlspecialchars($note) . "</div>" : "";
+        $rejectBody = "
+        <div style='font-family: Segoe UI, -apple-system, BlinkMacSystemFont, Roboto, sans-serif; max-width: 520px; margin: 0 auto; padding: 30px; background: #faf9f7; border-radius: 16px; border: 1px solid #ede8e1;'>
+            <div style='text-align: center; margin-bottom: 24px;'>
+                <div style='display: inline-block; width: 56px; height: 56px; background: #854d0e; color: #fef08a; border-radius: 14px; line-height: 56px; font-size: 26px; box-shadow: 0 4px 12px rgba(133,77,14,0.2);'>📋</div>
+                <h2 style='color: #2b1f1d; margin: 12px 0 4px; font-size: 22px; font-weight: 700;'>$storeName</h2>
+                <p style='color: #854d0e; font-size: 13px; margin: 0; font-weight: 600; text-transform: uppercase; letter-spacing: 1px;'>Registration Status Update</p>
+            </div>
+            <div style='background: #ffffff; border-radius: 14px; padding: 26px; border: 1px solid #e7e2da; box-shadow: 0 2px 8px rgba(0,0,0,0.04);'>
+                <p style='color: #292524; font-size: 15px; margin-top: 0;'>Hello <strong>" . htmlspecialchars($req['full_name']) . "</strong>,</p>
+                <p style='color: #57534e; font-size: 14px; line-height: 1.5;'>Thank you for your interest. We regret to inform you that your registration request for a <strong>{$roleLabel}</strong> account was not approved at this time.</p>
+                $reasonText
+                <p style='font-size: 12px; color: #a8a29e; margin-top: 18px; margin-bottom: 0;'>If you believe this decision was made in error, please contact your store management.</p>
+            </div>
+        </div>";
+        jsonResponseAndContinue(['success' => true, 'message' => "{$roleLabel} registration request from '{$req['full_name']}' rejected."]);
+        sendEmail($req['email'], "$storeName — {$roleLabel} Registration Update", $rejectBody);
+        exit;
     } else {
         $stmt = $db->prepare("SELECT * FROM system_requests WHERE id=? AND status='pending'");
         $stmt->execute([$id]);
@@ -678,14 +813,43 @@ function handleSACreateUser() {
         jsonResponse(['success' => false, 'message' => 'This email address is already registered to an existing account.'], 409);
     }
 
-    $hashed = password_hash($password, PASSWORD_BCRYPT);
+    $hashed = password_hash($password, PASSWORD_BCRYPT, ['cost' => 9]);
     $db->prepare("INSERT INTO users (username,password,first_name,last_name,middle_initial,suffix,full_name,email,role,is_active) VALUES (?,?,?,?,?,?,?,?,1)")
        ->execute([$username, $hashed, $first_name ?: null, $last_name ?: null, $middle_initial ?: null, $suffix ?: null, $full_name, $email, $role]);
 
     $newId = $db->lastInsertId();
     logAction('create_user', 'user', $newId, "Created $role: $full_name ($username)");
 
-    jsonResponse(['success' => true, 'message' => "User '$full_name' created as $role.", 'user_id' => $newId]);
+    // Send welcome / activation email to user
+    $storeName = getSetting('store_name') ?: 'ChipiPie Cafe';
+    $roleLabel = ucfirst($role);
+    $posUrl    = "http://" . ($_SERVER['HTTP_HOST'] ?? 'localhost') . "/CHIPIPIE_SYSTEM/chipipie-pos.php";
+    $welcomeBody = "
+    <div style='font-family: Segoe UI, -apple-system, BlinkMacSystemFont, Roboto, sans-serif; max-width: 520px; margin: 0 auto; padding: 30px; background: #faf9f7; border-radius: 16px; border: 1px solid #ede8e1;'>
+        <div style='text-align: center; margin-bottom: 24px;'>
+            <div style='display: inline-block; width: 56px; height: 56px; background: #5c3d2e; color: #f5eedc; border-radius: 14px; line-height: 56px; font-size: 26px; box-shadow: 0 4px 12px rgba(92,61,46,0.2);'>👋</div>
+            <h2 style='color: #2b1f1d; margin: 12px 0 4px; font-size: 22px; font-weight: 700;'>$storeName</h2>
+            <p style='color: #8c7365; font-size: 13px; margin: 0; font-weight: 600; text-transform: uppercase; letter-spacing: 1px;'>Welcome to the Team</p>
+        </div>
+        <div style='background: #ffffff; border-radius: 14px; padding: 26px; border: 1px solid #e7e2da; box-shadow: 0 2px 8px rgba(0,0,0,0.04);'>
+            <p style='color: #292524; font-size: 15px; margin-top: 0;'>Hello <strong>" . htmlspecialchars($full_name) . "</strong>,</p>
+            <p style='color: #57534e; font-size: 14px; line-height: 1.5;'>Your <strong>{$roleLabel}</strong> account has been created by the Super Administrator.</p>
+            <div style='background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 10px; padding: 14px 18px; margin: 20px 0;'>
+                <div style='font-size: 13px; color: #64748b; margin-bottom: 4px;'>Role: <strong style='color:#0f172a;'>{$roleLabel}</strong></div>
+                <div style='font-size: 13px; color: #64748b; margin-bottom: 4px;'>Username: <strong style='color:#0f172a; font-family: monospace;'>{$username}</strong></div>
+                <div style='font-size: 13px; color: #64748b;'>Email: <strong style='color:#0f172a;'>{$email}</strong></div>
+            </div>
+            <p style='color: #57534e; font-size: 14px; line-height: 1.5;'>You can now sign in at the POS system:</p>
+            <div style='text-align: center; margin: 24px 0 10px;'>
+                <a href='$posUrl' style='display: inline-block; background: #5c3d2e; color: #ffffff; padding: 12px 28px; border-radius: 10px; text-decoration: none; font-weight: 600; font-size: 14px; box-shadow: 0 4px 12px rgba(92,61,46,0.25);'>
+                    ☕ Sign In to POS System
+                </a>
+            </div>
+        </div>
+    </div>";
+    jsonResponseAndContinue(['success' => true, 'message' => "User '$full_name' created as $role.", 'user_id' => $newId]);
+    sendEmail($email, "$storeName — {$roleLabel} Account Created", $welcomeBody);
+    exit;
 }
 
 function handleSAUpdateUser() {
@@ -770,7 +934,7 @@ function handleSAResetPassword() {
         jsonResponse(['success' => false, 'message' => 'Cannot reset another super admin password.'], 403);
     }
 
-    $hashed = password_hash($newPass, PASSWORD_BCRYPT);
+    $hashed = password_hash($newPass, PASSWORD_BCRYPT, ['cost' => 9]);
     $db->prepare("UPDATE users SET password=? WHERE id=?")->execute([$hashed, $userId]);
 
     logAction('reset_password', 'user', $userId, "Password reset for: {$user['username']}");
@@ -817,19 +981,17 @@ function handleSADeleteAdminRequest() {
     }
 
     $db = getDB();
-    $stmt = $db->prepare("SELECT id, username, full_name, status FROM admin_registration_requests WHERE id=?");
+    $stmt = $db->prepare("SELECT id, username, full_name, status, role FROM admin_registration_requests WHERE id=?");
     $stmt->execute([$id]);
     $req = $stmt->fetch();
     if (!$req) {
-        jsonResponse(['success' => false, 'message' => 'Admin request not found.'], 404);
+        jsonResponse(['success' => false, 'message' => 'Registration request not found.'], 404);
     }
-    if ($req['status'] !== 'approved') {
-        jsonResponse(['success' => false, 'message' => 'Cannot delete an admin request that is not yet approved.'], 400);
-    }
+    // Super Admin can delete any registration request (pending, approved, or rejected)
 
     $db->prepare("DELETE FROM admin_registration_requests WHERE id=?")->execute([$id]);
-    logAction('delete_admin_registration_request', 'admin_registration_request', $id, "Deleted admin request: {$req['full_name']} ({$req['username']})");
-    jsonResponse(['success' => true, 'message' => "Admin request for '{$req['full_name']}' permanently removed."]);
+    logAction('delete_registration_request', 'admin_registration_request', $id, "Deleted registration request: {$req['full_name']} ({$req['username']})");
+    jsonResponse(['success' => true, 'message' => "Registration request for '{$req['full_name']}' permanently removed."]);
 }
 
 // =====================================================
@@ -1156,7 +1318,7 @@ function handleSubmitRequest() {
     $description = trim($input['description'] ?? '');
     $payload     = $input['payload']          ?? null;
 
-    $validTypes = ['admin_approval','void_order','refund_order','menu_change','setting_change','user_deactivate','user_activate','user_delete','other'];
+    $validTypes = ['admin_approval','void_order','refund_order','menu_change','setting_change','user_deactivate','user_activate','user_delete','registration_delete','other'];
     if (!in_array($type, $validTypes)) {
         jsonResponse(['success' => false, 'message' => 'Invalid request type.'], 400);
     }

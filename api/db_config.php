@@ -73,6 +73,43 @@ function jsonResponse($data, $statusCode = 200) {
 }
 
 /**
+ * Send JSON response immediately to browser and close HTTP connection,
+ * allowing long-running tasks (such as SMTP email delivery) to complete in the background.
+ */
+function jsonResponseAndContinue($data, $statusCode = 200) {
+    if (headers_sent()) {
+        jsonResponse($data, $statusCode);
+    }
+
+    if (session_status() === PHP_SESSION_ACTIVE) {
+        session_write_close();
+    }
+
+    ignore_user_abort(true);
+    set_time_limit(60);
+
+    http_response_code($statusCode);
+    header('Content-Type: application/json');
+    header('Connection: close');
+
+    while (ob_get_level() > 0) {
+        @ob_end_clean();
+    }
+
+    ob_start();
+    echo json_encode($data);
+    $size = ob_get_length();
+    header("Content-Length: {$size}");
+    ob_end_flush();
+    @ob_flush();
+    flush();
+
+    if (function_exists('fastcgi_finish_request')) {
+        fastcgi_finish_request();
+    }
+}
+
+/**
  * Get JSON POST body
  */
 function getJsonInput() {
@@ -84,9 +121,10 @@ function getJsonInput() {
 /**
  * Ensure sessions table exists in TiDB/MySQL
  */
-function ensureSessionTable() {
-    static $ensured = false;
-    if ($ensured) return;
+function ensureSessionTable($force = false) {
+    static $ensured = true; // Optimistic: session table already verified in DB
+    if ($ensured && !$force) return;
+    $ensured = true;
     try {
         $db = getDB();
         $db->exec("CREATE TABLE IF NOT EXISTS php_sessions (
@@ -95,6 +133,21 @@ function ensureSessionTable() {
             last_activity INT NOT NULL,
             INDEX idx_last_activity (last_activity)
         ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci");
+    } catch (Exception $e) {}
+}
+
+/**
+ * Ensure role column exists in admin_registration_requests
+ */
+function ensureRegistrationRequestsRoleColumn($pdo = null) {
+    static $ensured = false;
+    if ($ensured) return;
+    try {
+        $db = $pdo ?: getDB();
+        $cols = $db->query("SHOW COLUMNS FROM admin_registration_requests LIKE 'role'")->fetchAll();
+        if (empty($cols)) {
+            $db->exec("ALTER TABLE admin_registration_requests ADD COLUMN role VARCHAR(20) NOT NULL DEFAULT 'cashier' AFTER email");
+        }
         $ensured = true;
     } catch (Exception $e) {}
 }
@@ -158,22 +211,87 @@ function registerDbSessionHandler() {
 }
 
 /**
- * Start session with TiDB persistence and cookie/header support
+ * Detect whether current request belongs to the dedicated Super Admin Portal or the POS System
  */
+function getPortalContext() {
+    // 1. Explicit Header sent by fetch / AJAX
+    $header = strtolower(trim($_SERVER['HTTP_X_PORTAL'] ?? ''));
+    if ($header === 'superadmin' || $header === 'sa') return 'superadmin';
+    if ($header === 'pos') return 'pos';
+
+    // 2. Query or Post parameter
+    $param = strtolower(trim($_GET['portal'] ?? ($_POST['portal'] ?? '')));
+    if ($param === 'superadmin' || $param === 'sa') return 'superadmin';
+    if ($param === 'pos') return 'pos';
+
+    // 3. Redirect parameter
+    $redirect = strtolower(trim($_GET['redirect'] ?? ''));
+    if (strpos($redirect, 'superadmin') !== false) return 'superadmin';
+
+    // 4. Script filename or Request URI inspection
+    $script = strtolower(basename($_SERVER['SCRIPT_NAME'] ?? ''));
+    $uri    = strtolower($_SERVER['REQUEST_URI'] ?? '');
+    if (strpos($script, 'superadmin') !== false || strpos($uri, 'superadmin') !== false) {
+        return 'superadmin';
+    }
+
+    return 'pos';
+}
+
+/**
+ * Start session with TiDB persistence, distinct session isolation (POS vs Super Admin), and cookie/header support
+ */
+/**
+ * Synchronize a companion session for the other portal so Super Admin can be logged into both portals simultaneously
+ */
+function syncCompanionSession($user, $targetPortal) {
+    $sessName = ($targetPortal === 'superadmin') ? 'CHIPIPIE_SA_SESS' : 'CHIPIPIE_POS_SESS';
+    $prefix   = ($targetPortal === 'superadmin') ? 'sa' : 'pos';
+    $newSid   = $prefix . bin2hex(random_bytes(16));
+    $userId   = $user['id'] ?? ($user['user_id'] ?? 0);
+    $data = serialize([
+        'user_id'   => $userId,
+        'username'  => $user['username'] ?? '',
+        'full_name' => $user['full_name'] ?? '',
+        'email'     => $user['email'] ?? '',
+        'role'      => $user['role'] ?? 'super_admin'
+    ]);
+    try {
+        $db = getDB();
+        $db->prepare("REPLACE INTO php_sessions (id, data, last_activity) VALUES (?, ?, ?)")
+           ->execute([$newSid, $data, time()]);
+        $isHttps = (!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off')
+            || (isset($_SERVER['HTTP_X_FORWARDED_PROTO']) && $_SERVER['HTTP_X_FORWARDED_PROTO'] === 'https')
+            || (isset($_SERVER['SERVER_PORT']) && $_SERVER['SERVER_PORT'] == 443);
+        setcookie($sessName, $newSid, [
+            'expires'  => time() + 86400 * 7,
+            'path'     => '/',
+            'domain'   => '',
+            'secure'   => $isHttps,
+            'httponly' => true,
+            'samesite' => 'Lax'
+        ]);
+    } catch (Exception $e) {}
+    return $newSid;
+}
 function ensureSession() {
     if (session_status() === PHP_SESSION_ACTIVE) {
         return;
     }
 
+    // Dedicated session name: CHIPIPIE_SA_SESS for Super Admin, CHIPIPIE_POS_SESS for POS
+    $portal = getPortalContext();
+    $cookieName = ($portal === 'superadmin') ? 'CHIPIPIE_SA_SESS' : 'CHIPIPIE_POS_SESS';
+    session_name($cookieName);
+
     // Check for session ID in header or query param if cookie is missing
-    $cookieName = session_name();
     if (empty($_COOKIE[$cookieName])) {
         $altId = $_SERVER['HTTP_X_SESSION_ID'] 
             ?? $_SERVER['HTTP_AUTHORIZATION'] 
             ?? ($_GET['session_id'] ?? '');
         if ($altId) {
             $altId = preg_replace('/^Bearer\s+/i', '', trim($altId));
-            if (preg_match('/^[a-zA-Z0-9,-]{16,128}$/', $altId)) {
+            if (preg_match('/^[a-zA-Z0-9,_-]{16,128}$/', $altId)) {
                 session_id($altId);
             }
         }
@@ -287,8 +405,13 @@ function isValidSendableEmail($email) {
     if (str_ends_with($domain, '.chipipiecafe.com') || str_ends_with($domain, '.example.com')) return false;
 
     // Verify domain has active DNS MX or A records on the internet
+    // Cache results per-domain within this request to avoid duplicate DNS round-trips
     if (function_exists('checkdnsrr')) {
-        if (!@checkdnsrr($domain, 'MX') && !@checkdnsrr($domain, 'A')) {
+        static $dnsCache = [];
+        if (!array_key_exists($domain, $dnsCache)) {
+            $dnsCache[$domain] = (@checkdnsrr($domain, 'MX') || @checkdnsrr($domain, 'A'));
+        }
+        if (!$dnsCache[$domain]) {
             return false;
         }
     }
@@ -318,7 +441,8 @@ function sendEmail($to, $subject, $body) {
 
     try {
         // Open SSL socket directly to Gmail SMTP
-        $socket = fsockopen(SMTP_HOST, SMTP_PORT, $errno, $errstr, 10);
+        $socket = fsockopen(SMTP_HOST, SMTP_PORT, $errno, $errstr, 8);
+        if ($socket) stream_set_timeout($socket, 8);
         if (!$socket) throw new Exception("Socket error $errno: $errstr");
 
         $read = function() use ($socket, &$smtpLog) {
@@ -376,14 +500,46 @@ function sendEmail($to, $subject, $body) {
 }
 
 /**
- * Get a system setting
+ * Load all system settings into a static in-memory cache (one DB round-trip per request).
+ * @internal Called lazily on the first getSetting() / getSettings() call.
+ */
+function _loadSettingsCache() {
+    static $cache = null;
+    static $loaded = false;
+    if ($loaded) return $cache;
+    $loaded = true;
+    try {
+        $db = getDB();
+        $rows = $db->query("SELECT setting_key, setting_value FROM system_settings")->fetchAll();
+        $cache = [];
+        foreach ($rows as $r) {
+            $cache[$r['setting_key']] = $r['setting_value'];
+        }
+    } catch (Exception $e) {
+        $cache = [];
+    }
+    return $cache;
+}
+
+/**
+ * Get a system setting (cached — only one DB query per PHP request regardless of how many times called)
  */
 function getSetting($key) {
-    $db = getDB();
-    $stmt = $db->prepare("SELECT setting_value FROM system_settings WHERE setting_key = ?");
-    $stmt->execute([$key]);
-    $row = $stmt->fetch();
-    return $row ? $row['setting_value'] : null;
+    $cache = _loadSettingsCache();
+    return $cache[$key] ?? null;
+}
+
+/**
+ * Get multiple system settings at once from the cache.
+ * Returns an associative array of key => value. Missing keys return the provided default.
+ */
+function getSettings(array $keys, $default = null) {
+    $cache = _loadSettingsCache();
+    $result = [];
+    foreach ($keys as $k) {
+        $result[$k] = $cache[$k] ?? $default;
+    }
+    return $result;
 }
 
 // =====================================================
@@ -416,9 +572,10 @@ function getClientIP() {
 /**
  * Ensure rate_limits table exists in database
  */
-function ensureRateLimitTable() {
-    static $ensured = false;
-    if ($ensured) return;
+function ensureRateLimitTable($force = false) {
+    static $ensured = true; // Optimistic: table & columns already verified in DB
+    if ($ensured && !$force) return;
+    $ensured = true;
     try {
         $db = getDB();
         $db->exec("CREATE TABLE IF NOT EXISTS rate_limits (
@@ -435,16 +592,7 @@ function ensureRateLimitTable() {
             INDEX idx_action_id (action, identifier),
             INDEX idx_locked_until (locked_until)
         ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci");
-
-        // Ensure lockout_count exists for upgrades
-        $cols = $db->query("SHOW COLUMNS FROM rate_limits LIKE 'lockout_count'")->fetchAll();
-        if (empty($cols)) {
-            $db->exec("ALTER TABLE rate_limits ADD COLUMN lockout_count INT NOT NULL DEFAULT 0 AFTER hits");
-        }
-        $ensured = true;
-    } catch (Exception $e) {
-        // Table might already exist or DB error
-    }
+    } catch (Exception $e) {}
 }
 
 /**
@@ -680,7 +828,7 @@ if ($origin) {
     header('Access-Control-Allow-Origin: *');
 }
 header('Access-Control-Allow-Methods: GET, POST, PUT, DELETE, OPTIONS');
-header('Access-Control-Allow-Headers: Content-Type, Authorization, X-Session-Id, X-Requested-With');
+header('Access-Control-Allow-Headers: Content-Type, Authorization, X-Session-Id, X-Requested-With, X-Portal');
 
 if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS') {
     http_response_code(200);

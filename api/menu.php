@@ -356,8 +356,6 @@ function handleRequestAddMenu() {
     $stmt = $db->prepare("INSERT INTO system_requests (type, requested_by, requester_name, title, description, payload, approval_token, status) VALUES (?, ?, ?, ?, ?, ?, ?, 'pending')");
     $stmt->execute(['menu_change', $userId, $requester, $title, $desc, json_encode($payload), $approvalToken]);
 
-    sendMenuRequestEmail('add', $payload, $requester, $approvalToken, $userRole);
-
     $isCashier = ($userRole === 'cashier');
 
     $resp = [
@@ -371,7 +369,13 @@ function handleRequestAddMenu() {
     if (DEV_MODE && !$isCashier) {
         $resp['dev_token'] = $pinCode;
     }
-    jsonResponse($resp);
+
+    // Flush response to browser immediately (<50ms) so PIN/authorization code appears instantly
+    jsonResponseAndContinue($resp);
+
+    // Deliver notification emails in background
+    sendMenuRequestEmail('add', $payload, $requester, $approvalToken, $userRole);
+    exit;
 }
 
 function handleRequestDeleteMenu() {
@@ -464,8 +468,6 @@ function handleRequestDeleteMenu() {
     $stmt = $db->prepare("INSERT INTO system_requests (type, requested_by, requester_name, title, description, payload, approval_token, status) VALUES (?, ?, ?, ?, ?, ?, ?, 'pending')");
     $stmt->execute(['menu_change', $userId, $requester, $title, $desc, json_encode($payload), $approvalToken]);
 
-    sendMenuRequestEmail('delete', $payload, $requester, $approvalToken, $userRole);
-
     $resp = [
         'success'        => true,
         'message'        => "Request to remove '{$item['name']}' sent to admin email for approval.",
@@ -474,7 +476,13 @@ function handleRequestDeleteMenu() {
     if (DEV_MODE) {
         $resp['dev_token'] = $pinCode;
     }
-    jsonResponse($resp);
+
+    // Flush response to browser immediately (<50ms) so deletion token appears instantly
+    jsonResponseAndContinue($resp);
+
+    // Deliver notification emails in background
+    sendMenuRequestEmail('delete', $payload, $requester, $approvalToken, $userRole);
+    exit;
 }
 
 function handleCancelDeleteMenu() {
