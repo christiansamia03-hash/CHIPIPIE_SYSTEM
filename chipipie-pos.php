@@ -5292,7 +5292,7 @@
       const target = document.querySelector(cardSelector || '#login-wrapper .login-card, #sa-login-screen .sa-login-card');
       if (!target) return;
 
-      // 1. FIX: Restore correct step visibility inside the card
+      // 1. Restore correct step visibility inside the card
       const sCreds     = target.querySelector('#pos-step-credentials, #sa-step-credentials');
       const s2fa       = target.querySelector('#pos-step-2fa, #sa-step-2fa');
       const sForgotReq = target.querySelector('#pos-step-forgot-request, #sa-step-forgot');
@@ -5332,7 +5332,7 @@
         document.head.appendChild(sty);
       }
       sty.textContent = `
-        /* Cartoon Cat fully visible resting on card top rim */
+        /* Cartoon Cat stage resting on card top rim */
         .cartoon-cat-stage {
           position: absolute;
           bottom: 100%;
@@ -5342,6 +5342,13 @@
           height: 195px; /* 471x382 aspect ratio */
           pointer-events: none;
           z-index: 25;
+        }
+        /* Clip container for cat head so it naturally rises from behind the card rim */
+        .cartoon-cat-head-wrap {
+          position: absolute;
+          inset: 0;
+          clip-path: inset(-120px -100px 0px -100px);
+          pointer-events: none;
         }
         .cartoon-cat-head-img {
           position: absolute;
@@ -5424,7 +5431,29 @@
         .cat-blinking .cat-eyelid {
           transform: translateY(0%) !important;
         }
-        /* Resting Rim Paws */
+        /* Climbing Reaching Arms (animated when newly opened) */
+        .climb-paw-arm {
+          position: absolute;
+          width: 58px;
+          height: 104px;
+          bottom: -4px;
+          background-size: contain;
+          background-repeat: no-repeat;
+          background-position: center top;
+          pointer-events: none;
+          filter: drop-shadow(0 2px 6px rgba(0,0,0,0.45));
+          z-index: 30;
+          opacity: 0;
+        }
+        .climb-paw-left {
+          left: 8px;
+          background-image: url('assets/img/cat-pink-arm-left.png');
+        }
+        .climb-paw-right {
+          right: 8px;
+          background-image: url('assets/img/cat-pink-arm-right.png');
+        }
+        /* Resting Rim Paws (hook over card rim) */
         .rim-paw {
           position: absolute;
           width: 56px;
@@ -5444,7 +5473,7 @@
           right: 4px;
           background-image: url('assets/img/cartoon-paw-right.png');
         }
-        /* Pink Paw Fluffy Arms reaching up to cover eyes */
+        /* Pink Paw Fluffy Arms reaching up to cover eyes (password focus) */
         .cat-arms-container {
           position: absolute;
           inset: 0;
@@ -5477,10 +5506,12 @@
           transform-origin: 70% 95%;
           transform: translateY(60px) rotate(20deg) scale(0.85);
         }
-        /* Covering eyes active state: both arms cover eyes */
+        /* Covering eyes active state: resting rim paws MUST disappear completely! */
         .cat-covering-eyes .rim-paw {
-          opacity: 0;
-          transform: translateY(6px) scale(0.8);
+          opacity: 0 !important;
+          visibility: hidden !important;
+          transform: translateY(10px) scale(0.6) !important;
+          pointer-events: none !important;
         }
         .cat-covering-eyes .pink-arm-left {
           opacity: 1;
@@ -5503,29 +5534,7 @@
         catStage.id = 'cartoon-peeking-cat';
         catStage.className = 'cartoon-cat-stage';
         catStage.innerHTML = `
-          <div class="cartoon-cat-head-img">
-            <div class="cat-eye-socket cat-eye-left">
-              <div class="cat-pupil cat-pupil-left"></div>
-              <div class="cat-eyelid"></div>
-            </div>
-            <div class="cat-eye-socket cat-eye-right">
-              <div class="cat-pupil cat-pupil-right"></div>
-              <div class="cat-eyelid"></div>
-            </div>
-          </div>
-          <!-- Resting Rim Paws -->
-          <div class="rim-paw rim-paw-left"></div>
-          <div class="rim-paw rim-paw-right"></div>
-          <!-- Pink Paw Fluffy Arms inside stage-clipped viewport -->
-          <div class="cat-arms-container">
-            <div class="pink-arm pink-arm-left"></div>
-            <div class="pink-arm pink-arm-right"></div>
-          </div>
-        `;
-        target.prepend(catStage);
-      } else {
-        if (!catStage.querySelector('.cat-eye-socket')) {
-          catStage.innerHTML = `
+          <div class="cartoon-cat-head-wrap">
             <div class="cartoon-cat-head-img">
               <div class="cat-eye-socket cat-eye-left">
                 <div class="cat-pupil cat-pupil-left"></div>
@@ -5536,7 +5545,39 @@
                 <div class="cat-eyelid"></div>
               </div>
             </div>
-            <!-- Resting Rim Paws -->
+          </div>
+          <!-- Climbing Reaching Arms (animated when newly opened) -->
+          <div class="climb-paw-arm climb-paw-left"></div>
+          <div class="climb-paw-arm climb-paw-right"></div>
+          <!-- Resting Rim Clinging Paws -->
+          <div class="rim-paw rim-paw-left"></div>
+          <div class="rim-paw rim-paw-right"></div>
+          <!-- Pink Paw Fluffy Arms inside stage-clipped viewport (password focus) -->
+          <div class="cat-arms-container">
+            <div class="pink-arm pink-arm-left"></div>
+            <div class="pink-arm pink-arm-right"></div>
+          </div>
+        `;
+        target.prepend(catStage);
+      } else {
+        if (!catStage.querySelector('.cat-eye-socket')) {
+          catStage.innerHTML = `
+            <div class="cartoon-cat-head-wrap">
+              <div class="cartoon-cat-head-img">
+                <div class="cat-eye-socket cat-eye-left">
+                  <div class="cat-pupil cat-pupil-left"></div>
+                  <div class="cat-eyelid"></div>
+                </div>
+                <div class="cat-eye-socket cat-eye-right">
+                  <div class="cat-pupil cat-pupil-right"></div>
+                  <div class="cat-eyelid"></div>
+                </div>
+              </div>
+            </div>
+            <!-- Climbing Reaching Arms (animated when newly opened) -->
+            <div class="climb-paw-arm climb-paw-left"></div>
+            <div class="climb-paw-arm climb-paw-right"></div>
+            <!-- Resting Rim Clinging Paws -->
             <div class="rim-paw rim-paw-left"></div>
             <div class="rim-paw rim-paw-right"></div>
             <!-- Pink Paw Fluffy Arms inside stage-clipped viewport -->
@@ -5551,6 +5592,11 @@
       if (catStage.dataset.initialized === 'true') return;
       catStage.dataset.initialized = 'true';
 
+      const headImg   = catStage.querySelector('.cartoon-cat-head-img');
+      const climbL    = catStage.querySelector('.climb-paw-left');
+      const climbR    = catStage.querySelector('.climb-paw-right');
+      const rimL      = catStage.querySelector('.rim-paw-left');
+      const rimR      = catStage.querySelector('.rim-paw-right');
       const pupilL    = catStage.querySelector('.cat-pupil-left');
       const pupilR    = catStage.querySelector('.cat-pupil-right');
       const armRight  = catStage.querySelector('.pink-arm-right');
@@ -5576,7 +5622,6 @@
           }
         }, nextBlink);
       }
-      scheduleBlink();
 
       // 6. Lifelike Micro-Glances (Saccades) during idle
       function scheduleSaccade() {
@@ -5594,15 +5639,95 @@
           scheduleSaccade();
         }, Math.random() * 3500 + 2500);
       }
-      scheduleSaccade();
 
-      // 7. Pupil Offset Helper
+      // 7. Initial Climbing Entrance: Paw reaches -> forms clinging paw -> Cat pulls up!
+      if (typeof gsap !== 'undefined') {
+        gsap.set(headImg, { y: 200, opacity: 1 });
+        gsap.set(rimL, { opacity: 0, scale: 0.7, y: 12 });
+        gsap.set(rimR, { opacity: 0, scale: 0.7, y: 12 });
+        gsap.set(climbL, { opacity: 0, y: 80, rotation: -25, scale: 0.85 });
+        gsap.set(climbR, { opacity: 0, y: 80, rotation: 25, scale: 0.85 });
+
+        const climbTl = gsap.timeline({
+          delay: 0.2,
+          onComplete: () => {
+            gsap.set([climbL, climbR], { display: 'none' });
+            if (rimL) { rimL.style.opacity = ''; rimL.style.transform = ''; rimL.style.visibility = ''; }
+            if (rimR) { rimR.style.opacity = ''; rimR.style.transform = ''; rimR.style.visibility = ''; }
+            scheduleBlink();
+            scheduleSaccade();
+          }
+        });
+
+        // Step 1: First paw (left) reaches up fast from below card rim
+        climbTl.to(climbL, {
+          opacity: 1,
+          y: 10,
+          rotation: -10,
+          duration: 0.28,
+          ease: "back.out(1.5)"
+        })
+        // Step 2: First paw curls down and forms into the clinging paw on the rim
+        .to(climbL, {
+          y: 35,
+          opacity: 0,
+          duration: 0.16,
+          ease: "power2.in"
+        }, "+=0.05")
+        .to(rimL, {
+          opacity: 1,
+          scale: 1,
+          y: 0,
+          duration: 0.16,
+          ease: "back.out(2.0)"
+        }, "<")
+
+        // Step 3: Second paw (right) reaches up fast from below card rim
+        .to(climbR, {
+          opacity: 1,
+          y: 10,
+          rotation: 10,
+          duration: 0.26,
+          ease: "back.out(1.5)"
+        }, "+=0.04")
+        // Step 4: Second paw curls down and forms into the right clinging paw on the rim
+        .to(climbR, {
+          y: 35,
+          opacity: 0,
+          duration: 0.16,
+          ease: "power2.in"
+        }, "+=0.05")
+        .to(rimR, {
+          opacity: 1,
+          scale: 1,
+          y: 0,
+          duration: 0.16,
+          ease: "back.out(2.0)"
+        }, "<")
+
+        // Step 5: With both paws clinging to the rim, cat pulls itself up over the rim!
+        .to(headImg, {
+          y: -7,
+          duration: 0.45,
+          ease: "back.out(1.5)"
+        }, "+=0.04")
+        .to(headImg, {
+          y: 0,
+          duration: 0.20,
+          ease: "power1.inOut"
+        });
+      } else {
+        scheduleBlink();
+        scheduleSaccade();
+      }
+
+      // 8. Pupil Offset Helper
       function setPupils(ox, oy) {
         if (pupilL) pupilL.style.transform = `translate(calc(-50% + ${ox.toFixed(1)}px), calc(-50% + ${oy.toFixed(1)}px))`;
         if (pupilR) pupilR.style.transform = `translate(calc(-50% + ${ox.toFixed(1)}px), calc(-50% + ${oy.toFixed(1)}px))`;
       }
 
-      // 8. Eyes look at input box (Follow typing cursor across)
+      // 9. Eyes look at input box (Follow typing cursor across)
       if (userInput) {
         const updateGaze = () => {
           const len   = userInput.value.length;
@@ -5614,6 +5739,8 @@
           isCoveringEyes = false;
           isPasswordVisible = false;
           catStage.classList.remove('cat-covering-eyes');
+          if (rimL) { rimL.style.opacity = '1'; rimL.style.visibility = 'visible'; }
+          if (rimR) { rimR.style.opacity = '1'; rimR.style.visibility = 'visible'; }
           if (armRight) armRight.classList.remove('arm-peeking');
           updateGaze();
         });
@@ -5623,7 +5750,7 @@
         userInput.addEventListener('input', updateGaze);
       }
 
-      // 9. Centralized Password Paw State Controller
+      // 10. Centralized Password Paw State Controller
       function updatePasswordPawState() {
         const isFocused = (document.activeElement === passInput);
         const isToggleActive = (document.activeElement === passToggle);
@@ -5634,6 +5761,8 @@
           isCoveringEyes = false;
           isPasswordVisible = false;
           catStage.classList.remove('cat-covering-eyes');
+          if (rimL) { rimL.style.opacity = '1'; rimL.style.visibility = 'visible'; }
+          if (rimR) { rimR.style.opacity = '1'; rimR.style.visibility = 'visible'; }
           if (armRight) armRight.classList.remove('arm-peeking');
           return;
         }
@@ -5641,6 +5770,9 @@
         if (isFocused || isToggleActive || isText) {
           isCoveringEyes = true;
           catStage.classList.add('cat-covering-eyes');
+          // Hide resting rim paws completely when paws are up!
+          if (rimL) { rimL.style.opacity = '0'; rimL.style.visibility = 'hidden'; }
+          if (rimR) { rimR.style.opacity = '0'; rimR.style.visibility = 'hidden'; }
 
           if (isText) {
             // SHOW PASSWORD: Only 1 paw (right paw) lowers a little to peek! Left paw stays covering!
@@ -5658,6 +5790,8 @@
           isCoveringEyes = false;
           isPasswordVisible = false;
           catStage.classList.remove('cat-covering-eyes');
+          if (rimL) { rimL.style.opacity = '1'; rimL.style.visibility = 'visible'; }
+          if (rimR) { rimR.style.opacity = '1'; rimR.style.visibility = 'visible'; }
           if (armRight) armRight.classList.remove('arm-peeking');
           setPupils(0, 0);
         }
@@ -5673,7 +5807,7 @@
         });
       }
 
-      // 10. Password Visibility Toggle: PEEK THROUGH 1 PAW!
+      // 11. Password Visibility Toggle: PEEK THROUGH 1 PAW!
       if (passToggle) {
         passToggle.addEventListener('mousedown', (e) => {
           // Prevent clicking the toggle button from stealing focus from password input
