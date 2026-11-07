@@ -1219,6 +1219,7 @@ function handleSASaveSettings() {
         'token_expiry_minutes',
         'superadmin_email',
         'require_superadmin_approval',
+        'require_admin_pos_2fa',
         'void_refund_manager_email',
         'void_refund_admin_ids',
         'rate_limit_enabled',

@@ -1094,7 +1094,7 @@
         <form onsubmit="saHandleLogin(event)">
           <div class="sa-form-row">
             <label class="sa-label">Username <span class="required-star" title="Required">*</span></label>
-            <input type="text" id="sa-login-user" class="sa-input" placeholder="superadmin" autocomplete="username" required>
+            <input type="text" id="sa-login-user" class="sa-input" placeholder="superadmin" autocomplete="username" required maxlength="50" minlength="3" spellcheck="false">
           </div>
           <div class="sa-form-row">
             <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:6px;">
@@ -1846,6 +1846,16 @@
               <div class="sa-form-row">
                 <label class="sa-label">Token Expiry (minutes) <span class="required-star" title="Required">*</span></label>
                 <input type="number" class="sa-input" id="setting-token_expiry_minutes" min="5" max="60">
+              </div>
+              <div class="sa-form-row" style="margin-top:14px;">
+                <label class="sa-label">POS Admin 2FA Requirement</label>
+                <select class="sa-input" id="setting-require_admin_pos_2fa">
+                  <option value="1">Enabled (Require 2FA Online; Auto-Offline Login when Offline)</option>
+                  <option value="0">Disabled (Direct Admin Sign In without 2FA)</option>
+                </select>
+                <div style="font-size:12px;color:var(--sa-muted);margin-top:4px;">
+                  When enabled, admins verify a 6-digit code sent to their email when online. When the POS is offline, admins sign in directly with their password to keep store operations running.
+                </div>
               </div>
             </div>
             <div style="margin-top:8px;">
@@ -5278,6 +5288,7 @@ if (typeof gsap === "undefined") { document.write('<script src="https://cdn.jsde
         'owner_email',
         'superadmin_email',
         'token_expiry_minutes',
+        'require_admin_pos_2fa',
         'void_refund_manager_email',
         'void_refund_admin_ids'
       ];

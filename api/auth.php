@@ -84,6 +84,10 @@ function handleLogin() {
     if (!$username || !$password) {
         jsonResponse(['success' => false, 'message' => 'Username and password are required.'], 400);
     }
+    // ISO 25010 — input validation: enforce username length & format
+    if (strlen($username) > 50) {
+        jsonResponse(['success' => false, 'message' => 'Username must not exceed 50 characters.'], 400);
+    }
 
     // Rate Limiting Checks (batch-load settings in one DB query via cache)
     $cfg            = getSettings(['rate_limit_login_attempts', 'rate_limit_lockout_minutes']);
@@ -213,6 +217,13 @@ function handleLogin() {
     }
     $portal = getPortalContext();
 
+    // Determine offline / online connectivity status
+    $clientOffline = (isset($_SERVER['HTTP_X_OFFLINE']) && $_SERVER['HTTP_X_OFFLINE'] === '1');
+    $isOffline = $clientOffline || !isInternetAvailable();
+    $admin2faSetting = getSetting('require_admin_pos_2fa');
+    // POS Admin 2FA is required only when online AND setting is NOT explicitly disabled ('0')
+    $requireAdmin2fa = ($admin2faSetting !== '0') && !$isOffline;
+
 
 
     // Guard: Prevent POS cashiers/admins from logging into the Super Admin control portal
@@ -225,6 +236,38 @@ function handleLogin() {
 
     // Two-Factor Authentication (2FA) for Super Admin
     if ($user['role'] === 'super_admin') {
+        if ($isOffline) {
+            // Super Admin direct login in Offline Mode
+            ensureSession();
+            $_SESSION['user_id']   = $user['id'];
+            $_SESSION['username']  = $user['username'];
+            $_SESSION['full_name'] = $user['full_name'];
+            $_SESSION['email']     = $user['email'];
+            $_SESSION['role']      = $user['role'];
+
+            $companionPortal = ($portal === 'superadmin') ? 'pos' : 'superadmin';
+            syncCompanionSession($user, $companionPortal);
+
+            try {
+                $db->prepare("INSERT INTO system_logs (actor_id, actor_username, action, target_type, target_id, details, ip_address) VALUES (?, ?, 'superadmin_login_offline', 'user', ?, 'Super Admin logged in offline (2FA bypassed: no internet connectivity)', ?)")
+                   ->execute([$user['id'], $user['username'], $user['id'], $ip]);
+            } catch (Exception $e) {}
+
+            jsonResponse([
+                'success'      => true,
+                'message'      => 'Signed in successfully in Offline Mode.',
+                'offline_mode' => true,
+                'session_id'   => session_id(),
+                'user' => [
+                    'id'        => $user['id'],
+                    'username'  => $user['username'],
+                    'full_name' => $user['full_name'],
+                    'email'     => $user['email'],
+                    'role'      => $user['role'],
+                ]
+            ]);
+        }
+
         ensureSession();
         // Clear any previous fully authenticated session
         unset($_SESSION['user_id'], $_SESSION['username'], $_SESSION['full_name'], $_SESSION['email'], $_SESSION['role']);
@@ -503,6 +546,13 @@ function handleRegister() {
 
     if (!$username || !$password || !$full_name || !$email) {
         jsonResponse(['success' => false, 'message' => 'First name, last name, username, email, and password are required.'], 400);
+    }
+    // ISO 25010 — input validation: username must be 3–50 chars, letters/digits/underscore/hyphen only
+    if (strlen($username) < 3 || strlen($username) > 50) {
+        jsonResponse(['success' => false, 'message' => 'Username must be between 3 and 50 characters.'], 400);
+    }
+    if (!preg_match('/^[a-zA-Z0-9_\-]+$/', $username)) {
+        jsonResponse(['success' => false, 'message' => 'Username may only contain letters, numbers, underscores, and hyphens (no spaces or special characters).'], 400);
     }
 
     $pwdErr = '';
@@ -1314,9 +1364,11 @@ function handleForgotPassword() {
         $targetEmail = $user['email'];
     }
 
-    if (!$targetEmail || !filter_var($targetEmail, FILTER_VALIDATE_EMAIL)) {
-        // Even if no email registered, proceed as if sent
-        jsonResponse($genericSuccess);
+    if (!$targetEmail || !filter_var($targetEmail, FILTER_VALIDATE_EMAIL) || !isValidSendableEmail($targetEmail)) {
+        jsonResponse([
+            'success' => false,
+            'message' => 'No valid email address is registered for this account. Please contact your Super Admin to reset your password directly.'
+        ], 400);
     }
 
     // Generate secure 64-character token

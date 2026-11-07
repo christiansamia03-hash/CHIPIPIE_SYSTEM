@@ -3525,7 +3525,7 @@
         <form onsubmit="handleLogin(event)">
           <div class="mb-3">
             <label class="form-label">Username <span class="required-star" title="Required">*</span></label>
-            <input type="text" id="login-user" class="form-control" required>
+            <input type="text" id="login-user" class="form-control" required maxlength="50" minlength="3" autocomplete="username" spellcheck="false">
           </div>
           <div class="mb-4">
             <div class="d-flex justify-content-between align-items-center mb-1">
@@ -3578,6 +3578,11 @@
             <i class="bi bi-arrow-left"></i> Back to Login
           </button>
         </div>
+        <div class="mt-2 text-center" style="margin-top:10px;">
+          <button type="button" onclick="handlePosCancel2FA()" style="background:none; border:none; color:var(--cafe-brown, #5c3d2e); font-size:12px; cursor:pointer; text-decoration:underline; display:inline-flex; align-items:center; gap:4px;">
+            <i class="bi bi-wifi-off"></i> Offline or no email access? Click to Sign In directly
+          </button>
+        </div>
       </div>
 
       <!-- STEP 3: FORGOT PASSWORD - REQUEST RESET LINK -->
@@ -3593,7 +3598,7 @@
         <form id="pos-forgot-form" onsubmit="handlePosSendForgotLink(event)">
           <div class="mb-3 text-start">
             <label class="form-label" style="font-size:12.5px;">Username or Email <span class="required-star" title="Required">*</span></label>
-            <input type="text" id="pos-forgot-user" class="form-control" placeholder="Enter username or email" required>
+            <input type="text" id="pos-forgot-user" class="form-control" placeholder="Enter username or email" required maxlength="100" spellcheck="false">
           </div>
           <button type="submit" id="pos-forgot-send-btn" class="btn-cafe-primary btn-lg w-100" style="font-size:15px; padding:11px;">
             <i class="bi bi-send-fill me-1"></i> Send Recovery Link
@@ -3719,7 +3724,7 @@
           <div class="col-md-6 col-12">
             <label class="form-label mb-1" style="font-size:12px;font-weight:600;">Username <span class="required-star" title="Required">*</span></label>
             <div style="position:relative;">
-              <input type="text" id="reg-user" class="form-control" placeholder="juandc" required style="padding:7px 10px;font-size:13px;">
+              <input type="text" id="reg-user" class="form-control" placeholder="juandc" required maxlength="50" minlength="3" pattern="[a-zA-Z0-9_\-]+" title="3–50 characters: letters, numbers, underscore or hyphen only." style="padding:7px 10px;font-size:13px;">
               <span id="reg-user-hint" style="display:none;position:absolute;right:10px;top:50%;transform:translateY(-50%);font-size:10px;color:#888;pointer-events:none;">auto-filled</span>
             </div>
           </div>
@@ -4782,7 +4787,7 @@
             <div class="col-md-6 col-12">
               <label class="form-label mb-1" style="font-size:12px;font-weight:600;">Username <span class="required-star" title="Required">*</span></label>
               <div style="position:relative;">
-                <input type="text" class="form-control" id="modal-reg-user" placeholder="juandc" style="padding:7px 10px;font-size:13px;">
+                <input type="text" class="form-control" id="modal-reg-user" placeholder="juandc" maxlength="50" minlength="3" pattern="[a-zA-Z0-9_\-]+" title="3–50 characters: letters, numbers, underscore or hyphen only." style="padding:7px 10px;font-size:13px;">
                 <span id="modal-reg-user-hint" style="display:none;position:absolute;right:10px;top:50%;transform:translateY(-50%);font-size:10px;color:#888;pointer-events:none;">auto-filled</span>
               </div>
             </div>
@@ -5513,11 +5518,11 @@
         }
         .cat-covering-eyes .pink-arm-left {
           opacity: 1;
-          transform: translateY(22px) rotate(18deg) scale(1.12);
+          transform: translateY(36px) rotate(18deg) scale(1.12);
         }
         .cat-covering-eyes .pink-arm-right {
           opacity: 1;
-          transform: translateY(18px) rotate(-18deg) scale(1.12);
+          transform: translateY(32px) rotate(-18deg) scale(1.12);
         }
         /* Show password: ONLY right paw lowers a little to peek! Left paw stays covering! */
         .cat-covering-eyes .pink-arm-right.arm-peeking {
@@ -5703,15 +5708,10 @@
 
         // Step 5: With both paws clinging to the rim, cat pulls itself up over the rim!
         .to(headImg, {
-          y: -7,
+          y: 14,
           duration: 0.45,
-          ease: "back.out(1.5)"
-        }, "+=0.04")
-        .to(headImg, {
-          y: 0,
-          duration: 0.20,
-          ease: "power1.inOut"
-        });
+          ease: "power2.out"
+        }, "+=0.04");
       } else {
         scheduleBlink();
         scheduleSaccade();
@@ -5817,7 +5817,8 @@ if (typeof gsap === "undefined") { document.write('<script src="https://cdn.jsde
     async function api(endpoint, data = null, method = null) {
       const opts = { credentials: 'include' };
       opts.headers = {
-        'X-Portal': 'pos'
+        'X-Portal': 'pos',
+        'X-Offline': navigator.onLine ? '0' : '1'
       };
       const sid = localStorage.getItem('chipipie_pos_session_id') || localStorage.getItem('chipipie_session_id');
       if (sid) {
@@ -9048,6 +9049,9 @@ if (typeof gsap === "undefined") { document.write('<script src="https://cdn.jsde
           }
           currentUser = res.user;
           updateUserInfoUI(res.user);
+          if (res.offline_mode) {
+            showToast('🌐 Logged in as ' + (res.user.role === 'admin' ? 'Administrator' : 'User') + ' (Offline Mode)');
+          }
           await activateApp(res.user.role === 'admin' || res.user.role === 'super_admin');
         } else {
           if (res.is_super_admin) {
@@ -9345,14 +9349,24 @@ if (typeof gsap === "undefined") { document.write('<script src="https://cdn.jsde
 
       try {
         const res = await api('auth.php?action=forgot_password', { identifier });
-        // The form/button disappears and "The email has been sent" appears!
         const formEl = document.getElementById('pos-forgot-form');
         const sentMsg = document.getElementById('pos-forgot-sent-msg');
         const instruction = document.getElementById('pos-forgot-instruction');
 
-        if (formEl) formEl.style.display = 'none';
-        if (instruction) instruction.style.display = 'none';
-        if (sentMsg) sentMsg.style.display = 'block';
+        if (res && res.success) {
+          // Email sent — show confirmation screen
+          if (formEl) formEl.style.display = 'none';
+          if (instruction) instruction.style.display = 'none';
+          if (sentMsg) sentMsg.style.display = 'block';
+        } else {
+          // Show the actual error message from the server
+          errEl.textContent = (res && res.message) || 'Could not send reset link. Please try again.';
+          errEl.style.display = 'block';
+          if (btn) {
+            btn.disabled = false;
+            btn.innerHTML = '<i class="bi bi-send-fill me-1"></i> Send Recovery Link';
+          }
+        }
       } catch (err) {
         errEl.textContent = 'Connection error. Please try again.';
         errEl.style.display = 'block';

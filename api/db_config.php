@@ -383,6 +383,38 @@ function validatePasswordComplexity($password, &$error = '') {
 /**
  * Check if email address is valid and not a reserved/dummy placeholder domain
  */
+/**
+ * Check if the server has active external internet connectivity.
+ * Fast check using raw DNS server IPs (bypasses local DNS resolution) with a 0.5s timeout.
+ */
+function isInternetAvailable($timeout = 0.5) {
+    static $isOnline = null;
+    if ($isOnline !== null) return $isOnline;
+
+    // Check if client explicitly signaled offline via HTTP header
+    if (isset($_SERVER['HTTP_X_OFFLINE']) && $_SERVER['HTTP_X_OFFLINE'] === '1') {
+        $isOnline = false;
+        return false;
+    }
+
+    $hosts = [
+        ['ip' => '1.1.1.1', 'port' => 53],
+        ['ip' => '8.8.8.8', 'port' => 53],
+    ];
+
+    foreach ($hosts as $host) {
+        $socket = @fsockopen($host['ip'], $host['port'], $errno, $errstr, $timeout);
+        if ($socket) {
+            fclose($socket);
+            $isOnline = true;
+            return true;
+        }
+    }
+
+    $isOnline = false;
+    return false;
+}
+
 function isValidSendableEmail($email) {
     $email = trim($email);
     if (!filter_var($email, FILTER_VALIDATE_EMAIL)) return false;
@@ -406,7 +438,8 @@ function isValidSendableEmail($email) {
 
     // Verify domain has active DNS MX or A records on the internet
     // Cache results per-domain within this request to avoid duplicate DNS round-trips
-    if (function_exists('checkdnsrr')) {
+    // Verify domain has active DNS MX or A records on the internet ONLY if internet is available
+    if (isInternetAvailable() && function_exists('checkdnsrr')) {
         static $dnsCache = [];
         if (!array_key_exists($domain, $dnsCache)) {
             $dnsCache[$domain] = (@checkdnsrr($domain, 'MX') || @checkdnsrr($domain, 'A'));
