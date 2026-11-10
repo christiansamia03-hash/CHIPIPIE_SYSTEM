@@ -24,6 +24,10 @@ elseif ($action === 'execute_void_batch_with_code')       { handleExecuteVoidBat
 elseif ($action === 'reject_void_batch')                  { handleRejectVoidBatch(); }
 elseif ($method === 'GET' && $action === 'check_batch_status') { handleCheckBatchStatus(); }
 elseif ($method === 'GET' && $action === 'decide_void_refund') { handleDecideVoidRefund(); }
+elseif ($method === 'GET' && $action === 'chart_weekly')       { handleChartWeekly(); }
+elseif ($method === 'GET' && $action === 'chart_weekly_weeks') { handleChartWeeklyWeeks(); }
+elseif ($method === 'GET' && $action === 'chart_hourly')       { handleChartHourly(); }
+elseif ($method === 'GET' && $action === 'chart_monthly')      { handleChartMonthly(); }
 else { jsonResponse(['success' => false, 'message' => 'Invalid action.'], 400); }
 
 function getVoidRefundRecipients() {
@@ -1321,4 +1325,131 @@ function handleCheckBatchStatus() {
     } else {
         jsonResponse(['success' => true, 'batch_status' => 'pending']);
     }
+}
+
+// ── Chart: Weekly (by week_start or week offset) ─────────────────────────────
+function handleChartWeekly() {
+    requireLogin();
+    $db = getDB();
+
+    if (!empty($_GET['week_start']) && preg_match('/^\d{4}-\d{2}-\d{2}$/', $_GET['week_start'])) {
+        $weekStart = $_GET['week_start'];
+        $weekEnd   = date('Y-m-d', strtotime($weekStart . ' +6 days'));
+    } else {
+        $offset = max(0, min(52, intval($_GET['week_offset'] ?? 0)));
+        $weekStart = date('Y-m-d', strtotime("monday this week -{$offset} week"));
+        $weekEnd   = date('Y-m-d', strtotime("sunday this week -{$offset} week"));
+    }
+
+    $rows = $db->prepare("
+        SELECT DAYOFWEEK(created_at) as dow, COALESCE(SUM(total),0) as rev
+        FROM orders
+        WHERE DATE(created_at) BETWEEN ? AND ?
+          AND status = 'Completed'
+        GROUP BY DAYOFWEEK(created_at)
+    ");
+    $rows->execute([$weekStart, $weekEnd]);
+    $data = [0,0,0,0,0,0,0];
+    foreach ($rows->fetchAll() as $r) {
+        $idx = ($r['dow'] + 5) % 7; // Mon=0
+        $data[$idx] = floatval($r['rev']);
+    }
+
+    // Build day labels with actual dates
+    $labels = [];
+    for ($i = 0; $i < 7; $i++) {
+        $labels[] = date('D j', strtotime($weekStart . " +{$i} days"));
+    }
+
+    $formattedLabel = date('M j', strtotime($weekStart)) . ' – ' . date('M j, Y', strtotime($weekEnd));
+
+    jsonResponse([
+        'success'         => true,
+        'data'            => $data,
+        'labels'          => $labels,
+        'formatted_label' => $formattedLabel,
+        'week_start'      => $weekStart,
+        'week_end'        => $weekEnd
+    ]);
+}
+
+// ── Chart: Available weeks for picker ────────────────────────────────────────
+function handleChartWeeklyWeeks() {
+    requireLogin();
+    $db = getDB();
+    // Get up to 52 distinct Monday-of-week dates that have orders
+    $rows = $db->query("
+        SELECT DISTINCT DATE_SUB(DATE(created_at), INTERVAL (DAYOFWEEK(created_at)+5)%7 DAY) as week_start
+        FROM orders WHERE status='Completed'
+        ORDER BY week_start DESC LIMIT 52
+    ")->fetchAll();
+    $weeks = [];
+    foreach ($rows as $r) {
+        $start = $r['week_start'];
+        $end   = date('Y-m-d', strtotime($start . ' +6 days'));
+        $weeks[] = [
+            'week_start' => $start,
+            'label'      => date('M j', strtotime($start)) . ' – ' . date('M j, Y', strtotime($end))
+        ];
+    }
+    if (empty($weeks)) {
+        $start = date('Y-m-d', strtotime('monday this week'));
+        $end   = date('Y-m-d', strtotime('sunday this week'));
+        $weeks[] = ['week_start' => $start, 'label' => date('M j', strtotime($start)) . ' – ' . date('M j, Y', strtotime($end))];
+    }
+    jsonResponse(['success' => true, 'weeks' => $weeks]);
+}
+
+// ── Chart: Hourly (by date) ──────────────────────────────────────────────────
+function handleChartHourly() {
+    requireLogin();
+    $date = $_GET['date'] ?? date('Y-m-d');
+    if (!preg_match('/^\d{4}-\d{2}-\d{2}$/', $date)) {
+        $date = date('Y-m-d');
+    }
+
+    $db = getDB();
+    $rows = $db->prepare("
+        SELECT HOUR(created_at) as hr, COALESCE(SUM(total),0) as rev
+        FROM orders
+        WHERE DATE(created_at) = ?
+          AND status = 'Completed'
+        GROUP BY HOUR(created_at)
+    ");
+    $rows->execute([$date]);
+    $data = array_fill(0, 18, 0); // 9am–2am (18 slots)
+    foreach ($rows->fetchAll() as $r) {
+        $h = intval($r['hr']);
+        if ($h >= 9)       $data[$h - 9]  = floatval($r['rev']);
+        elseif ($h <= 2)   $data[$h + 15] = floatval($r['rev']);
+    }
+
+    jsonResponse(['success' => true, 'data' => $data, 'date' => $date]);
+}
+
+// ── Chart: Monthly (by year) ─────────────────────────────────────────────────
+function handleChartMonthly() {
+    requireLogin();
+    $year = intval($_GET['year'] ?? date('Y'));
+    if ($year < 2020 || $year > 2100) $year = intval(date('Y'));
+
+    $db = getDB();
+    $rows = $db->prepare("
+        SELECT MONTH(created_at) as mo, COALESCE(SUM(total),0) as rev
+        FROM orders
+        WHERE YEAR(created_at) = ? AND status = 'Completed'
+        GROUP BY MONTH(created_at)
+    ");
+    $rows->execute([$year]);
+    $data = [0,0,0,0,0,0,0,0,0,0,0,0];
+    foreach ($rows->fetchAll() as $r) {
+        $data[intval($r['mo']) - 1] = floatval($r['rev']);
+    }
+
+    // Available years (for the dropdown)
+    $yearsRaw = $db->query("SELECT DISTINCT YEAR(created_at) as yr FROM orders WHERE status='Completed' ORDER BY yr DESC")->fetchAll();
+    $years = array_map(fn($r) => intval($r['yr']), $yearsRaw);
+    if (empty($years)) $years = [intval(date('Y'))];
+
+    jsonResponse(['success' => true, 'data' => $data, 'year' => $year, 'available_years' => $years]);
 }
