@@ -157,6 +157,11 @@
       vertical-align: middle;
     }
 
+    .badge.badge-new {
+      background: #1e293b;
+      color: #ffffff;
+    }
+
     .bg {
       padding: 32px 24px;
       overflow-x: auto;
@@ -889,25 +894,28 @@
   <header>
     <div class="logo-badge">&#9749;</div>
     <h1>ChipiPie Cafe &mdash; System Process Diagrams</h1>
-    <p>High-Readability Black &amp; White Architecture Diagrams &nbsp;&middot;&nbsp; Flowcharts &nbsp;&middot;&nbsp; Use Cases &nbsp;&middot;&nbsp; ERD &nbsp;&middot;&nbsp; DFDs</p>
+    <p>High-Readability Architecture Diagrams &nbsp;&middot;&nbsp; Flowcharts &nbsp;&middot;&nbsp; PayMongo QR PH &nbsp;&middot;&nbsp; Super Admin Center &nbsp;&middot;&nbsp; Use Cases &nbsp;&middot;&nbsp; ERDs &nbsp;&middot;&nbsp; DFDs</p>
   </header>
 
   <nav>
-    <a href="#fc1">FC 1: Auth &amp; Registration</a>
+    <a href="#fc1">FC 1: Auth &amp; Password Reset</a>
     <a href="#fc2a">FC 2A: POS Browse &amp; Cart</a>
-    <a href="#fc2b">FC 2B: Checkout &amp; Voids</a>
-    <a href="#fc3a">FC 3A: Inventory Management</a>
+    <a href="#fc2b">FC 2B: PayMongo &amp; Checkout</a>
+    <a href="#fc3a">FC 3A: Inventory &amp; Settings</a>
     <a href="#fc3b">FC 3B: User Approvals</a>
     <a href="#fc3c">FC 3C: Analytics &amp; Orders</a>
-    <a href="#fc4">FC Complete Flow</a>
+    <a href="#fc3d">FC 3D: Super Admin Control</a>
+    <a href="#fc4">FC Complete Master Flow</a>
     <a href="#uc0">Use Case L0</a>
     <a href="#uc1a">Use Case L1A</a>
     <a href="#uc1b">Use Case L1B</a>
-    <a href="#erd-pos">ERD: POS &amp; Orders</a>
-    <a href="#erd-sec">ERD: Security &amp; Logs</a>
+    <a href="#uc1c">Use Case L1C</a>
+    <a href="#erd-pos">ERD: POS &amp; Adjustments</a>
+    <a href="#erd-sec">ERD: Security, Logs &amp; Rates</a>
     <a href="#dfd0">DFD Level 0</a>
     <a href="#dfd1a">DFD Level 1A</a>
     <a href="#dfd1b">DFD Level 1B</a>
+    <a href="#dfd1c">DFD Level 1C</a>
   </nav>
 
     <!-- Print Helper Toolbar (Screen Only) -->
@@ -941,7 +949,7 @@
   <main>
 
     <!-- ==============================================================
-         FC PAGE 1: AUTHENTICATION & REGISTRATION APPROVAL FLOW
+         FC PAGE 1: AUTHENTICATION, RATE LIMITING & PASSWORD RESET
          ============================================================== -->
     <div class="sec" id="fc1">
       <div class="sec-head">
@@ -951,6 +959,10 @@
             <h2>Flowchart Page 1 of 3: Authentication &amp; Registration <span class="badge">Flowchart</span></h2>
             <p>Login lockout security, pending registration verification (Cashier/Admin), 2FA verification &amp; approval notification</p>
           </div>
+        <div class="sec-icon">&#9658;</div>
+        <div>
+          <h2>Flowchart Page 1: Authentication, Rate Limiting &amp; Password Reset <span class="badge">Flowchart</span></h2>
+          <p>Login rate limits with escalating lockout, pending approval intercepts, 2FA manager codes, Super Admin 2FA &amp; email password recovery</p>
         </div>
         <button type="button" class="print-single-btn" onclick="printSingleDiagram('fc1', 'portrait')" title="Print only this diagram on a single clean page">
           🖨️ Print Diagram
@@ -961,6 +973,16 @@
 flowchart TD
     START([START: User Access]) --> OPEN[Open ChipiPie POS Portal]
     OPEN --> SESS{Active Session?}
+    START([START: User Access]) --> OPEN[User Opens ChipiPie POS Portal]
+    OPEN --> SESS{Active Session in DB / Cookie?}
+    SESS -- Yes --> ROLE_CHECK{Identify User Role}
+    SESS -- No --> PORTAL[/Display Login / Registration Screen/]
+
+    PORTAL --> CHOICE{Select Action}
+
+    CHOICE -- Sign In --> CREDS[/Enter Username & Password/]
+    CREDS --> RATE_LIMIT{Rate Limit Check in rate_limits}
+    RATE_LIMIT -- Locked Out --> RET_429[/Display 429: Security Lockout<br/>5m / 20m Duration/]
     
     SESS -- No --> AUTH_TYPE{Portal Action}
     
@@ -987,9 +1009,43 @@ flowchart TD
     CHK_2FA -- Valid --> CON_B((Connector B:<br/>Admin Dashboard))
     
     ROLE_GATE -- Super Admin --> SA_PIPE[Send Super Admin 2FA] --> CON_SA((Connector S:<br/>Super Admin))
+    ACTIVE_CHECK -- Yes --> PWD_VERIFY{Verify Bcrypt Hash}
+    PWD_VERIFY -- Failed --> COOLDOWN[Increment Failed Hits in rate_limits<br/>Escalate Lockout & Log in system_logs]
+    COOLDOWN --> RET_401
+    
+    PWD_VERIFY -- Passed --> ROLE_CHECK
+
+    ROLE_CHECK -- Cashier --> CON_A((Connector A:<br/>Cashier POS))
+    ROLE_CHECK -- Admin --> SEND_2FA[Generate & Email 6-Digit<br/>2FA Code to Manager]
+    SEND_2FA --> PROMPT_2FA[/Prompt 2FA Verification Modal/]
+    PROMPT_2FA --> VERIFY_2FA{Code Valid &<br/>Not Expired in admin_tokens?}
+    VERIFY_2FA -- Passed --> CON_B((Connector B:<br/>Admin Dashboard))
+    VERIFY_2FA -- Failed --> PROMPT_2FA
+    
+    ROLE_CHECK -- Super Admin --> SA_2FA[Send 6-Digit 2FA Code<br/>to superadmin_email]
+    SA_2FA --> VERIFY_SA_2FA{Verify Super Admin 2FA Code}
+    VERIFY_SA_2FA -- Passed --> CON_SA((Connector S:<br/>Super Admin Control))
+    VERIFY_SA_2FA -- Failed --> SA_2FA
+
+    CHOICE -- Register --> REG_FORM[/Fill Registration Form:<br/>Name, Username, Email, Password, Role/]
+    REG_FORM --> REG_SUBMIT[Insert into admin_registration_requests<br/>with role=cashier/admin, status=pending]
+    REG_SUBMIT --> REG_NOTIFY[Send Approval Email with 1-Click<br/>Secure Link to Store Owner]
+    REG_NOTIFY --> REG_MSG[/Display Notice: Registration Submitted.<br/>Awaiting Management Approval/]
+
+    CHOICE -- Forgot Password --> FORGOT_FORM[/Enter Registered Email or Username/]
+    FORGOT_FORM --> USER_EXISTS{Account Found in users?}
+    USER_EXISTS -- No --> FORGOT_MSG[/Display Notice: Sent Reset Link if Account Exists/]
+    USER_EXISTS -- Yes --> GEN_RESET[Generate Secure 6-Digit PIN or Reset Link<br/>in admin_tokens with 15m Expiry]
+    GEN_RESET --> EMAIL_RESET[Dispatch Password Reset Email via Gmail SMTP]
+    EMAIL_RESET --> RESET_INPUT[/Enter 6-Digit Code / Click Reset Link & Enter New Password/]
+    RESET_INPUT --> VERIFY_RESET_TOKEN{Token Valid & Not Used?}
+    VERIFY_RESET_TOKEN -- Valid --> UPDATE_PWD[Bcrypt Hash & Update password in users<br/>Mark Token Used in admin_tokens]
+    UPDATE_PWD --> LOG_PWD[Log Password Reset in system_logs]
+    LOG_PWD --> PORTAL
+    VERIFY_RESET_TOKEN -- Invalid --> FORGOT_MSG
         </div>
       </div>
-      <div class="sec-note">&#9660; Connector A &rarr; Cashier POS (Page 2) &nbsp;&nbsp;|&nbsp;&nbsp; Connector B &rarr; Admin Dashboard (Page 3)</div>
+      <div class="sec-note">&#9660; Connector A &rarr; Cashier POS (Page 2A) &nbsp;&nbsp;|&nbsp;&nbsp; Connector B &rarr; Admin Dashboard (Page 3A) &nbsp;&nbsp;|&nbsp;&nbsp; Connector S &rarr; Super Admin Center (Page 3D)</div>
     </div>
 
     <!-- ==============================================================
@@ -1003,6 +1059,10 @@ flowchart TD
             <h2>FC Page 2 of 3: Cashier &mdash; Part 1: Browse &amp; Cart <span class="badge">Flowchart</span></h2>
             <p>From Connector A &rarr; Category shortcut bar &rarr; Subcategory tabs &rarr; Size variant modal &rarr; Connector F</p>
           </div>
+        <div class="sec-icon">&#9658;</div>
+        <div>
+          <h2>Flowchart Page 2A: Cashier &mdash; Browse &amp; Cart Management <span class="badge">Flowchart</span></h2>
+          <p>From Connector A &rarr; Category shortcut bar &rarr; Subcategory tabs &rarr; Size variant modal &rarr; Connector F</p>
         </div>
         <button type="button" class="print-single-btn" onclick="printSingleDiagram('fc2a', 'portrait')" title="Print only this diagram on a single clean page">
           🖨️ Print Diagram
@@ -1020,7 +1080,7 @@ flowchart TD
     GRID --> ITEM_CLICK[/Click Menu Item Card/]
     ITEM_CLICK --> CHECK_SIZES{Size Pricing<br/>JSON?}
     
-    CHECK_SIZES -- Yes --> SIZE_MODAL[/Display Size Selection Modal:<br/>Regular, Upsize, 12oz, 16oz/]
+    CHECK_SIZES -- Yes --> SIZE_MODAL[/Display Size Selection Modal:<br/>Regular, Upsize, 12oz, 16oz, S, M, L/]
     SIZE_MODAL --> SELECT_SIZE[/Cashier Selects Desired Size/]
     SELECT_SIZE --> ADD_SIZE_CART[Add Variant Item & Price to Cart]
     
@@ -1038,11 +1098,11 @@ flowchart TD
     CART_OPS -- Complete Selection --> CON_F((Connector F:<br/>Tender & Checkout))
         </div>
       </div>
-      <div class="sec-note">&#9660; Continues to Connector F &rarr; Part 2: Checkout &amp; Voids</div>
+      <div class="sec-note">&#9660; Continues to Connector F &rarr; Part 2: PayMongo, Checkout &amp; Voids</div>
     </div>
 
     <!-- ==============================================================
-         FC PAGE 2B: CASHIER - CHECKOUT & VOIDS
+         FC PAGE 2B: CASHIER - PAYMONGO, CHECKOUT & VOIDS
          ============================================================== -->
     <div class="sec" id="fc2b">
       <div class="sec-head">
@@ -1052,6 +1112,10 @@ flowchart TD
             <h2>FC Page 2 of 3: Cashier &mdash; Part 2: Checkout &amp; Voids <span class="badge">Flowchart</span></h2>
             <p>From Connector F &rarr; Payment tender &rarr; Stock validation &amp; deduction &rarr; Thermal receipt &rarr; Void requests</p>
           </div>
+        <div class="sec-icon">&#9658;</div>
+        <div>
+          <h2>Flowchart Page 2B: Cashier &mdash; PayMongo QR PH, Checkout &amp; Multi-Channel Voids <span class="badge">Flowchart</span></h2>
+          <p>From Connector F &rarr; Cash calculation or PayMongo dynamic QR PH polling &rarr; Real-time inventory deduction &rarr; Multi-channel void authorizations</p>
         </div>
         <button type="button" class="print-single-btn" onclick="printSingleDiagram('fc2b', 'portrait')" title="Print only this diagram on a single clean page">
           🖨️ Print Diagram
@@ -1064,16 +1128,32 @@ flowchart TD
     CART_VALID -- Yes --> RET_REG[Return to Register Grid]
     
     CART_VALID -- No --> PAY_SELECT{Payment Method}
+    CART_VALID -- No --> PAY_SELECT{Select Payment Method}
     
     PAY_SELECT -- Cash --> CASH_INPUT[/Input Cash Tendered/]
     CASH_INPUT --> CASH_CHECK{Tendered >=<br/>Total Due?}
     CASH_CHECK -- No --> ERR_INSUFF[/Display: Insufficient Cash/] --> CASH_INPUT
     CASH_CHECK -- Yes --> CALC_CHANGE[Compute Customer Change Due]
+    CALC_CHANGE --> STOCK_VALIDATE{Validate Stock Levels<br/>in menu_items}
     
     PAY_SELECT -- GCash --> GCASH_INPUT[/Enter GCash Reference No/]
     
     CALC_CHANGE --> STOCK_VALIDATE{Validate<br/>Stock Levels?}
     GCASH_INPUT --> STOCK_VALIDATE
+    PAY_SELECT -- PayMongo Dynamic QR PH --> PM_KEY_CHK{PayMongo Secret Key<br/>Configured in system_settings?}
+    PM_KEY_CHK -- No --> PM_NO_KEY[/Display Notice: PayMongo Key Missing.<br/>Admin must configure in Settings/]
+    PM_NO_KEY --> RET_REG
+    
+    PM_KEY_CHK -- Yes --> CREATE_INTENT[Call api/paymongo.php: POST Payment Intent<br/>Attach QR PH Payment Method]
+    CREATE_INTENT --> RETRIEVE_QR[Receive Scannable Dynamic QR PH Image Code<br/>from PayMongo API]
+    RETRIEVE_QR --> DISPLAY_QR[/Render Live QR PH Canvas on Screen<br/>Show Amount & Expiry Timer/]
+    DISPLAY_QR --> POLL_LOOP[POS Initiates Live Polling Loop:<br/>GET check_qrph Every 2 Seconds]
+    POLL_LOOP --> PM_STATUS{PayMongo Payment Status?}
+    PM_STATUS -- Pending / Awaiting --> POLL_LOOP
+    PM_STATUS -- Cancelled / Expired --> PM_FAILED[/Display Payment Timed Out / Cancelled/]
+    PM_FAILED --> RET_REG
+    PM_STATUS -- Succeeded --> PM_SUCCESS_TOAST[/Display: PayMongo Payment Verified Toast/]
+    PM_SUCCESS_TOAST --> STOCK_VALIDATE
     
     STOCK_VALIDATE -- Insufficient --> ERR_OOS[/Display Out of Stock Alert/] --> RET_REG
     
@@ -1083,14 +1163,46 @@ flowchart TD
     INSERT_ORDER --> LOW_STOCK_CHECK{Low Stock<br/>Threshold?}
     LOW_STOCK_CHECK -- Yes --> WARN_LOW[/Display Low Stock Toast/] --> PRINT_RCPT
     LOW_STOCK_CHECK -- No --> PRINT_RCPT[/Render & Print Thermal Receipt/]
+    STOCK_VALIDATE -- Stock Available --> DEDUCT_STOCK[Deduct Purchased Quantities from menu_items]
+    DEDUCT_STOCK --> GEN_ORDER_ID[Generate Unique Order Number]
+    GEN_ORDER_ID --> INSERT_ORDER[Save Transaction into orders & order_items Tables]
+    
+    INSERT_ORDER --> LOW_STOCK_CHECK{Any Item Stock &lt;=<br/>min_stock Threshold?}
+    LOW_STOCK_CHECK -- Yes --> WARN_LOW[/Display Low Stock Toast Notification/]
+    LOW_STOCK_CHECK -- No --> PRINT_RCPT[/Render & Print Official Thermal Receipt/]
+    WARN_LOW --> PRINT_RCPT
     
     PRINT_RCPT --> NEXT_STEP{Next Operation}
     NEXT_STEP -- New Transaction --> DASH_RESET[Reset Register for New Customer]
     NEXT_STEP -- Void Request --> VOID_SUBMIT[Submit Void / Refund Request to Manager] --> DASH_RESET
     NEXT_STEP -- Close Shift --> LOGOUT([Cashier End Shift / Logout]) --> CON_C((Connector C:<br/>Return to Login))
+    
+    NEXT_STEP -- Void / Refund Request --> VOID_PROMPT[/Enter Reason for Order Void or Refund/]
+    VOID_PROMPT --> VOID_GATE{Authorization Method}
+    
+    VOID_GATE -- Manager PIN on POS --> ENTER_PIN[/Manager Enters 6-Digit Authorization PIN/]
+    ENTER_PIN --> VERIFY_PIN{PIN Valid in admin_tokens<br/>for Active Admin?}
+    VERIFY_PIN -- Valid --> EXECUTE_VOID[Update Order status=Voided/Refunded<br/>Restore Stock Quantities in menu_items]
+    VERIFY_PIN -- Invalid --> ENTER_PIN
+    
+    VOID_GATE -- Store Owner 1-Click Email --> DISPATCH_EMAIL[Send 1-Click Decision Link<br/>to Store Owner & Active Managers]
+    DISPATCH_EMAIL --> OWNER_DECIDE{Owner / Manager Decision via Email}
+    OWNER_DECIDE -- Approved --> EXECUTE_VOID
+    OWNER_DECIDE -- Rejected --> REJECT_TOAST[/Display Notice: Void Request Rejected/]
+    
+    VOID_GATE -- Super Admin Request --> SUBMIT_SA_REQ[Insert Request into system_requests<br/>with type=void_order/refund_order]
+    SUBMIT_SA_REQ --> WAIT_SA[/Pending Super Admin Review/]
+    
+    EXECUTE_VOID --> RECORD_ADJUST[Insert Record into order_adjustments<br/>Log Event in system_logs]
+    RECORD_ADJUST --> DASH_RESET
+    REJECT_TOAST --> DASH_RESET
+    WAIT_SA --> DASH_RESET
+    
+    NEXT_STEP -- End Shift / Logout --> LOGOUT([Cashier Logout])
+    LOGOUT --> CON_C((Connector C:<br/>Return to Login))
         </div>
       </div>
-      <div class="sec-note">&#9650; From Connector F (Part 1) &nbsp;&nbsp;|&nbsp;&nbsp; Connector C &rarr; Login Portal</div>
+      <div class="sec-note">&#9650; From Connector F (Page 2A) &nbsp;&nbsp;|&nbsp;&nbsp; Connector C &rarr; Login Portal</div>
     </div>
 
     <!-- ==============================================================
@@ -1104,6 +1216,10 @@ flowchart TD
             <h2>FC Page 3 of 3: Admin &mdash; Menu &amp; Inventory <span class="badge">Flowchart</span></h2>
             <p>From Connector B &rarr; Add/Edit size-variant items &rarr; Adjust stock &rarr; 15-minute delete bypass token security</p>
           </div>
+        <div class="sec-icon">&#9658;</div>
+        <div>
+          <h2>Flowchart Page 3A: Admin &mdash; Menu, Inventory &amp; Settings <span class="badge">Flowchart</span></h2>
+          <p>From Connector B &rarr; Add/Edit size-variant items &rarr; Adjust stock &rarr; 15-minute delete bypass token security &rarr; PayMongo API key setup</p>
         </div>
         <button type="button" class="print-single-btn" onclick="printSingleDiagram('fc3a', 'portrait')" title="Print only this diagram on a single clean page">
           🖨️ Print Diagram
@@ -1156,6 +1272,20 @@ flowchart TD
     TOKEN_EVAL -- Valid --> CONSUME_TOKEN[Mark Token is_used=1 & Delete Item Record]
     CONSUME_TOKEN --> INV_SUCCESS
           </div>
+    BYPASS_MODAL --> TOKEN_EVAL{Token Valid &<br/>Within 15 Minutes?}
+    TOKEN_EVAL -- Invalid / Expired --> TOKEN_ERR[/Display: Invalid or Expired Token Error/]
+    TOKEN_ERR --> BYPASS_MODAL
+    TOKEN_EVAL -- Valid --> CONSUME_TOKEN[Mark Token is_used=1 in admin_tokens]
+    CONSUME_TOKEN --> COMMIT_DELETE[Permanently Delete Item & Record System Audit Log]
+    COMMIT_DELETE --> INV_SUCCESS
+
+    TAB_SELECT -- Store Settings Tab --> SETTINGS_MODAL[/Open System Settings Modal/]
+    SETTINGS_MODAL --> SET_PAYMONGO[/Input PayMongo Secret Key: sk_test_... or sk_live_.../]
+    SET_PAYMONGO --> SAVE_KEY[Save to system_settings Table]
+    SAVE_KEY --> SET_SUCCESS[/Display Notice: PayMongo API Key Configured/]
+
+    TAB_SELECT -- User Approvals & Management --> CON_E((Connector E:<br/>User Management))
+    TAB_SELECT -- Sales Orders & Analytics --> CON_D((Connector D:<br/>Analytics & Orders))
         </div>
       </div>
       <div class="sec-note">&#9650; From Connector B (Page 1) &nbsp;&nbsp;|&nbsp;&nbsp; Connector E &rarr; User Management &nbsp;&nbsp;|&nbsp;&nbsp; Connector D &rarr; Analytics &amp; Orders</div>
@@ -1172,6 +1302,10 @@ flowchart TD
             <h2>FC Page 3 of 3: Admin &mdash; User Approvals &amp; Management <span class="badge">Flowchart</span></h2>
             <p>From Connector E &rarr; Pending registration approvals (Cashier &amp; Admin) &rarr; Multi-channel authorization</p>
           </div>
+        <div class="sec-icon">&#9658;</div>
+        <div>
+          <h2>Flowchart Page 3B: Admin &mdash; User Approvals &amp; Management <span class="badge">Flowchart</span></h2>
+          <p>From Connector E &rarr; Pending registration approvals (Cashier &amp; Admin) &rarr; Multi-channel authorization</p>
         </div>
         <button type="button" class="print-single-btn" onclick="printSingleDiagram('fc3b', 'portrait')" title="Print only this diagram on a single clean page">
           🖨️ Print Diagram
@@ -1213,9 +1347,37 @@ flowchart TD
     STAFF_MODAL --> SAVE_REQ["Insert Pending Request & Email Owner Link"] --> MGMT_REFRESH2["Refresh Staff Directory"]
     STAFF_OPS -- Account Control --> REQ_SA[/"Submit System Request to Super Admin<br/>via system_requests"/] --> MGMT_REFRESH2
           </div>
+    APPROVE_CHANNEL -- Direct POS UI Approval --> UI_APPROVE[Admin Clicks Approve Button in Table]
+    UI_APPROVE --> COMMIT_CASHIER[Insert Record into users Table<br/>with role=cashier, is_active=1]
+    COMMIT_CASHIER --> UPDATE_REQ_UI[Update admin_registration_requests<br/>status=approved, approved_at=NOW]
+    UPDATE_REQ_UI --> EMAIL_USER[Dispatch Welcome & Approval Confirmation Email]
+    EMAIL_USER --> MGMT_REFRESH[Display Success Banner & Refresh Table]
+
+    APPROVE_CHANNEL -- Owner 1-Click Email Link --> OWNER_CLICK[Store Owner Clicks Approval Link in Email]
+    OWNER_CLICK --> TOKEN_CHECK{Token Valid &<br/>Request Pending?}
+    TOKEN_CHECK -- Valid --> COMMIT_DYNAMIC[Create Active User in users with<br/>Requested Role: Cashier or Admin]
+    COMMIT_DYNAMIC --> UPDATE_REQ_OWNER[Update Request status=approved]
+    UPDATE_REQ_OWNER --> EMAIL_USER
+    TOKEN_CHECK -- Invalid / Used --> TOKEN_FAIL[/Display: Link Expired or Already Processed/]
+
+    APPROVE_CHANNEL -- Reject Registration --> REJECT_ACT[Admin / Owner Clicks Reject]
+    REJECT_ACT --> UPDATE_REQ_REJ[Update Request status=rejected]
+    UPDATE_REQ_REJ --> MGMT_REFRESH
+
+    APPROVE_CHANNEL -- Resend Owner Token --> RESEND_ACT[Admin Clicks Resend Approval Link]
+    RESEND_ACT --> DISPATCH_NEW_TOKEN[Email Fresh Approval Link to Store Owner]
+    DISPATCH_NEW_TOKEN --> MGMT_REFRESH
+
+    OP_SELECT -- Register Staff Member --> STAFF_MODAL[/Fill Staff Credentials & Choose Role:<br/>Cashier or Admin/]
+    STAFF_MODAL --> SAVE_PENDING_REQ[Insert into admin_registration_requests<br/>status=pending]
+    SAVE_PENDING_REQ --> NOTIFY_OWNER[Send Approval Email with Link to Owner]
+    NOTIFY_OWNER --> MGMT_REFRESH
+
+    OP_SELECT -- Toggle / Delete User Account --> REQ_SUPERADMIN[/Submit Request to Super Admin Panel<br/>via system_requests/]
+    REQ_SUPERADMIN --> MGMT_REFRESH
         </div>
       </div>
-      <div class="sec-note">&#9650; From Connector E (Menu Page) &nbsp;&nbsp;|&nbsp;&nbsp; Multi-Channel Authorization Process</div>
+      <div class="sec-note">&#9650; From Connector E (Menu Page 3A) &nbsp;&nbsp;|&nbsp;&nbsp; Multi-Channel Authorization Process</div>
     </div>
 
     <!-- ==============================================================
@@ -1229,6 +1391,10 @@ flowchart TD
             <h2>FC Page 3 of 3: Admin &mdash; Orders, Voids &amp; Analytics <span class="badge">Flowchart</span></h2>
             <p>From Connector D &rarr; Expandable order cards &rarr; Void authorization &rarr; Real-time revenue KPIs &amp; trend charts</p>
           </div>
+        <div class="sec-icon">&#9658;</div>
+        <div>
+          <h2>Flowchart Page 3C: Admin &mdash; Orders, Adjustments &amp; Analytics <span class="badge">Flowchart</span></h2>
+          <p>From Connector D &rarr; Expandable order cards &rarr; Manager PIN void authorization &rarr; Real-time revenue KPIs &amp; trend charts</p>
         </div>
         <button type="button" class="print-single-btn" onclick="printSingleDiagram('fc3c', 'portrait')" title="Print only this diagram on a single clean page">
           🖨️ Print Diagram
@@ -1253,12 +1419,107 @@ flowchart TD
     EXPAND_CARD --> VOID_ACTION{Authorize Void?}
     VOID_ACTION -- Yes --> VERIFY_AUTH[Verify Manager Auth & Restock Items]
     VERIFY_AUTH --> LOG_AUDIT[Log Audit Record & Void Order] --> ORDERS_DASH
+    VIEW_CHOICE -- Orders Management View --> ORDERS_DASH[Orders Log View]
+    ORDERS_DASH --> FILTER_ORDERS[/Filter by Date Range, Status, or Order Number/]
+    FILTER_ORDERS --> EXPAND_CARD[/Click Expandable Order Card/]
+    EXPAND_CARD --> VIEW_ITEMS[Inspect Full Item Breakdown:<br/>Item Name, Size Variant, Quantity, Unit Price, Subtotal]
+    VIEW_ITEMS --> VOID_ACTION{Authorize Void / Refund?}
+    VOID_ACTION -- Yes --> VERIFY_AUTH[Verify Manager Authorization PIN from admin_tokens]
+    VERIFY_AUTH --> UPDATE_ORDER_VOID[Update Order status=Voided or Refunded<br/>and Restock Items in menu_items]
+    UPDATE_ORDER_VOID --> LOG_ADJUST[Insert Record into order_adjustments<br/>Log Event in system_logs]
+    LOG_ADJUST --> ORDERS_DASH
     VOID_ACTION -- No --> ORDERS_DASH
 
     VIEW_CHOICE -- Logout --> ADMIN_LOGOUT([Admin Logout]) --> CON_C((Connector C:<br/>Return to Login))
         </div>
       </div>
-      <div class="sec-note">&#9650; From Connector D (Page 3) &nbsp;&nbsp;|&nbsp;&nbsp; Connector C &rarr; Login Portal</div>
+      <div class="sec-note">&#9650; From Connector D (Page 3A) &nbsp;&nbsp;|&nbsp;&nbsp; Connector C &rarr; Login Portal</div>
+    </div>
+
+    <!-- ==============================================================
+         FC PAGE 3D: SUPER ADMIN - CONTROL CENTER & GOVERNANCE
+         ============================================================== -->
+    <div class="sec" id="fc3d">
+      <div class="sec-head">
+        <div class="sec-icon">&#9658;</div>
+        <div>
+          <h2>Flowchart Page 3D: Super Admin &mdash; Control Center, System Requests &amp; Audit Governance <span class="badge badge-new">New Subsystem</span></h2>
+          <p>From Connector S &rarr; System Requests approval/rejection &rarr; User governance &rarr; Rate limit reset &rarr; Central immutable audit trail</p>
+        </div>
+      </div>
+      <div class="bg">
+        <div class="mermaid">
+flowchart TD
+    CON_SA((Connector S:<br/>Super Admin Control)) --> SA_PORTAL([Super Admin Control Center])
+    SA_PORTAL --> SA_NAV{Select Control Workspace}
+
+    SA_NAV -- Overview Dashboard --> SA_DASH[Executive Overview Hub]
+    SA_DASH --> QUERY_SYS_STATS[Fetch System-Wide KPIs:<br/>Gross Sales, Total Orders, Active Users, Pending Requests Badge]
+    QUERY_SYS_STATS --> SA_DASH
+
+    SA_NAV -- System Requests Approval --> REQ_TABLE[/Inspect system_requests Queue:<br/>Voids, Refunds, Menu Deletions, Account Actions/]
+    REQ_TABLE --> SELECT_REQ[/Select Pending System Request/]
+    SELECT_REQ --> EVAL_REQ{Super Admin Decision}
+    
+    EVAL_REQ -- Approve Request --> RUN_ACTION[Execute Payload Action:<br/>Void Order & Restock, Update Menu, or Toggle User Account]
+    RUN_ACTION --> UPDATE_REQ_APP[Update system_requests status=approved<br/>Set reviewed_by, reviewed_at & review_note]
+    UPDATE_REQ_APP --> LOG_SA_ACT[Record Action in system_logs with IP Address]
+    LOG_SA_ACT --> REQ_REFRESH[Display Success Notice & Refresh Queue]
+    
+    EVAL_REQ -- Reject Request --> ENTER_REJ_NOTE[/Enter Rejection Note/]
+    ENTER_REJ_NOTE --> UPDATE_REQ_REJ[Update system_requests status=rejected<br/>Set reviewed_by & review_note]
+    UPDATE_REQ_REJ --> LOG_SA_ACT
+    
+    SA_NAV -- Registration Approvals --> ADMIN_REQS_TABLE[/Review Pending Staff & Admin Registrations<br/>in admin_registration_requests/]
+    ADMIN_REQS_TABLE --> REG_DECISION{Registration Decision}
+    REG_DECISION -- Approve User --> COMMIT_SA_USER[Insert into users with role=cashier/admin, is_active=1]
+    COMMIT_SA_USER --> UPDATE_REG_STATUS[Update admin_registration_requests status=approved]
+    UPDATE_REG_STATUS --> SEND_WELCOME[Email Welcome & Account Activated Confirmation]
+    SEND_WELCOME --> REG_REFRESH[Refresh Approvals Table]
+    REG_DECISION -- Reject / Purge --> DELETE_REG[Delete or Mark Rejected in admin_registration_requests]
+    DELETE_REG --> REG_REFRESH
+
+    SA_NAV -- User Lifecycle Management --> USERS_TABLE[/View All Users in users Table/]
+    USERS_TABLE --> USER_OP{Select User Action}
+    USER_OP -- Create New User --> CREATE_USER_MODAL[/Input Name, Username, Email, Password, Role/]
+    CREATE_USER_MODAL --> COMMIT_NEW_USER[Insert Direct Active User into users Table]
+    COMMIT_NEW_USER --> LOG_SA_ACT
+    
+    USER_OP -- Toggle Active / Inactive --> TOGGLE_USER[Set is_active = 0 or 1 in users Table]
+    TOGGLE_USER --> LOG_SA_ACT
+    
+    USER_OP -- Force Reset Password --> FORCE_PWD[/Enter Temporary Password / Generate Reset Link/]
+    FORCE_PWD --> COMMIT_PWD_HASH[Update Bcrypt Password in users Table]
+    COMMIT_PWD_HASH --> LOG_SA_ACT
+    
+    USER_OP -- Permanently Delete User --> DELETE_USER_CONFIRM[Confirm Account Deletion]
+    DELETE_USER_CONFIRM --> COMMIT_USER_DEL[Delete Record from users Table & Nullify Foreign Keys]
+    COMMIT_USER_DEL --> LOG_SA_ACT
+
+    SA_NAV -- System Settings & Security --> SETTINGS_VIEW[Store & Security Settings Form]
+    SETTINGS_VIEW --> CONFIG_CHOICE{Configure Settings}
+    CONFIG_CHOICE -- Store & Email Settings --> SAVE_STORE[Update store_name, owner_email, superadmin_email]
+    CONFIG_CHOICE -- Void & Refund Rules --> SAVE_VOID[Update void_refund_manager_email & void_refund_admin_ids]
+    CONFIG_CHOICE -- Rate Limit Policies --> SAVE_RL[Update rate_limit_enabled, max_attempts, lockout_minutes, rpm]
+    SAVE_STORE --> COMMIT_SETTINGS[Upsert into system_settings Table]
+    SAVE_VOID --> COMMIT_SETTINGS
+    SAVE_RL --> COMMIT_SETTINGS
+    COMMIT_SETTINGS --> LOG_SA_ACT
+
+    CONFIG_CHOICE -- Inspect Rate Limits --> RATE_LIMITS_TABLE[/Query rate_limits Table:<br/>IP Address, Action, Hits, Lockout Count, Locked Until/]
+    RATE_LIMITS_TABLE --> RESET_RL_ACT[Click Reset Rate Limits Button]
+    RESET_RL_ACT --> CLEAR_LOCKOUTS[Truncate / Clear Locked Records in rate_limits]
+    CLEAR_LOCKOUTS --> LOG_SA_ACT
+
+    SA_NAV -- Audit Log Inspection --> LOGS_TABLE[/Browse Central Audit Logs from system_logs Table:<br/>Timestamp, Actor Username, Action, Target, Details, IP/]
+    LOGS_TABLE --> FILTER_LOGS[/Filter by Date Range, Actor, Action, or IP Address/]
+    FILTER_LOGS --> LOGS_TABLE
+
+    SA_NAV -- Logout Session --> SA_LOGOUT([Super Admin Logout])
+    SA_LOGOUT --> CON_C((Connector C:<br/>Return to Login))
+        </div>
+      </div>
+      <div class="sec-note">&#9650; From Connector S (Page 1) &nbsp;&nbsp;|&nbsp;&nbsp; Connector C &rarr; Login Portal</div>
     </div>
 
     <!-- ==============================================================
@@ -1272,6 +1533,10 @@ flowchart TD
             <h2>Unified End-to-End System Master Architecture Flow <span class="badge">Master</span></h2>
             <p>Executive architectural lifecycle: Authentication &rarr; Cashier POS &rarr; Inventory &rarr; Approvals &rarr; Analytics</p>
           </div>
+        <div class="sec-icon">&#9670;</div>
+        <div>
+          <h2>Unified End-to-End System Master Architecture Flow <span class="badge">Master</span></h2>
+          <p>Complete lifecycle: Rate Limiting &rarr; 2FA Auth &rarr; Cashier POS &amp; PayMongo QR PH &rarr; Inventory &rarr; Approvals &rarr; Super Admin Governance</p>
         </div>
         <button type="button" class="print-single-btn" onclick="printSingleDiagram('fc4', 'portrait')" title="Print only this diagram on a single clean page">
           🖨️ Print Diagram
@@ -1284,6 +1549,28 @@ flowchart TD
     
     AUTH_GATE -- Register Staff --> REG_PIPE[Registration Submission -> Owner 1-Click Link Approval]
     AUTH_GATE -- Sign In --> LOGIN_PIPE[Security Gate -> Password Hash -> 2FA Token Verification]
+    AUTH_GATE -- Register (Staff/Admin) --> REG_SUBMIT[Submit Registration Details & Select Role]
+    REG_SUBMIT --> REG_PENDING[Insert into admin_registration_requests with status=pending]
+    REG_PENDING --> OWNER_EMAIL[Dispatch Approval Email with 1-Click Link to Store Owner]
+    OWNER_EMAIL --> WAIT_SCREEN[/Display: Registration Pending Approval Notice/]
+
+    AUTH_GATE -- Forgot Password --> RECOVER_PWD[Submit Email & Generate 15m Token / Link in admin_tokens]
+    RECOVER_PWD --> SEND_RESET[Dispatch Password Reset Email via Gmail SMTP]
+    SEND_RESET --> RESET_FINISH[Verify Token, Hash Password & Update users Table]
+    RESET_FINISH --> AUTH_GATE
+
+    AUTH_GATE -- Sign In --> LOGIN_CHECK{Validate Credentials & Security}
+    LOGIN_CHECK -- Check Rate Limits --> RL_EVAL{Under Rate Limit in rate_limits?}
+    RL_EVAL -- Limit Exceeded --> SEC_LOCK[/Display 429: Security Lockout/]
+    RL_EVAL -- Permitted --> CRED_EVAL{User Exists in users Table?}
+    
+    CRED_EVAL -- Not in users --> PEND_EVAL{Is Registration Pending?}
+    PEND_EVAL -- Yes --> PEND_403[/Display 403: Registration Still Pending Approval/]
+    PEND_EVAL -- No --> RET_401[/Display 401: Invalid Credentials/]
+    
+    CRED_EVAL -- In users --> PW_EVAL{Verify Bcrypt Password & Active Status}
+    PW_EVAL -- Verified & Active --> ROLE_ROUTE{Route by User Role}
+    PW_EVAL -- Inactive / Bad Password --> RET_FAIL[/Display Error & Log Security Event in system_logs/]
 
     LOGIN_PIPE --> P1_START[["PHASE 1: CASHIER POS ORDER & CHECKOUT PIPELINE"]]
 
@@ -1295,6 +1582,26 @@ flowchart TD
         C4 --> C5[Stock Level Check & Auto-Deduction in menu_items]
         C5 --> C6[Record Transaction in orders & order_items]
         C6 --> C7[Thermal Receipt Print & Low Stock Alerts]
+    ROLE_ROUTE -- Role: Super Admin --> SA_2FA_CODE[Send 6-Digit 2FA Code to superadmin_email]
+    SA_2FA_CODE --> VERIFY_SA_CODE{Verify Super Admin 2FA Token}
+    VERIFY_SA_CODE -- Valid --> SA_PIPELINE
+    VERIFY_SA_CODE -- Invalid --> SEC_LOCK
+
+    subgraph CASHIER_PIPELINE [CASHIER POS TRANSACTION PIPELINE]
+        direction TB
+        C1[Category Shortcuts & Subcategory Tabs] --> C2[Browse Menu Items Grid]
+        C2 --> C3[Size Variant Selection Modal: Regular, Upsize, 12oz, 16oz, S, M, L]
+        C3 --> C4[Order Cart Live Calculation & Review]
+        C4 --> C5{Payment Tender Selection}
+        C5 -- Cash --> C6A[Input Tendered Amount & Compute Customer Change]
+        C5 -- PayMongo Dynamic QR PH --> C6B[Call PayMongo API -> Generate QR PH Canvas -> Poll Status Live]
+        C6A --> C7{Stock Level Validation in DB}
+        C6B --> C7
+        C7 -- In Stock --> C8[Automatic Stock Quantity Deduction from menu_items]
+        C8 --> C9[Record Transaction in orders & order_items Tables]
+        C9 --> C10[Low Stock Toast & Official Thermal Receipt Print]
+        C10 --> C11[Multi-Channel Void Request: Manager PIN / Owner Email Link / Super Admin Request]
+        C11 --> C12[Update orders Status, Restock Items & Log in order_adjustments]
     end
 
     P1_START --> C1
@@ -1310,9 +1617,40 @@ flowchart TD
 
     P2_START --> A1
     A5 --> CLOSE_SYSTEM([Session Audited & Securely Closed])
+        A1[Admin Dashboard Hub] --> A2{Administrative Workspace}
+        A2 -- Menu & Inventory --> A3[Add/Edit Items with Size Variant Pricing JSON]
+        A3 --> A4[15-Minute Security Bypass Token for Item Deletions via admin_tokens]
+        A2 -- User Approvals --> A5[Pending Registrations Table: Cashier UI 1-Click Approval]
+        A5 --> A6[Store Owner 1-Click Email Token Approval]
+        A2 -- Sales & Analytics --> A7[Real-time Revenue KPIs, Hourly Peak Charts & Sales Reports]
+        A7 --> A8[Expandable Order Cards & Manager Void Authorizations]
+        A2 -- Settings --> A9[Configure PayMongo Secret Key in system_settings]
+    end
+
+    subgraph SA_PIPELINE [SUPER ADMIN GOVERNANCE PIPELINE]
+        direction TB
+        S1[Super Admin Control Center Hub] --> S2{Governance Workspace}
+        S2 -- System Requests --> S3[Review & Authorize Order Voids, Refunds, Menu Deletions]
+        S2 -- User Management --> S4[Direct User Creation, Role Editing, Account Lockout & Permanent Deletion]
+        S2 -- Settings & Rate Limits --> S5[Configure Security Thresholds & 1-Click Reset rate_limits]
+        S2 -- Audit Trail --> S6[Browse Full Immutable Audit Logs from system_logs]
+    end
+
+    C12 --> LOGOUT_CSH([Cashier Logout / End Shift])
+    A4 --> LOGOUT_ADM([Admin Session Finished])
+    A6 --> LOGOUT_ADM
+    A8 --> LOGOUT_ADM
+    A9 --> LOGOUT_ADM
+    S3 --> LOGOUT_SA([Super Admin Session Closed])
+    S4 --> LOGOUT_SA
+    S5 --> LOGOUT_SA
+    S6 --> LOGOUT_SA
+    LOGOUT_CSH --> TERMINAL([Session Terminated / Returned to Portal])
+    LOGOUT_ADM --> TERMINAL
+    LOGOUT_SA --> TERMINAL
         </div>
       </div>
-      <div class="sec-note">&#9670; Comprehensive End-to-End System Workflow Across All Roles &amp; Security Boundary Gates</div>
+      <div class="sec-note">&#9670; Comprehensive End-to-End System Workflow Across All Roles, Payment Gateways &amp; Security Gates</div>
     </div>
 
     <!-- ==============================================================
@@ -1326,6 +1664,10 @@ flowchart TD
             <h2>Use Case Diagram Level 0: Context System Boundary <span class="badge">Context</span></h2>
             <p>System boundary, primary actors (Cashier, Admin, Owner, Super Admin, Gmail SMTP) &amp; core use case clusters</p>
           </div>
+        <div class="sec-icon">&#9678;</div>
+        <div>
+          <h2>Use Case Diagram Level 0: Context System Boundary <span class="badge">Context</span></h2>
+          <p>System boundary, primary actors (Cashier, Admin, Owner, Super Admin) &amp; external services (Gmail SMTP, PayMongo API)</p>
         </div>
         <button type="button" class="print-single-btn" onclick="printSingleDiagram('uc0', 'portrait')" title="Print only this diagram on a single clean page">
           🖨️ Print Diagram
@@ -1347,15 +1689,18 @@ flowchart TD
         UC_AUTH["UC 1.0: Authentication, Rate Limits & 2FA"]
         UC_REG["UC 2.0: Staff Registration & Approvals"]
         UC_INV["UC 3.0: Menu Catalog & 15-Min Bypass Token"]
-        UC_POS["UC 4.0: POS Register, Stock Deduction & Receipts"]
-        UC_ORD["UC 5.0: Order History, Expandable Cards & Voids"]
+        UC_POS["UC 4.0: POS Register, PayMongo QR PH & Cash Checkout"]
+        UC_ORD["UC 5.0: Order History, Voids & order_adjustments"]
         UC_ANA["UC 6.0: Sales Analytics, KPIs & Summary Reports"]
         UC_SEC["UC 7.0: Security Governance & System Logs"]
         UC_AUTH --> UC_REG --> UC_INV --> UC_POS --> UC_ORD --> UC_ANA --> UC_SEC
+        UC_SA["UC 7.0: Super Admin Requests & User Governance"]
+        UC_SEC["UC 8.0: Security Settings, API Keys & Rate Limits"]
     end
 
     subgraph SERVICES [External Supporting Services]
         EML(["Gmail SMTP Service"])
+        PAY(["PayMongo API Gateway"])
     end
 
     CSH --- UC_AUTH
@@ -1364,14 +1709,27 @@ flowchart TD
     ADM --- UC_INV
     ADM --- UC_ANA
     OWN --- UC_REG
+    ADM --- UC_SEC
+
+    OWN --- UC_REG
+    OWN --- UC_AUTH
+    OWN --- UC_ORD
+    
+    SA --- UC_AUTH
+    SA --- UC_REG
+    SA --- UC_ORD
+    SA --- UC_SA
     SA --- UC_SEC
 
     UC_AUTH --- EML
     UC_REG --- EML
     UC_INV --- EML
+    UC_ORD --- EML
+    UC_POS --- PAY
+    UC_SEC --- PAY
         </div>
       </div>
-      <div class="sec-note">Actor Interactions &amp; High-Level System Boundary Decomposition</div>
+      <div class="sec-note">Actor Interactions &amp; High-Level System Boundary Decomposition with Payment Gateway</div>
     </div>
 
     <!-- ==============================================================
@@ -1385,6 +1743,10 @@ flowchart TD
             <h2>Use Case L1: Authentication &amp; User Approvals <span class="badge">Level 1</span></h2>
             <p>Login rate limits, 2FA manager codes, Cashier &amp; Admin registration approvals, owner 1-click links &amp; account controls</p>
           </div>
+        <div class="sec-icon">&#9678;</div>
+        <div>
+          <h2>Use Case L1A: Authentication, Security &amp; Staff Approvals <span class="badge">Level 1</span></h2>
+          <p>Rate limits, 2FA manager codes, Super Admin 2FA, password recovery via email &amp; multi-channel staff registration approvals</p>
         </div>
         <button type="button" class="print-single-btn" onclick="printSingleDiagram('uc1a', 'portrait')" title="Print only this diagram on a single clean page">
           🖨️ Print Diagram
@@ -1420,6 +1782,22 @@ flowchart TD
         UC10["UC 10: Resend Fresh Approval Token to Owner"]
         UC11["UC 11: Superadmin Account Governance / Deletion"]
         UC6 --> UC7 --> UC8 --> UC9 --> UC10 --> UC11
+    subgraph SUBSYS_AUTH [Process 1.0: Authentication & Security Access]
+        UC1["Login with Rate Limiting & Escalating Lockout"]
+        UC2["Pending Approval Status Intercept"]
+        UC3["Admin 2FA Email Code Verification"]
+        UC4["Super Admin 2FA Verification"]
+        UC5["Forgot Password & Email Reset Link / PIN"]
+        UC6["Session Management & Logout"]
+    end
+
+    subgraph SUBSYS_APPROVE [Process 2.0: Registration & Staff Approvals]
+        UC7["Submit Registration (Cashier or Admin)"]
+        UC8["Owner 1-Click Email Token Approval"]
+        UC9["Admin POS UI Cashier Direct Approval"]
+        UC10["Reject Registration Request"]
+        UC11["Resend Approval Token to Owner"]
+        UC12["Super Admin Account Activation / Deletion"]
     end
 
     subgraph EXT_MAIL [External Supporting Service]
@@ -1434,9 +1812,37 @@ flowchart TD
     UC7 -.-> EML
     UC8 -.-> EML
     UC10 -.-> EML
+    CSH --> UC1
+    CSH --> UC2
+    CSH --> UC5
+    CSH --> UC7
+    CSH --> UC6
+
+    ADM --> UC1
+    ADM --> UC3
+    ADM --> UC5
+    ADM --> UC6
+    ADM --> UC7
+    ADM --> UC9
+    ADM --> UC10
+    ADM --> UC11
+
+    OWN --> UC8
+    SA --> UC1
+    SA --> UC4
+    SA --> UC5
+    SA --> UC12
+
+    UC3 -.->|Sends 2FA Code| EML
+    UC4 -.->|Sends 2FA Code| EML
+    UC5 -.->|Sends Reset Link| EML
+    UC7 -.->|Sends Approval Link| EML
+    UC8 -.->|Sends Confirmation| EML
+    UC9 -.->|Sends Confirmation| EML
+    UC11 -.->|Resends Token| EML
         </div>
       </div>
-      <div class="sec-note">Granular Functional Use Cases &mdash; Authentication &amp; Multi-Channel Registration Approvals</div>
+      <div class="sec-note">Granular Functional Use Cases &mdash; Authentication, Password Recovery &amp; Multi-Channel Registration Approvals</div>
     </div>
 
     <!-- ==============================================================
@@ -1450,6 +1856,10 @@ flowchart TD
             <h2>Use Case L1: Menu, POS, Orders &amp; Analytics <span class="badge">Level 1</span></h2>
             <p>Size variants, checkout, photo replace/delete modal, void/refund PIN requests, weekly VS analytics &amp; 15-min auto-purge tokens</p>
           </div>
+        <div class="sec-icon">&#9678;</div>
+        <div>
+          <h2>Use Case L1B: Menu, POS, Orders &amp; PayMongo Checkout <span class="badge">Level 1</span></h2>
+          <p>Size variants, PayMongo dynamic QR PH checkout, stock deductions, thermal receipts, order adjustments &amp; real-time KPIs</p>
         </div>
         <button type="button" class="print-single-btn" onclick="printSingleDiagram('uc1b', 'portrait')" title="Print only this diagram on a single clean page">
           🖨️ Print Diagram
@@ -1508,10 +1918,134 @@ flowchart TD
         </div>
       </div>
       <div class="sec-note">Subsystem Functional Decomposition &mdash; Menu Inventory, POS Checkout, System Requests &amp; Sales Analytics</div>
+        UC13["Manage Items with Size Price JSON"]
+        UC14["Quick Stock Adjust & Min Thresholds"]
+        UC15["Toggle Item Availability Active/Hidden"]
+        UC16["Request 15-Min Delete Bypass Token"]
+        UC17["Delete Menu Item with Verified Token"]
+    end
+
+    subgraph SUBSYS_POS [Process 4.0: POS & Payment Checkout]
+        direction TB
+        UC18["Category Shortcuts & Subcategory Tabs"]
+        UC19["Add Item with Size Variant Modal"]
+        UC20["Cart Management: Adjust Qty & Remove"]
+        UC21["Process Cash Payment with Tender & Change"]
+        UC22["Generate PayMongo Dynamic QR PH Code"]
+        UC23["Live Polling for PayMongo Payment Success"]
+        UC24["Automatic Stock Deduction & Low Stock Alert"]
+        UC25["Print Thermal & Official Receipts"]
+    end
+
+    subgraph SUBSYS_ORD [Process 5.0: Orders, Adjustments & Analytics]
+        direction TB
+        UC26["View Expandable Order Cards & Item Breakdown"]
+        UC27["Submit Void / Refund Request with Reason"]
+        UC28["Authorize Void / Refund via Manager PIN"]
+        UC29["Record Adjustment in order_adjustments Table"]
+        UC30["Real-Time Financial KPIs & Hourly Peak Charts"]
+        UC31["Print Formal Sales Summary Reports"]
+    end
+
+    subgraph EXT_PAY [External Payment Gateway]
+        PAY(["PayMongo API Gateway"])
+    end
+
+    CSH --> UC18
+    CSH --> UC19
+    CSH --> UC20
+    CSH --> UC21
+    CSH --> UC22
+    CSH --> UC23
+    CSH --> UC24
+    CSH --> UC25
+    CSH --> UC26
+    CSH --> UC27
+
+    ADM --> UC13
+    ADM --> UC14
+    ADM --> UC15
+    ADM --> UC16
+    ADM --> UC17
+    ADM --> UC26
+    ADM --> UC28
+    ADM --> UC29
+    ADM --> UC30
+    ADM --> UC31
+
+    UC22 -.->|Creates Payment Intent| PAY
+    UC23 -.->|Polls Payment Status| PAY
+        </div>
+      </div>
+      <div class="sec-note">Subsystem Functional Decomposition &mdash; Menu Inventory, PayMongo QR PH Checkout &amp; Sales Analytics</div>
     </div>
 
     <!-- ==============================================================
-         ERD DOMAIN 1: POS & ORDERS
+         USE CASE DIAGRAM LEVEL 1C: SUPER ADMIN CONTROL CENTER
+         ============================================================== -->
+    <div class="sec" id="uc1c">
+      <div class="sec-head">
+        <div class="sec-icon">&#9678;</div>
+        <div>
+          <h2>Use Case L1C: Super Admin Control Center &amp; System Governance <span class="badge badge-new">New Subsystem</span></h2>
+          <p>System requests authorization, user account lifecycle governance, store security policies, rate limit monitoring &amp; central audit logs</p>
+        </div>
+      </div>
+      <div class="bg">
+        <div class="mermaid">
+flowchart LR
+    subgraph ACT_SA [Governance Actors]
+        SA(["Super Admin"])
+        ADM_REQ(["Admin Requesters"])
+    end
+
+    subgraph SUBSYS_REQ [Process 6.0: System Requests Governance]
+        UC32["Inspect Pending system_requests Queue"]
+        UC33["Authorize Order Void & Auto-Restock Inventory"]
+        UC34["Authorize Order Refund & Auto-Restock Inventory"]
+        UC35["Authorize Protected Menu Item Deletions"]
+        UC36["Reject System Request with Review Note"]
+    end
+
+    subgraph SUBSYS_USR [Process 7.0: User Account Lifecycle Governance]
+        UC37["Create Any User Direct (Admin/Cashier/Superadmin)"]
+        UC38["Update User Information & Role Permissions"]
+        UC39["Toggle User is_active Status (Immediate Lock)"]
+        UC40["Force Reset User Password"]
+        UC41["Permanently Delete User Account"]
+    end
+
+    subgraph SUBSYS_SEC [Process 8.0: Security Policies & Audit Trails]
+        UC42["Configure Store Settings & Notification Recipients"]
+        UC43["Save PayMongo Secret API Key in system_settings"]
+        UC44["Configure Rate Limiting Thresholds & Lockout Rules"]
+        UC45["Monitor rate_limits Table & Clear Lockouts"]
+        UC46["Inspect Immutable System Audit Trail (system_logs)"]
+    end
+
+    ADM_REQ -->|Submits Requests| UC32
+    SA --> UC32
+    SA --> UC33
+    SA --> UC34
+    SA --> UC35
+    SA --> UC36
+    SA --> UC37
+    SA --> UC38
+    SA --> UC39
+    SA --> UC40
+    SA --> UC41
+    SA --> UC42
+    SA --> UC43
+    SA --> UC44
+    SA --> UC45
+    SA --> UC46
+        </div>
+      </div>
+      <div class="sec-note">Super Admin Executive Governance &mdash; Multi-Entity Approvals, Rate Limit Resets &amp; Security Audit</div>
+    </div>
+
+    <!-- ==============================================================
+         ERD DOMAIN 1: POS, CATALOG, ORDERS & ADJUSTMENTS
          ============================================================== -->
     <div class="sec" id="erd-pos">
       <div class="sec-head">
@@ -1521,6 +2055,10 @@ flowchart TD
             <h2>ERD Part 1: POS Catalog, Orders &amp; Transaction Pipeline <span class="badge">Database Schema</span></h2>
             <p>Relational entities for product catalog, categories, size pricing variants, order headers &amp; line items</p>
           </div>
+        <div class="sec-icon">&#9638;</div>
+        <div>
+          <h2>ERD Part 1: POS Catalog, Orders &amp; Adjustments Pipeline <span class="badge">Database Schema</span></h2>
+          <p>Relational entities for product catalog, categories, size pricing variants, orders, order items &amp; order adjustments</p>
         </div>
         <button type="button" class="print-single-btn" onclick="printSingleDiagram('erd-pos', 'portrait')" title="Print only this diagram on a single clean page">
           🖨️ Print Diagram
@@ -1533,6 +2071,8 @@ erDiagram
     MENU_ITEMS ||--o{ ORDER_ITEMS : "ordered_in"
     ORDERS ||--|{ ORDER_ITEMS : "contains"
     USERS ||--o{ ORDERS : "processes"
+    ORDERS ||--o{ ORDER_ADJUSTMENTS : "adjusted_by"
+    USERS ||--o{ ORDER_ADJUSTMENTS : "authorizes"
 
     CATEGORIES {
         int id PK
@@ -1547,9 +2087,12 @@ erDiagram
         decimal price
         text size_prices
         mediumtext image
+        varchar emoji
+        text image
         int stock
         int min_stock
         tinyint is_available
+        timestamp created_at
         timestamp updated_at
     }
 
@@ -1560,7 +2103,6 @@ erDiagram
         decimal total
         varchar payment_method
         varchar status
-        text void_reason
         timestamp created_at
     }
 
@@ -1574,6 +2116,16 @@ erDiagram
         varchar size
     }
 
+    ORDER_ADJUSTMENTS {
+        int id PK
+        int order_id FK
+        enum type
+        decimal amount
+        varchar reason
+        int processed_by FK
+        timestamp created_at
+    }
+
     USERS {
         int id PK
         varchar username UK
@@ -1581,14 +2133,16 @@ erDiagram
         varchar email
         enum role
         tinyint is_active
+        timestamp created_at
+        timestamp updated_at
     }
         </div>
       </div>
-      <div class="sec-note">Entity Relationships: Core Transaction &amp; Inventory Pipeline (chipipie_pos)</div>
+      <div class="sec-note">Entity Relationships: Core Transaction, Inventory &amp; Order Adjustments Pipeline (chipipie_pos)</div>
     </div>
 
     <!-- ==============================================================
-         ERD DOMAIN 2: SECURITY & LOGS
+         ERD DOMAIN 2: SECURITY, AUDIT LOGS, RATE LIMITS & SESSIONS
          ============================================================== -->
     <div class="sec" id="erd-sec">
       <div class="sec-head">
@@ -1598,6 +2152,10 @@ erDiagram
             <h2>ERD Part 2: Security, Approvals, Requests &amp; Audit Logs <span class="badge">Database Schema</span></h2>
             <p>Relational entities for registration requests, 2FA/bypass tokens, system requests &amp; comprehensive audit logs</p>
           </div>
+        <div class="sec-icon">&#9638;</div>
+        <div>
+          <h2>ERD Part 2: Security, Approvals, Requests, Rate Limits &amp; Audit Logs <span class="badge">Database Schema</span></h2>
+          <p>Relational entities for registration requests, bypass/2FA tokens, system requests, rate limits, audit logs &amp; system settings</p>
         </div>
         <button type="button" class="print-single-btn" onclick="printSingleDiagram('erd-sec', 'portrait')" title="Print only this diagram on a single clean page">
           🖨️ Print Diagram
@@ -1611,6 +2169,8 @@ erDiagram
     USERS ||--o{ SYSTEM_REQUESTS : "submits"
     SYSTEM_REQUESTS ||--o{ SYSTEM_LOGS : "audits"
     SYSTEM_SETTINGS ||--o{ SYSTEM_LOGS : "configures"
+    USERS ||--o{ SYSTEM_REQUESTS : "reviews"
+    USERS ||--o{ SYSTEM_LOGS : "logs_activity"
 
     USERS {
         int id PK
@@ -1619,11 +2179,20 @@ erDiagram
         varchar email
         enum role
         tinyint is_active
+        timestamp created_at
+        timestamp updated_at
     }
 
     ADMIN_REGISTRATION_REQUESTS {
         int id PK
         varchar username
+        varchar password
+        varchar first_name
+        varchar last_name
+        varchar middle_initial
+        varchar suffix
+        varchar full_name
+        varchar email
         varchar role
         varchar approval_token UK
         enum status
@@ -1637,14 +2206,23 @@ erDiagram
         varchar purpose
         tinyint is_used
         datetime expires_at
+        datetime used_at
+        timestamp created_at
     }
 
     SYSTEM_REQUESTS {
         int id PK
-        varchar type
+        enum type
         int requested_by FK
         varchar title
         enum status
+        text description
+        json payload
+        enum status
+        int reviewed_by FK
+        datetime reviewed_at
+        text review_note
+        timestamp created_at
     }
 
     SYSTEM_LOGS {
@@ -1652,7 +2230,28 @@ erDiagram
         int actor_id FK
         varchar action
         varchar target_type
+        int target_id
+        text details
+        varchar ip_address
         timestamp created_at
+    }
+
+    RATE_LIMITS {
+        int id PK
+        varchar rate_key UK
+        varchar action
+        varchar identifier
+        int hits
+        int lockout_count
+        datetime first_hit_at
+        datetime last_hit_at
+        datetime locked_until
+    }
+
+    PHP_SESSIONS {
+        varchar id PK
+        mediumtext data
+        int last_activity
     }
 
     SYSTEM_SETTINGS {
@@ -1662,7 +2261,7 @@ erDiagram
     }
         </div>
       </div>
-      <div class="sec-note">Entity Relationships: Security, Tokens, Multi-Channel Approvals &amp; System Logs</div>
+      <div class="sec-note">Entity Relationships: Security, Tokens, Multi-Channel Approvals, Rate Limiting &amp; System Logs</div>
     </div>
 
     <!-- ==============================================================
@@ -1676,6 +2275,10 @@ erDiagram
             <h2>DFD Level 0: Context System Boundary <span class="badge">Context</span></h2>
             <p>Global data flows between external entities (Cashier, Admin, Owner, Super Admin, Gmail SMTP) &amp; POS Process 0</p>
           </div>
+        <div class="sec-icon">&#8646;</div>
+        <div>
+          <h2>DFD Level 0: Context System Boundary <span class="badge">Context</span></h2>
+          <p>Global data flows between external entities (Cashier, Admin, Owner, Super Admin, Gmail SMTP, PayMongo API) &amp; POS Process 0</p>
         </div>
         <button type="button" class="print-single-btn" onclick="printSingleDiagram('dfd0', 'portrait')" title="Print only this diagram on a single clean page">
           🖨️ Print Diagram
@@ -1701,9 +2304,35 @@ flowchart TD
 
     SYS -->|"Security 2FA & Notification Emails"| EML(["Gmail SMTP Service"])
     EML -->|"1-Click Approval Links"| OWN
+    CSH(["Cashier"])
+    ADM(["Admin"])
+    OWN(["Store Owner"])
+    SA(["Super Admin"])
+    EML(["Gmail SMTP Service"])
+    PAY(["PayMongo API Gateway"])
+
+    SYS["Process 0: ChipiPie Cafe POS System"]
+
+    CSH -->|"1. Credentials & Orders<br/>2. Cash Payment Details<br/>3. Void/Refund Requests"| SYS
+    SYS -->|"1. Active POS Session<br/>2. Thermal Receipts<br/>3. Out-of-Stock Alerts"| CSH
+
+    SYS -->|"1. Payment Intent & Amount<br/>2. QR PH Method Request"| PAY
+    PAY -->|"1. Base64 Scannable QR Code<br/>2. Payment Succeeded Status"| SYS
+
+    ADM -->|"1. 2FA Codes & Staff Approvals<br/>2. Menu & Size Variant Updates<br/>3. 15-Min Bypass Token Requests<br/>4. PayMongo Secret Key"| SYS
+    SYS -->|"1. Real-Time KPIs & Trend Charts<br/>2. Expandable Order Histories<br/>3. Inventory Low Stock Alerts"| ADM
+
+    OWN -->|"1. 1-Click Email Token Approval<br/>2. 1-Click Void/Refund Decision"| SYS
+    SYS -->|"1. Account Activated Confirmations"| OWN
+
+    SA -->|"1. System Request Approvals/Rejections<br/>2. Direct User Creation & Deletion<br/>3. Rate Limit Reset Commands<br/>4. Global Security Policy Updates"| SYS
+    SYS -->|"1. System Health KPIs & Request Queue<br/>2. Comprehensive Immutable Audit Logs<br/>3. Live Rate Limit Status"| SA
+
+    SYS -->|"1. 2FA Codes, Bypass Tokens & Reset Links<br/>2. 1-Click Approval Links & Notifications"| EML
+    EML -->|"1. Deliver Security Emails to Recipients"| OWN
         </div>
       </div>
-      <div class="sec-note">Context Data Flow Level 0: External Entities &amp; Boundary Process</div>
+      <div class="sec-note">Context Data Flow Level 0: External Entities, Payment Gateway &amp; Boundary Process</div>
     </div>
 
     <!-- ==============================================================
@@ -1717,6 +2346,10 @@ flowchart TD
             <h2>DFD Level 1A: Authentication &amp; Registration <span class="badge">Level 1</span></h2>
             <p>Process 1.0 (Login, Rate Limits, Lockout, 2FA) &amp; Process 2.0 (Cashier &amp; Admin Registration Approvals)</p>
           </div>
+        <div class="sec-icon">&#8646;</div>
+        <div>
+          <h2>DFD Level 1A: Authentication, Security &amp; Staff Approvals <span class="badge">Level 1</span></h2>
+          <p>Process 1.0 (Login, Rate Limits, Lockout, 2FA, Password Recovery) &amp; Process 2.0 (Cashier &amp; Admin Registration Approvals)</p>
         </div>
         <button type="button" class="print-single-btn" onclick="printSingleDiagram('dfd1a', 'portrait')" title="Print only this diagram on a single clean page">
           🖨️ Print Diagram
@@ -1726,26 +2359,34 @@ flowchart TD
         <div class="dfd-block">
           <h3 class="dfd-subtitle">Process 1.0: Authentication &amp; Access Validation</h3>
           <div class="mermaid">
+      <div class="bg" style="flex-direction: column; gap: 36px;">
+        <h3 style="font-size: 1.05rem; font-weight: 800; border-bottom: 2px solid #000; padding-bottom: 8px; width: 100%; max-width: 820px; text-align: center;">Process 1.0: Authentication, Rate Limits &amp; Password Recovery</h3>
+        <div class="mermaid">
 flowchart TD
     CSH(["Cashier"])
     ADM(["Admin"])
+    SA(["Super Admin"])
     EML(["Gmail SMTP Service"])
 
     P1_1["1.1 Check Rate Limits & Validate Credentials"]
     P1_2["1.2 Intercept Pending Registration Status"]
-    P1_3["1.3 Verify Admin 2FA Token via Email"]
+    P1_3["1.3 Verify Admin / Superadmin 2FA Token"]
     P1_4["1.4 Generate Session & Role Permissions"]
+    P1_5["1.5 Process Password Recovery & Reset Link"]
 
     DS1[("D1: users")]
     DS4[("D4: admin_registration_requests")]
     DS5[("D5: admin_tokens")]
+    DS6[("D6: rate_limits")]
 
     CSH -->|"1. Username & Password"| P1_1
     ADM -->|"1. Username & Password"| P1_1
-    P1_1 -->|"2. Read User Record"| DS1
-    P1_1 -->|"3. Query Pending"| P1_2
-    P1_2 -->|"4. Check Requests"| DS4
-    P1_2 -->|"5. 403 Pending Notice"| CSH
+    SA -->|"1. Username & Password"| P1_1
+    P1_1 -->|"2. Check & Increment Hits"| DS6
+    P1_1 -->|"3. Read User Record"| DS1
+    P1_1 -->|"4. Query Pending"| P1_2
+    P1_2 -->|"5. Check Requests"| DS4
+    P1_2 -->|"6. 403 Pending Notice"| CSH
     
     P1_1 -->|"6. Trigger Admin 2FA"| P1_3
     P1_3 -->|"7. Verify Token"| DS5
@@ -1753,6 +2394,16 @@ flowchart TD
     P1_3 -->|"9. Active Session Context"| P1_4
     P1_4 -->|"10. Cashier / Admin Session"| CSH
           </div>
+    P1_1 -->|"7. Trigger 2FA Generation"| P1_3
+    P1_3 -->|"8. Verify Token in DB"| DS5
+    P1_3 -->|"9. Send 2FA Code Email"| EML
+    P1_3 -->|"10. Active Session Context"| P1_4
+    P1_4 -->|"11. Session Cookie & Access Grant"| CSH
+
+    CSH -->|"12. Forgot Password Request"| P1_5
+    P1_5 -->|"13. Save Reset Token"| DS5
+    P1_5 -->|"14. Dispatch Reset Link / PIN"| EML
+    P1_5 -->|"15. Update Bcrypt Password"| DS1
         </div>
 
         <div class="dfd-block">
@@ -1792,7 +2443,7 @@ flowchart TD
           </div>
         </div>
       </div>
-      <div class="sec-note">Detailed Subsystem Data Store Transitions &mdash; Authentication &amp; Registration Approvals</div>
+      <div class="sec-note">Detailed Subsystem Data Store Transitions &mdash; Authentication, Rate Limiting &amp; Staff Approvals</div>
     </div>
 
     <!-- ==============================================================
@@ -1806,6 +2457,10 @@ flowchart TD
             <h2>DFD Level 1B: Menu, POS, Orders &amp; Analytics <span class="badge">Level 1</span></h2>
             <p>Process 3.0 (Menu &amp; Bypass Tokens), Process 4.0 (Order Checkout &amp; Stock Deduction) &amp; Process 5.0 (Orders &amp; KPIs)</p>
           </div>
+        <div class="sec-icon">&#8646;</div>
+        <div>
+          <h2>DFD Level 1B: Menu, POS, PayMongo Orders &amp; Analytics <span class="badge">Level 1</span></h2>
+          <p>Process 3.0 (Menu &amp; Bypass Tokens), Process 4.0 (PayMongo QR PH &amp; Cash Checkout) &amp; Process 5.0 (Orders, Adjustments &amp; KPIs)</p>
         </div>
         <button type="button" class="print-single-btn" onclick="printSingleDiagram('dfd1b', 'portrait')" title="Print only this diagram on a single clean page">
           🖨️ Print Diagram
@@ -1815,6 +2470,9 @@ flowchart TD
         <div class="dfd-block">
           <h3 class="dfd-subtitle">Process 3.0: Menu Catalog &amp; Protected Deletion</h3>
           <div class="mermaid">
+      <div class="bg" style="flex-direction: column; gap: 36px;">
+        <h3 style="font-size: 1.05rem; font-weight: 800; border-bottom: 2px solid #000; padding-bottom: 8px; width: 100%; max-width: 820px; text-align: center;">Process 3.0: Menu Catalog, Settings &amp; Protected Deletion</h3>
+        <div class="mermaid">
 flowchart TD
     ADM(["Admin"])
     EML(["Gmail SMTP Service"])
@@ -1822,9 +2480,11 @@ flowchart TD
     P3_1["3.1 Add / Edit Menu Items with Size Prices JSON"]
     P3_2["3.2 Quick Stock Adjust & Thresholds"]
     P3_3["3.3 Validate 15-Minute Delete Bypass Token"]
+    P3_4["3.4 Save PayMongo API Key in Settings"]
 
     DS2[("D2: menu_items")]
     DS5[("D5: admin_tokens")]
+    DS9[("D9: system_settings")]
 
     ADM -->|"1. Add / Edit Item Details"| P3_1
     P3_1 -->|"2. Save Item & Size Prices"| DS2
@@ -1836,74 +2496,193 @@ flowchart TD
     P3_3 -->|"6. Dispatch 15-Min Token"| EML
     ADM -->|"7. Submit 6-Digit Bypass Token"| P3_3
     P3_3 -->|"8. Verify & Consume Token"| DS5
-    P3_3 -->|"9. Delete Item Record & Restock"| DS2
+    P3_3 -->|"9. Delete Item Record"| DS2
+
+    ADM -->|"10. Save PayMongo Secret Key"| P3_4
+    P3_4 -->|"11. Upsert Setting Key"| DS9
         </div>
         </div>
 
         <div class="dfd-block">
           <h3 class="dfd-subtitle">Process 4.0: POS Order Processing &amp; Real-Time Stock Deduction</h3>
           <div class="mermaid">
+        <h3 style="font-size: 1.05rem; font-weight: 800; border-bottom: 2px solid #000; padding-bottom: 8px; width: 100%; max-width: 820px; text-align: center;">Process 4.0: POS Order Processing, PayMongo QR PH &amp; Stock Deduction</h3>
+        <div class="mermaid">
 flowchart TD
     CSH(["Cashier"])
+    PAY(["PayMongo API Gateway"])
 
-    P4_1["4.1 Filter Category Shortcuts & Subcat Tabs"]
+    P4_1["4.1 Filter Categories & Subcat Tabs"]
     P4_2["4.2 Size Selection Modal & Pricing Variant"]
-    P4_3["4.3 Cart Live Calc & Payment (Cash/GCash)"]
-    P4_4["4.4 Automatic Stock Deduction & Thermal Receipt"]
+    P4_3["4.3 Cart Live Calc & Tender Selection (Cash/PayMongo)"]
+    P4_4["4.4 Create Dynamic QR PH & Poll Payment Status"]
+    P4_5["4.5 Automatic Stock Deduction & Thermal Receipt"]
 
     DS2[("D2: menu_items")]
     DS3[("D3: orders & order_items")]
+    DS9[("D9: system_settings")]
 
     DS2 -->|"1. Active Menu Items Catalog"| P4_1
     CSH -->|"2. Browse Categories & Subcats"| P4_1
     CSH -->|"3. Select Item & Choose Size Variant"| P4_2
     P4_2 -->|"4. Add Sized Item to Cart"| P4_3
-    CSH -->|"5. Tender Payment: Cash with Change or GCash"| P4_3
-    P4_3 -->|"6. Validate Stock & Commit Order"| P4_4
-    P4_4 -->|"7. Deduct Stock Quantities"| DS2
-    P4_4 -->|"8. Insert Order & Line Items"| DS3
-    P4_4 -->|"9. Render Official Thermal Receipt"| CSH
+    
+    CSH -->|"5A. Cash Tendered"| P4_3
+    CSH -->|"5B. Select PayMongo QR PH"| P4_4
+    DS9 -->|"6. Read PayMongo Key"| P4_4
+    P4_4 -->|"7. POST /v1/payment_intents"| PAY
+    PAY -->|"8. Base64 Scannable QR Code"| P4_4
+    P4_4 -->|"9. Render QR Code Canvas"| CSH
+    P4_4 -->|"10. Live Polling Loop"| PAY
+    PAY -->|"11. Status === succeeded"| P4_4
+
+    P4_3 -->|"12. Validate Stock & Commit Order"| P4_5
+    P4_4 -->|"12. Payment Verified Event"| P4_5
+    P4_5 -->|"13. Deduct Stock Quantities"| DS2
+    P4_5 -->|"14. Insert Order & Line Items"| DS3
+    P4_5 -->|"15. Render Official Thermal Receipt"| CSH
         </div>
         </div>
 
         <div class="dfd-block">
           <h3 class="dfd-subtitle">Process 5.0: Orders, Voids &amp; Sales Analytics</h3>
           <div class="mermaid">
+        <h3 style="font-size: 1.05rem; font-weight: 800; border-bottom: 2px solid #000; padding-bottom: 8px; width: 100%; max-width: 820px; text-align: center;">Process 5.0: Orders, Multi-Channel Voids, Adjustments &amp; Analytics</h3>
+        <div class="mermaid">
 flowchart TD
     CSH(["Cashier"])
     ADM(["Admin"])
+    OWN(["Store Owner"])
+    EML(["Gmail SMTP Service"])
 
     P5_1["5.1 Expandable Order Cards & Item Breakdown"]
-    P5_2["5.2 Submit & Authorize Order Void / Refund"]
-    P5_3["5.3 Compute Real-Time KPIs & Hourly Peak Charts"]
-    P5_4["5.4 Print Thermal & Formal Sales Reports"]
+    P5_2["5.2 Process Void / Refund via Manager PIN or Email Link"]
+    P5_3["5.3 Log Record into order_adjustments"]
+    P5_4["5.4 Compute Real-Time KPIs & Hourly Peak Charts"]
+    P5_5["5.5 Print Thermal & Formal Sales Reports"]
 
     DS3[("D3: orders & order_items")]
     DS2[("D2: menu_items")]
+    DS5[("D5: admin_tokens")]
+    DS7[("D7: order_adjustments")]
+    DS10[("D10: system_logs")]
 
     DS3 -->|"1. Completed Order Records"| P5_1
     CSH -->|"2. View Shift Past Orders"| P5_1
     ADM -->|"2. Filter & Expand Order Cards"| P5_1
 
     CSH -->|"3. Submit Void / Refund Request"| P5_2
-    ADM -->|"4. Enter Manager Auth Code"| P5_2
+    ADM -->|"4A. Manager PIN Authorization"| P5_2
+    P5_2 -->|"4B. Validate PIN in DB"| DS5
+    P5_2 -->|"4C. Dispatch 1-Click Email Decision"| EML
+    OWN -->|"4D. 1-Click Decision Link"| P5_2
+
     P5_2 -->|"5. Update Order Status to Void/Refund"| DS3
     P5_2 -->|"6. Restock Items in Inventory"| DS2
+    P5_2 -->|"7. Write Adjustment Details"| DS7
+    P5_2 -->|"8. Write Security Audit Log"| DS10
 
-    DS3 -->|"7. Financial Transaction Streams"| P5_3
-    P5_3 -->|"8. Real-Time Revenue KPIs & Charts"| ADM
-    P5_3 -->|"9. Sales Summary Dataset"| P5_4
-    P5_4 -->|"10. Formatted Thermal Report"| ADM
+    DS3 -->|"9. Financial Transaction Streams"| P5_4
+    P5_4 -->|"10. Real-Time Revenue KPIs & Charts"| ADM
+    P5_4 -->|"11. Sales Summary Dataset"| P5_5
+    P5_5 -->|"12. Formatted Thermal Report"| ADM
+        </div>
+      </div>
+      <div class="sec-note">Detailed Subsystem Data Store Transitions &mdash; Menu Inventory, PayMongo QR PH Checkout &amp; Order Adjustments</div>
+    </div>
+
+    <!-- ==============================================================
+         DFD LEVEL 1C: SUPER ADMIN CONTROL CENTER & GOVERNANCE
+         ============================================================== -->
+    <div class="sec" id="dfd1c">
+      <div class="sec-head">
+        <div class="sec-icon">&#8646;</div>
+        <div>
+          <h2>DFD Level 1C: Super Admin Control Center, Requests &amp; Governance <span class="badge badge-new">New Subsystem</span></h2>
+          <p>Process 6.0 (System Requests Triage &amp; Execution), Process 7.0 (User Lifecycle Governance) &amp; Process 8.0 (Security Policies &amp; Audit Logs)</p>
+        </div>
+      </div>
+      <div class="bg" style="flex-direction: column; gap: 36px;">
+        <h3 style="font-size: 1.05rem; font-weight: 800; border-bottom: 2px solid #000; padding-bottom: 8px; width: 100%; max-width: 820px; text-align: center;">Process 6.0 &amp; 7.0: System Requests Execution &amp; User Account Governance</h3>
+        <div class="mermaid">
+flowchart TD
+    SA(["Super Admin"])
+    ADM(["Admin Requesters"])
+
+    P6_1["6.1 Triage Pending system_requests Queue"]
+    P6_2["6.2 Execute Approved Payload (Void/Refund/Catalog)"]
+    P6_3["6.3 Reject Request & Append Review Note"]
+    P7_1["7.1 Create / Update User & Role Permissions"]
+    P7_2["7.2 Toggle is_active Status (Immediate Lock)"]
+    P7_3["7.3 Force Reset Password & Delete User"]
+
+    DS8[("D8: system_requests")]
+    DS3[("D3: orders & order_items")]
+    DS2[("D2: menu_items")]
+    DS1[("D1: users")]
+    DS10[("D10: system_logs")]
+
+    ADM -->|"1. Submit System Request"| P6_1
+    P6_1 -->|"2. Insert Request with Payload"| DS8
+    SA -->|"3. Review Requests"| P6_1
+    SA -->|"4A. Approve Request"| P6_2
+    P6_2 -->|"5. Update status=approved"| DS8
+    P6_2 -->|"6. Void/Refund Orders"| DS3
+    P6_2 -->|"7. Restock Inventory"| DS2
+    P6_2 -->|"8. Write Audit Log"| DS10
+
+    SA -->|"4B. Reject Request"| P6_3
+    P6_3 -->|"9. Update status=rejected & note"| DS8
+    P6_3 -->|"10. Write Audit Log"| DS10
+
+    SA -->|"11. Create / Update Account"| P7_1
+    P7_1 -->|"12. Write to users Table"| DS1
+    SA -->|"13. Toggle Account Status"| P7_2
+    P7_2 -->|"14. Set is_active = 0 or 1"| DS1
+    SA -->|"15. Force Reset / Delete"| P7_3
+    P7_3 -->|"16. Update Hash / Delete Record"| DS1
+    P7_1 -->|"17. Log User Action"| DS10
+    P7_2 -->|"17. Log User Action"| DS10
+    P7_3 -->|"17. Log User Action"| DS10
+        </div>
+
+        <h3 style="font-size: 1.05rem; font-weight: 800; border-bottom: 2px solid #000; padding-bottom: 8px; width: 100%; max-width: 820px; text-align: center;">Process 8.0: System Settings, Rate Limit Oversight &amp; Audit Trail Inspection</h3>
+        <div class="mermaid">
+flowchart TD
+    SA(["Super Admin"])
+
+    P8_1["8.1 Configure Store, Emails & Notification Rules"]
+    P8_2["8.2 Configure Rate Limiting Policy Thresholds"]
+    P8_3["8.3 Inspect & Reset Active Rate Limit Lockouts"]
+    P8_4["8.4 Browse Central Immutable Audit Logs"]
+
+    DS9[("D9: system_settings")]
+    DS6[("D6: rate_limits")]
+    DS10[("D10: system_logs")]
+
+    SA -->|"1. Save Store / Email Rules"| P8_1
+    P8_1 -->|"2. Upsert Settings"| DS9
+    
+    SA -->|"3. Save Rate Limit Policies"| P8_2
+    P8_2 -->|"4. Upsert Rate Limit Rules"| DS9
+
+    DS6 -->|"5. Active Lockouts & Hit Counters"| P8_3
+    SA -->|"6. Click Reset Rate Limits"| P8_3
+    P8_3 -->|"7. Clear Lockouts & Reset Hits"| DS6
+    P8_3 -->|"8. Record Reset in Audit Log"| DS10
+
+    DS10 -->|"9. Immutable System Audit Entries"| P8_4
+    SA -->|"10. Filter Logs by Date / Actor / IP"| P8_4
         </div>
         </div>
       </div>
-      <div class="sec-note">Detailed Subsystem Data Store Transitions &mdash; Menu Inventory, POS Checkout &amp; Sales Analytics</div>
+      <div class="sec-note">Detailed Subsystem Data Store Transitions &mdash; Super Admin Governance, Rate Limit Controls &amp; Audit Logs</div>
     </div>
 
   </main>
 
   <footer>
-    <p>ChipiPie Cafe POS System &mdash; System Architecture &amp; Process Documentation &copy; 2026 &nbsp;|&nbsp; High-Readability Black &amp; White Diagrams &nbsp;|&nbsp; DB: chipipie_pos</p>
+    <p>ChipiPie Cafe POS System &mdash; System Architecture &amp; Process Documentation &copy; 2026 &nbsp;|&nbsp; High-Readability Architecture Diagrams &nbsp;|&nbsp; DB: chipipie_pos</p>
   </footer>
 
   <script>

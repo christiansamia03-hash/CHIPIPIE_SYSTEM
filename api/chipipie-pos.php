@@ -9330,8 +9330,8 @@ header('Expires: 0');
           window.salesChartIns.update();
         }
 
-        // Hourly chart
-        if (window.hourlyChartIns) {
+        // Hourly chart — only set initially if picker not yet set
+        if (window.hourlyChartIns && !document.getElementById('rep-day-picker')?.value) {
           window.hourlyChartIns.data.datasets[0].data = stats.hourly_chart;
           window.hourlyChartIns.update();
         }
@@ -9347,7 +9347,202 @@ header('Expires: 0');
         const selY = document.getElementById('pos-rep-year-picker')?.value || '';
         posLoadMonthlyChart(selY);
 
+        // Initialize chart filter pickers (async, non-blocking)
+        initChartPickers();
+
       } catch(e) { console.warn('Reports render failed:', e); }
+    }
+
+    /* ── Weekly chart loader ── */
+    async function loadWeeklyChart(weekStart) {
+      try {
+        const param = (weekStart && weekStart.match(/^\d{4}-\d{2}-\d{2}$/)) ? `week_start=${encodeURIComponent(weekStart)}` : `week_offset=0`;
+        const r = await api(`orders.php?action=chart_weekly&${param}`);
+        if (!r.success || !window.repWeeklyChartIns) return;
+        const vsEl = document.getElementById('rep-week-picker-vs');
+        const vsWeek = vsEl && vsEl.value;
+        const ch = window.repWeeklyChartIns;
+
+        if (vsWeek) {
+          const vsParam = vsWeek.match(/^\d{4}-\d{2}-\d{2}$/) ? `week_start=${encodeURIComponent(vsWeek)}` : `week_offset=0`;
+          const rv = await api(`orders.php?action=chart_weekly&${vsParam}`);
+          const labelA = r.formatted_label || r.week_start;
+          const labelB = (rv && rv.formatted_label) || (rv && rv.week_start) || vsWeek;
+
+          ch.data.labels = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
+          ch.data.datasets = [
+            { label: labelA, data: r.data, backgroundColor: 'rgba(37,99,235,0.85)', borderRadius: 6, borderSkipped: false },
+            { label: labelB, data: (rv && rv.data) || [0,0,0,0,0,0,0], backgroundColor: 'rgba(245,158,11,0.75)', borderRadius: 6, borderSkipped: false }
+          ];
+          ch.options.plugins.legend.display = false;
+          ch.update();
+
+          const la = document.getElementById('weekly-legend-a');
+          const lb = document.getElementById('weekly-legend-b');
+          const leg = document.getElementById('weekly-legend');
+          if (la) la.textContent = labelA;
+          if (lb) lb.textContent = labelB;
+          if (leg) leg.style.display = 'flex';
+        } else {
+          ch.data.labels = r.labels;
+          ch.data.datasets = [{
+            label: r.formatted_label || 'Weekly Sales',
+            data: r.data,
+            backgroundColor: ['#2563eb','#7c3aed','#059669','#f59e0b','#dc2626','#0891b2','#db2777'],
+            borderRadius: 8, borderSkipped: false
+          }];
+          ch.options.plugins.legend.display = false;
+          ch.update();
+          const leg = document.getElementById('weekly-legend');
+          if (leg) leg.style.display = 'none';
+        }
+      } catch(e) { console.warn('loadWeeklyChart error', e); }
+    }
+
+    /* ── Hourly chart loader ── */
+    async function loadHourlyChart(date) {
+      try {
+        const r = await api(`orders.php?action=chart_hourly&date=${date}`);
+        if (!r.success || !window.hourlyChartIns) return;
+        const vsEl = document.getElementById('rep-day-picker-vs');
+        const vsDate = vsEl && vsEl.value;
+        const fmtDate = d => new Date(d + 'T00:00:00').toLocaleDateString('en-PH', {month:'short', day:'numeric', year:'numeric'});
+        if (vsDate) {
+          const rv = await api(`orders.php?action=chart_hourly&date=${vsDate}`);
+          const ch = window.hourlyChartIns;
+          ch.data.datasets = [
+            { label: date, data: r.data, borderColor: '#0891b2', backgroundColor: 'rgba(8,145,178,0.12)', fill: true, tension: 0.4, pointRadius: 3, pointBackgroundColor: '#0891b2', pointBorderColor: '#fff', pointBorderWidth: 2 },
+            { label: vsDate, data: rv.data, borderColor: '#f59e0b', backgroundColor: 'rgba(245,158,11,0.10)', fill: true, tension: 0.4, pointRadius: 3, pointBackgroundColor: '#f59e0b', pointBorderColor: '#fff', pointBorderWidth: 2 }
+          ];
+          ch.options.plugins.legend.display = false;
+          ch.update();
+          const la = document.getElementById('hourly-legend-a');
+          const lb = document.getElementById('hourly-legend-b');
+          const leg = document.getElementById('hourly-legend');
+          if (la) la.textContent = fmtDate(date);
+          if (lb) lb.textContent = fmtDate(vsDate);
+          if (leg) leg.style.display = 'flex';
+          const title = document.getElementById('hourly-chart-title');
+          if (title) title.textContent = 'Hourly Sales — ' + fmtDate(date) + ' vs ' + fmtDate(vsDate);
+        } else {
+          const ch = window.hourlyChartIns;
+          ch.data.datasets = [{ data: r.data, borderColor: '#0891b2', backgroundColor: 'rgba(8,145,178,0.10)', fill: true, tension: 0.4, pointRadius: 4, pointBackgroundColor: '#0891b2', pointBorderColor: '#fff', pointBorderWidth: 2 }];
+          ch.update();
+          const leg = document.getElementById('hourly-legend');
+          if (leg) leg.style.display = 'none';
+          const title = document.getElementById('hourly-chart-title');
+          if (title) title.textContent = 'Hourly Sales — ' + fmtDate(date);
+        }
+      } catch(e) { console.warn('loadHourlyChart error', e); }
+    }
+
+    /* ── Monthly chart loader ── */
+    async function loadMonthlyChart(year) {
+      try {
+        const r = await api(`orders.php?action=chart_monthly&year=${year}`);
+        if (!r.success || !window.monthlyChartIns) return;
+        const vsEl = document.getElementById('rep-year-picker-vs');
+        const vsYear = vsEl && vsEl.value;
+        if (vsYear) {
+          const rv = await api(`orders.php?action=chart_monthly&year=${vsYear}`);
+          const ch = window.monthlyChartIns;
+          ch.data.datasets = [
+            { label: year, data: r.data, borderColor: '#7c3aed', backgroundColor: 'rgba(124,58,237,0.10)', fill: true, tension: 0.4, pointRadius: 3, pointBackgroundColor: '#7c3aed', pointBorderColor: '#fff', pointBorderWidth: 2 },
+            { label: vsYear, data: rv.data, borderColor: '#f59e0b', backgroundColor: 'rgba(245,158,11,0.10)', fill: true, tension: 0.4, pointRadius: 3, pointBackgroundColor: '#f59e0b', pointBorderColor: '#fff', pointBorderWidth: 2 }
+          ];
+          ch.options.plugins.legend.display = false;
+          ch.update();
+          const la = document.getElementById('monthly-legend-a');
+          const lb = document.getElementById('monthly-legend-b');
+          const leg = document.getElementById('monthly-legend');
+          if (la) la.textContent = year;
+          if (lb) lb.textContent = vsYear;
+          if (leg) leg.style.display = 'flex';
+        } else {
+          const ch = window.monthlyChartIns;
+          ch.data.datasets = [{ data: r.data, borderColor: '#7c3aed', backgroundColor: 'rgba(124,58,237,0.08)', fill: true, tension: 0.4, pointRadius: 4, pointBackgroundColor: '#7c3aed', pointBorderColor: '#fff', pointBorderWidth: 2 }];
+          ch.update();
+          const leg = document.getElementById('monthly-legend');
+          if (leg) leg.style.display = 'none';
+        }
+      } catch(e) { console.warn('loadMonthlyChart error', e); }
+    }
+
+    /* ── VS toggle ── */
+    const _vsActive = { weekly: false, hourly: false, monthly: false };
+    function toggleVs(chart) {
+      _vsActive[chart] = !_vsActive[chart];
+      const row = document.getElementById(`vs-row-${chart}`);
+      const btn = document.getElementById(`btn-vs-${chart}`);
+      if (row) row.style.display = _vsActive[chart] ? 'flex' : 'none';
+      if (btn) {
+        btn.textContent = _vsActive[chart] ? '✕ VS' : '+ VS';
+        btn.style.background = _vsActive[chart] ? '#fff3cd' : '#fdf8f4';
+        btn.style.borderColor = _vsActive[chart] ? '#f59e0b' : '#d4c5b0';
+        btn.style.color       = _vsActive[chart] ? '#92400e' : 'var(--cafe-brown)';
+      }
+      if (!_vsActive[chart]) {
+        // Clear VS picker and reload single dataset
+        const vsMap = { weekly: 'rep-week-picker-vs', hourly: 'rep-day-picker-vs', monthly: 'rep-year-picker-vs' };
+        const vsEl = document.getElementById(vsMap[chart]);
+        if (vsEl) { if (vsEl.tagName === 'SELECT') vsEl.value = ''; else vsEl.value = ''; }
+        const leg = document.getElementById(`${chart}-legend`);
+        if (leg) leg.style.display = 'none';
+        // Reload primary
+        if (chart === 'weekly') { const p = document.getElementById('rep-week-picker'); if (p && p.value) loadWeeklyChart(p.value); }
+        if (chart === 'hourly') { const p = document.getElementById('rep-day-picker');  if (p && p.value) loadHourlyChart(p.value); }
+        if (chart === 'monthly') { const p = document.getElementById('rep-year-picker'); if (p && p.value) loadMonthlyChart(p.value); }
+      }
+    }
+
+    /* ── Populate chart filter pickers ── */
+    async function initChartPickers() {
+      // Week picker + VS week picker
+      try {
+        const wr = await api('orders.php?action=chart_weekly_weeks');
+        const sel   = document.getElementById('rep-week-picker');
+        const selVs = document.getElementById('rep-week-picker-vs');
+        if (wr.success) {
+          const opts = wr.weeks.map((w, i) =>
+            `<option value="${w.week_start}" ${i===0?'selected':''}>${i===0?'This Week: ':''} ${w.label}</option>`
+          ).join('');
+          const optsVs = wr.weeks.map((w, i) =>
+            `<option value="${w.week_start}">${w.label}</option>`
+          ).join('');
+          if (sel) { sel.innerHTML = opts; }
+          if (selVs) { selVs.innerHTML = '<option value="">Select week…</option>' + optsVs; }
+          if (wr.weeks.length) loadWeeklyChart(wr.weeks[0].week_start);
+        }
+      } catch(e) {}
+
+      // Day picker — default to today; VS day picker set max to today
+      const dayPicker = document.getElementById('rep-day-picker');
+      const dayPickerVs = document.getElementById('rep-day-picker-vs');
+      if (dayPicker && !dayPicker.value) {
+        dayPicker.value = new Date().toISOString().slice(0,10);
+        dayPicker.max   = new Date().toISOString().slice(0,10);
+      }
+      if (dayPickerVs) {
+        dayPickerVs.max = new Date().toISOString().slice(0,10);
+      }
+
+      // Year picker + VS year picker
+      try {
+        const yr = await api('orders.php?action=chart_monthly&year=' + new Date().getFullYear());
+        const ysel   = document.getElementById('rep-year-picker');
+        const yselVs = document.getElementById('rep-year-picker-vs');
+        if (yr.success && yr.available_years) {
+          const curYear = new Date().getFullYear();
+          const yopts = yr.available_years.map(y =>
+            `<option value="${y}" ${y===curYear?'selected':''}>${y}</option>`
+          ).join('');
+          const yoptsVs = yr.available_years.map(y =>
+            `<option value="${y}">${y}</option>`
+          ).join('');
+          if (ysel) ysel.innerHTML = yopts;
+          if (yselVs) yselVs.innerHTML = '<option value="">Select year…</option>' + yoptsVs;
+        }
+      } catch(e) {}
     }
 
     /* ========== CHARTS ========== */
@@ -9381,7 +9576,7 @@ header('Expires: 0');
           responsive: true, maintainAspectRatio: false,
           plugins: {
             legend: { display: false },
-            tooltip: { callbacks: { label: ctx => ' ₱' + ctx.raw.toLocaleString() } }
+            tooltip: { callbacks: { label: ctx => (ctx.dataset.label ? ' ' + ctx.dataset.label + ': ' : ' ') + '₱' + ctx.raw.toLocaleString() } }
           },
           scales: {
             y: { grid: { color: gridColor }, beginAtZero: true, ticks: { color: tickColor, font: baseFont, callback: v => v >= 1000 ? '₱' + (v/1000) + 'k' : '₱' + v } },
@@ -9418,7 +9613,7 @@ header('Expires: 0');
         },
         options: {
           responsive: true, maintainAspectRatio: false,
-          plugins: { legend: { display: false }, tooltip: { callbacks: { label: ctx => ' ₱' + ctx.raw.toLocaleString() } } },
+          plugins: { legend: { display: false }, tooltip: { callbacks: { label: ctx => (ctx.dataset.label ? ' ' + ctx.dataset.label + ': ' : ' ') + '₱' + ctx.raw.toLocaleString() } } },
           scales: {
             y: { grid: { color: gridColor }, beginAtZero: true, ticks: { color: tickColor, font: baseFont } },
             x: { grid: { display: false }, ticks: { color: tickColor, font: baseFont } }
@@ -9439,7 +9634,7 @@ header('Expires: 0');
         },
         options: {
           responsive: true, maintainAspectRatio: false,
-          plugins: { legend: { display: false }, tooltip: { callbacks: { label: ctx => ' ₱' + ctx.raw.toLocaleString() } } },
+          plugins: { legend: { display: false }, tooltip: { callbacks: { label: ctx => (ctx.dataset.label ? ' ' + ctx.dataset.label + ': ' : ' ') + '₱' + ctx.raw.toLocaleString() } } },
           scales: {
             y: { grid: { color: gridColor }, beginAtZero: true, ticks: { color: tickColor, font: baseFont } },
             x: { grid: { display: false }, ticks: { color: tickColor, font: baseFont } }
@@ -9462,7 +9657,7 @@ header('Expires: 0');
           responsive: true, maintainAspectRatio: false,
           plugins: {
             legend: { display: false },
-            tooltip: { callbacks: { label: ctx => ' ₱' + ctx.raw.toLocaleString() } }
+            tooltip: { callbacks: { label: ctx => (ctx.dataset.label ? ' ' + ctx.dataset.label + ': ' : ' ') + '₱' + ctx.raw.toLocaleString() } }
           },
           scales: {
             y: { grid: { color: gridColor }, ticks: { color: tickColor, font: baseFont, callback: v => '₱' + v } },
@@ -9486,7 +9681,7 @@ header('Expires: 0');
           responsive: true, maintainAspectRatio: false,
           plugins: {
             legend: { display: false },
-            tooltip: { callbacks: { label: ctx => ' ₱' + ctx.raw.toLocaleString() } }
+            tooltip: { callbacks: { label: ctx => (ctx.dataset.label ? ' ' + ctx.dataset.label + ': ' : ' ') + '₱' + ctx.raw.toLocaleString() } }
           },
           scales: {
             y: { grid: { color: gridColor }, beginAtZero: true, ticks: { color: tickColor, font: baseFont, callback: v => v >= 1000 ? '\u20b1' + (v/1000) + 'k' : '\u20b1' + v } },
