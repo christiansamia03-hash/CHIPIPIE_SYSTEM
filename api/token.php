@@ -26,7 +26,8 @@ function handleRequestToken() {
     $expiresAt = date('Y-m-d H:i:s', strtotime("+$expiryMin minutes"));
 
     $stmt = $db->prepare("INSERT INTO admin_tokens (token, user_id, purpose, expires_at) VALUES (?, ?, ?, ?)");
-    $stmt->execute([$token, $_SESSION['user_id'], $purpose, $expiresAt]);
+    $stmt->execute([hashToken($token), $_SESSION['user_id'], $purpose, $expiresAt]);
+    purgeExpiredAdminTokens($db);
 
     // Route email based on purpose:
     // - General bypass → owner's email (needs owner approval)
@@ -95,13 +96,13 @@ function handleValidateToken() {
 
     $db = getDB();
     $now = date('Y-m-d H:i:s');
-    $stmt = $db->prepare("SELECT * FROM admin_tokens WHERE token = ? AND is_used = 0 AND expires_at > ?");
-    $stmt->execute([$token, $now]);
+    $stmt = $db->prepare("SELECT * FROM admin_tokens WHERE (token = ? OR token = ?) AND is_used = 0 AND expires_at > ?");
+    $stmt->execute([hashToken($token), $token, $now]);
     $row = $stmt->fetch();
 
     if (!$row) {
-        $stmt2 = $db->prepare("SELECT * FROM admin_tokens WHERE token = ?");
-        $stmt2->execute([$token]);
+        $stmt2 = $db->prepare("SELECT * FROM admin_tokens WHERE token = ? OR token = ?");
+        $stmt2->execute([hashToken($token), $token]);
         $ex = $stmt2->fetch();
         if ($ex) {
             $msg = $ex['is_used'] ? 'Token already used.' : 'Token expired (expired: ' . $ex['expires_at'] . ', now: ' . $now . '). Request a new one.';
@@ -111,5 +112,6 @@ function handleValidateToken() {
     }
 
     $db->prepare("UPDATE admin_tokens SET is_used = 1, used_at = ? WHERE id = ?")->execute([$now, $row['id']]);
+    purgeExpiredAdminTokens($db);
     jsonResponse(['success' => true, 'message' => 'Token validated. You may proceed.', 'purpose' => $row['purpose']]);
 }

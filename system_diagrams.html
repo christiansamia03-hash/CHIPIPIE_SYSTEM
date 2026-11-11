@@ -2,6 +2,12 @@
 <html lang="en">
 
 <head>
+  <style id="dynamic-page-orient">
+    @page {
+      size: A4 landscape;
+      margin: 8mm 10mm;
+    }
+  </style>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>ChipiPie Cafe - System Diagrams</title>
@@ -87,10 +93,10 @@
 
     /* Wide responsive container so diagrams never scale down into microscopic unreadable text */
     main {
-      max-width: 1420px;
-      width: 95%;
+      max-width: 1800px;
+      width: 96%;
       margin: 0 auto;
-      padding: 36px 16px;
+      padding: 28px 12px;
     }
 
     .sec {
@@ -180,8 +186,9 @@
        Mermaid Black and White High-Contrast & High Readability Overrides
        ======================================================= */
     .mermaid svg {
-      max-width: 100%;
-      height: auto;
+      width: 100% !important;
+      max-width: 100% !important;
+      height: auto !important;
       background-color: #ffffff !important;
     }
 
@@ -190,8 +197,9 @@
       fill: #000000 !important;
       color: #000000 !important;
       font-family: 'Inter', -apple-system, sans-serif !important;
-      font-size: 14.5px !important;
-      font-weight: 600 !important;
+      font-size: 16.5px !important;
+      font-weight: 700 !important;
+      -webkit-font-smoothing: antialiased !important;
     }
 
     .mermaid svg .nodeLabel,
@@ -199,8 +207,8 @@
     .mermaid svg .edgeLabel {
       color: #000000 !important;
       fill: #000000 !important;
-      font-size: 14px !important;
-      font-weight: 600 !important;
+      font-size: 16px !important;
+      font-weight: 700 !important;
     }
 
     .mermaid svg .node rect,
@@ -210,21 +218,42 @@
     .mermaid svg .node path {
       fill: #ffffff !important;
       stroke: #000000 !important;
-      stroke-width: 2px !important;
+      stroke-width: 2.2px !important;
+    }
+
+        /* Masking to prevent any lines or borders from slicing through cluster/subgraph titles */
+    .mermaid svg .cluster-label,
+    .mermaid svg .cluster-label foreignObject {
+      overflow: visible !important;
+    }
+
+    .mermaid svg .cluster-label span,
+    .mermaid svg .cluster-label div {
+      background: #ffffff !important;
+      padding: 3px 12px !important;
+      border: 1.5px solid #000000 !important;
+      border-radius: 5px !important;
+      box-shadow: 0 0 0 4px #ffffff !important;
+      display: inline-block !important;
+      font-weight: 800 !important;
+      font-size: 14.5px !important;
+      color: #000000 !important;
+      fill: #000000 !important;
+      white-space: nowrap !important;
     }
 
     .mermaid svg .cluster rect {
-      fill: #fafafa !important;
+      fill: #ffffff !important;
       stroke: #000000 !important;
-      stroke-width: 2px !important;
+      stroke-width: 2.2px !important;
       stroke-dasharray: 6,4 !important;
     }
 
     .mermaid svg .edgeLabel {
       background-color: #ffffff !important;
       color: #000000 !important;
-      font-weight: 700 !important;
-      padding: 2px 4px !important;
+      font-weight: 800 !important;
+      padding: 3px 6px !important;
     }
 
     .mermaid svg .edgeLabel rect {
@@ -237,7 +266,7 @@
     .mermaid svg .flowchart-link,
     .mermaid svg path.edge {
       stroke: #000000 !important;
-      stroke-width: 2px !important;
+      stroke-width: 2.2px !important;
     }
 
     .mermaid svg marker path,
@@ -250,40 +279,37 @@
     .mermaid svg .actor {
       fill: #ffffff !important;
       stroke: #000000 !important;
-      stroke-width: 2px !important;
+      stroke-width: 2.2px !important;
     }
 
     .mermaid svg text.actor > tspan {
       fill: #000000 !important;
       font-weight: 800 !important;
-      font-size: 15px !important;
+      font-size: 16px !important;
     }
 
     .mermaid svg .actor-line {
       stroke: #000000 !important;
       stroke-dasharray: 4,4 !important;
-      stroke-width: 1.5px !important;
+      stroke-width: 2px !important;
     }
 
-    .mermaid svg .attributeBoxEven {
+    .mermaid svg .attributeBoxEven,
+    .mermaid svg .attributeBoxOdd {
       fill: #ffffff !important;
       stroke: #000000 !important;
-    }
-
-    .mermaid svg .attributeBoxOdd {
-      fill: #f8fafc !important;
-      stroke: #000000 !important;
+      stroke-width: 1.5px !important;
     }
 
     .mermaid svg .er.entityBox {
       fill: #ffffff !important;
       stroke: #000000 !important;
-      stroke-width: 2px !important;
+      stroke-width: 2.2px !important;
     }
 
     .mermaid svg .er.relationshipLine {
       stroke: #000000 !important;
-      stroke-width: 1.5px !important;
+      stroke-width: 2px !important;
     }
 
     footer {
@@ -294,6 +320,168 @@
       font-weight: 600;
       border-top: 2px solid #000000;
       background: #ffffff;
+    }
+
+    /* Print Toolbar (Screen Only) */
+    .print-toolbar {
+      background: #ffffff;
+      border-bottom: 2px solid #000000;
+      padding: 12px 20px;
+      position: sticky;
+      top: 0;
+      z-index: 101;
+      box-shadow: 0 2px 10px rgba(0, 0, 0, 0.05);
+    }
+
+    .print-toolbar-inner {
+      max-width: 1420px;
+      margin: 0 auto;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      flex-wrap: wrap;
+      gap: 12px;
+    }
+
+    .print-toolbar-left {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+
+    .print-toolbar-left .icon {
+      font-size: 1.4rem;
+    }
+
+    .print-toolbar-left strong {
+      font-size: 0.95rem;
+      font-weight: 800;
+      color: #000000;
+      display: block;
+    }
+
+    .print-toolbar-left span {
+      font-size: 0.8rem;
+      color: #475569;
+      font-weight: 600;
+    }
+
+    .print-toolbar-actions {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      flex-wrap: wrap;
+    }
+
+    .btn-print-action {
+      padding: 7px 16px;
+      border-radius: 6px;
+      font-size: 0.84rem;
+      font-weight: 800;
+      cursor: pointer;
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      border: 2px solid #000000;
+      transition: all 0.15s ease;
+      font-family: inherit;
+    }
+
+    .btn-print-action.primary {
+      background: #000000;
+      color: #ffffff;
+    }
+
+    .btn-print-action.primary:hover {
+      background: #262626;
+      border-color: #262626;
+      transform: translateY(-1px);
+    }
+
+    .btn-print-action.secondary {
+      background: #ffffff;
+      color: #000000;
+    }
+
+    .btn-print-action.secondary:hover {
+      background: #f1f5f9;
+      transform: translateY(-1px);
+    }
+
+    .zoom-group {
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+      margin-left: 6px;
+      padding-left: 10px;
+      border-left: 1.5px solid #cbd5e1;
+    }
+
+    .zoom-btn {
+      width: 28px;
+      height: 28px;
+      line-height: 24px;
+      text-align: center;
+      border: 1.5px solid #000000;
+      border-radius: 4px;
+      background: #ffffff;
+      color: #000000;
+      font-weight: 800;
+      font-size: 0.9rem;
+      cursor: pointer;
+      transition: all 0.15s ease;
+    }
+
+    .zoom-btn:hover {
+      background: #000000;
+      color: #ffffff;
+    }
+
+    .zoom-level-text {
+      font-size: 0.82rem;
+      font-weight: 700;
+      min-width: 44px;
+      text-align: center;
+    }
+
+    /* Single Diagram Print Button */
+    .sec-head {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 14px;
+      padding: 16px 24px;
+      background: #f8fafc;
+      border-bottom: 2px solid #000000;
+    }
+
+    .sec-head-main {
+      display: flex;
+      align-items: center;
+      gap: 14px;
+      flex: 1;
+    }
+
+    .print-single-btn {
+      background: #ffffff;
+      color: #000000;
+      border: 1.5px solid #000000;
+      padding: 6px 14px;
+      border-radius: 6px;
+      font-size: 0.82rem;
+      font-weight: 700;
+      cursor: pointer;
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      transition: all 0.15s ease;
+      font-family: inherit;
+      white-space: nowrap;
+    }
+
+    .print-single-btn:hover {
+      background: #000000;
+      color: #ffffff;
     }
 
     #toggle-ui-btn {
@@ -326,6 +514,7 @@
 
     body.ui-hidden header,
     body.ui-hidden nav,
+    body.ui-hidden .print-toolbar,
     body.ui-hidden footer {
       display: none !important;
     }
@@ -334,6 +523,42 @@
       padding-top: 16px;
       max-width: 100% !important;
       width: 100% !important;
+    }
+
+    /* =======================================================
+       Dedicated High-Legibility Print Media Styles
+       ======================================================= */
+    @page {
+      size: A4 portrait;
+      margin: 6mm 8mm;
+    }
+
+    @page landscape-page {
+      size: A4 landscape;
+      margin: 6mm 8mm;
+    }
+
+    @page portrait-page {
+      size: A4 portrait;
+      margin: 6mm 8mm;
+    }
+
+    .dfd-block {
+      width: 100%;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+    }
+
+    .dfd-subtitle {
+      font-size: 1.05rem;
+      font-weight: 800;
+      border-bottom: 2px solid #000;
+      padding-bottom: 8px;
+      width: 100%;
+      max-width: 820px;
+      text-align: center;
+      margin-bottom: 12px;
     }
 
     @media print {
@@ -345,6 +570,8 @@
       nav,
       header,
       footer,
+      .print-toolbar,
+      .print-single-btn,
       #toggle-ui-btn {
         display: none !important;
       }
@@ -352,30 +579,307 @@
       body {
         background: #ffffff !important;
         color: #000000 !important;
+        margin: 0 !important;
+        padding: 0 !important;
       }
 
       main {
-        max-width: 100%;
-        padding: 0;
+        max-width: 100% !important;
+        width: 100% !important;
+        margin: 0 !important;
+        padding: 0 !important;
       }
 
+      /* In Portrait mode, all diagrams print on dedicated portrait pages */
+      .sec {
+        page: portrait-page;
+      }
+
+      /* Each diagram starts at the top of its own dedicated page */
       .sec {
         border: 2px solid #000000 !important;
-        break-inside: avoid;
-        page-break-inside: avoid;
         background: #ffffff !important;
-        margin-bottom: 24px;
         box-shadow: none !important;
+        margin: 0 0 16px 0 !important;
+        page-break-after: always !important;
+        break-after: page !important;
+        page-break-inside: avoid !important;
+        break-inside: avoid !important;
+        width: 100% !important;
+        box-sizing: border-box !important;
       }
 
+      .sec:last-child {
+        page-break-after: auto !important;
+        break-after: auto !important;
+      }
+
+      /* Allow multi-process DFD sections to break naturally across portrait pages */
+      #fc3a,
+      #fc3b,
+      #dfd1a,
+      #dfd1b {
+        page-break-inside: auto !important;
+        break-inside: auto !important;
+      }
+
+      .dfd-block {
+        page-break-inside: avoid !important;
+        break-inside: avoid !important;
+        width: 100% !important;
+        display: flex !important;
+        flex-direction: column !important;
+        align-items: center !important;
+        margin-bottom: 14px !important;
+      }
+
+      .dfd-subtitle {
+        font-size: 9.5pt !important;
+        font-weight: 800 !important;
+        color: #000000 !important;
+        border-bottom: 1.5px solid #000000 !important;
+        padding-bottom: 4px !important;
+        margin-bottom: 8px !important;
+      }
+
+      /* Single diagram print isolation */
+      body.printing-single .sec:not(.print-target) {
+        display: none !important;
+      }
+
+      body.printing-single .sec.print-target {
+        page-break-after: auto !important;
+        break-after: auto !important;
+        margin: 0 !important;
+      }
+
+      /* Compact card header on paper saves space for diagram */
       .sec-head {
-        background: #f1f5f9 !important;
+        background: #f8fafc !important;
         border-bottom: 2px solid #000000 !important;
+        padding: 6px 12px !important;
+        gap: 8px !important;
       }
 
-      @page {
-        size: A4 portrait;
-        margin: 10mm;
+      .sec-head h2 {
+        font-size: 11pt !important;
+        font-weight: 800 !important;
+        color: #000000 !important;
+      }
+
+      .sec-head p {
+        font-size: 8pt !important;
+        color: #333333 !important;
+        margin-top: 1px !important;
+      }
+
+      .sec-icon {
+        width: 24px !important;
+        height: 24px !important;
+        font-size: 10pt !important;
+        border-width: 1.5px !important;
+      }
+
+      .badge {
+        font-size: 7.5pt !important;
+        padding: 1px 6px !important;
+      }
+
+      .sec-note {
+        padding: 4px 10px !important;
+        font-size: 7.5pt !important;
+        font-weight: 700 !important;
+        border-top: 1.5px dashed #000000 !important;
+        background: #ffffff !important;
+      }
+
+      .bg {
+        padding: 6px 2px !important;
+        background: #ffffff !important;
+        min-height: 0 !important;
+        overflow: visible !important;
+        display: flex !important;
+        justify-content: center !important;
+        align-items: center !important;
+      }
+
+      .bg .mermaid {
+        width: 100% !important;
+        max-width: 100% !important;
+        display: flex !important;
+        justify-content: center !important;
+        align-items: center !important;
+      }
+
+      /* Completely override screen min-widths so diagrams never get clipped horizontally on paper */
+      .mermaid svg,
+      #fc1 .mermaid svg,
+      #fc2a .mermaid svg,
+      #fc2b .mermaid svg,
+      #fc3a .mermaid svg,
+      #fc3b .mermaid svg,
+      #fc3c .mermaid svg,
+      #fc4 .mermaid svg,
+      #uc0 .mermaid svg,
+      #uc1a .mermaid svg,
+      #uc1b .mermaid svg,
+      #erd-pos .mermaid svg,
+      #erd-sec .mermaid svg,
+      #dfd0 .mermaid svg,
+      #dfd1a .mermaid svg,
+      #dfd1b .mermaid svg {
+        min-width: 0 !important;
+        width: 100% !important;
+        max-width: 100% !important;
+        height: auto !important;
+        background-color: #ffffff !important;
+        transform: none !important;
+        overflow: visible !important;
+      }
+
+      /* Precise height constraints for A4 Portrait (297mm sheet height) */
+      .mermaid svg,
+      #fc1 .mermaid svg,
+      #fc2a .mermaid svg,
+      #fc2b .mermaid svg,
+      #fc3a .mermaid svg,
+      #fc3b .mermaid svg,
+      #fc3c .mermaid svg,
+      #fc4 .mermaid svg,
+      #uc0 .mermaid svg,
+      #uc1a .mermaid svg,
+      #uc1b .mermaid svg,
+      #erd-pos .mermaid svg,
+      #erd-sec .mermaid svg,
+      #dfd0 .mermaid svg {
+        max-height: 252mm !important;
+      }
+
+      #dfd1a .mermaid svg {
+        max-height: 110mm !important;
+      }
+
+      #dfd1b .mermaid svg {
+        max-height: 74mm !important;
+      }
+
+          /* Masking to prevent any lines or borders from slicing through cluster/subgraph titles */
+    .mermaid svg .cluster-label,
+    .mermaid svg .cluster-label foreignObject {
+      overflow: visible !important;
+    }
+
+    .mermaid svg .cluster-label span,
+    .mermaid svg .cluster-label div {
+      background: #ffffff !important;
+      padding: 3px 12px !important;
+      border: 1.5px solid #000000 !important;
+      border-radius: 5px !important;
+      box-shadow: 0 0 0 4px #ffffff !important;
+      display: inline-block !important;
+      font-weight: 800 !important;
+      font-size: 14.5px !important;
+      color: #000000 !important;
+      fill: #000000 !important;
+      white-space: nowrap !important;
+    }
+
+      /* High-contrast black & white print typography maintaining shape geometry */
+      .mermaid svg text,
+      .mermaid svg tspan {
+        fill: #000000 !important;
+        color: #000000 !important;
+        font-family: 'Inter', -apple-system, sans-serif !important;
+        font-weight: 700 !important;
+        stroke: none !important;
+        -webkit-font-smoothing: antialiased !important;
+      }
+
+      .mermaid svg .nodeLabel,
+      .mermaid svg .label {
+        fill: #000000 !important;
+        color: #000000 !important;
+        font-weight: 700 !important;
+        line-height: 1.35 !important;
+        stroke: none !important;
+      }
+
+      /* Keep foreignObject overflow visible in print so shapes never clip labels */
+      .mermaid foreignObject {
+        overflow: visible !important;
+      }
+
+      .mermaid foreignObject div {
+        overflow: visible !important;
+        text-align: center !important;
+      }
+
+      .mermaid svg .cluster-label text,
+      .mermaid svg .cluster-label span {
+        font-size: 18px !important;
+        font-weight: 900 !important;
+        fill: #000000 !important;
+        color: #000000 !important;
+      }
+
+      .mermaid svg .edgeLabel {
+        fill: #000000 !important;
+        color: #000000 !important;
+        font-weight: 700 !important;
+        background-color: #ffffff !important;
+        padding: 2px 5px !important;
+        border-radius: 3px !important;
+      }
+
+      .mermaid svg .node rect,
+      .mermaid svg .node circle,
+      .mermaid svg .node ellipse,
+      .mermaid svg .node polygon,
+      .mermaid svg .node path {
+        fill: #ffffff !important;
+        stroke: #000000 !important;
+        stroke-width: 2.6px !important;
+      }
+
+          /* Masking to prevent any lines or borders from slicing through cluster/subgraph titles */
+    .mermaid svg .cluster-label,
+    .mermaid svg .cluster-label foreignObject {
+      overflow: visible !important;
+    }
+
+    .mermaid svg .cluster-label span,
+    .mermaid svg .cluster-label div {
+      background: #ffffff !important;
+      padding: 3px 12px !important;
+      border: 1.5px solid #000000 !important;
+      border-radius: 5px !important;
+      box-shadow: 0 0 0 4px #ffffff !important;
+      display: inline-block !important;
+      font-weight: 800 !important;
+      font-size: 14.5px !important;
+      color: #000000 !important;
+      fill: #000000 !important;
+      white-space: nowrap !important;
+    }
+
+    .mermaid svg .cluster rect {
+        fill: #ffffff !important;
+        stroke: #000000 !important;
+        stroke-width: 2.4px !important;
+        stroke-dasharray: 6,4 !important;
+      }
+
+      .mermaid svg .edgePath .path,
+      .mermaid svg .flowchart-link,
+      .mermaid svg path.edge {
+        stroke: #000000 !important;
+        stroke-width: 2.4px !important;
+      }
+
+      .mermaid svg .edgeLabel rect {
+        fill: #ffffff !important;
+        stroke: #000000 !important;
+        stroke-width: 1.6px !important;
       }
     }
   </style>
@@ -406,6 +910,34 @@
     <a href="#dfd1b">DFD Level 1B</a>
   </nav>
 
+    <!-- Print Helper Toolbar (Screen Only) -->
+  <div class="print-toolbar" id="print-toolbar">
+    <div class="print-toolbar-inner">
+      <div class="print-toolbar-left">
+        <span class="icon">🖨️</span>
+        <div>
+          <strong>Print &amp; Export Center</strong>
+          <span>High-readability A4 page-fitted layout &bull; 1 Diagram per page</span>
+        </div>
+      </div>
+      <div class="print-toolbar-actions">
+        <button type="button" class="btn-print-action primary" onclick="printAllDiagrams('portrait')" title="Prints all 15 diagrams in Portrait orientation (each on its own page)">
+          🖨️ Print All (Portrait &mdash; Recommended)
+        </button>
+        <button type="button" class="btn-print-action secondary" onclick="printAllDiagrams('landscape')" title="Prints all 15 diagrams in Landscape orientation">
+          🖨️ Print All (Landscape)
+        </button>
+        <div class="zoom-group">
+          <span style="font-size:0.8rem;font-weight:700;color:#555;">Zoom:</span>
+          <button type="button" class="zoom-btn" onclick="adjustZoom(-0.1)" title="Zoom Out">&minus;</button>
+          <span id="zoom-level" class="zoom-level-text">100%</span>
+          <button type="button" class="zoom-btn" onclick="adjustZoom(0.1)" title="Zoom In">+</button>
+          <button type="button" class="zoom-btn" onclick="resetZoom()" title="Reset Zoom">&#8634;</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
   <main>
 
     <!-- ==============================================================
@@ -413,55 +945,48 @@
          ============================================================== -->
     <div class="sec" id="fc1">
       <div class="sec-head">
-        <div class="sec-icon">&#9658;</div>
-        <div>
-          <h2>Flowchart Page 1 of 3: Authentication &amp; Registration <span class="badge">Flowchart</span></h2>
-          <p>Login lockout security, pending registration verification (Cashier/Admin), 2FA verification &amp; approval notification</p>
+        <div class="sec-head-main">
+          <div class="sec-icon">&#9658;</div>
+          <div>
+            <h2>Flowchart Page 1 of 3: Authentication &amp; Registration <span class="badge">Flowchart</span></h2>
+            <p>Login lockout security, pending registration verification (Cashier/Admin), 2FA verification &amp; approval notification</p>
+          </div>
         </div>
+        <button type="button" class="print-single-btn" onclick="printSingleDiagram('fc1', 'portrait')" title="Print only this diagram on a single clean page">
+          🖨️ Print Diagram
+        </button>
       </div>
       <div class="bg">
         <div class="mermaid">
 flowchart TD
-    START([START: User Access]) --> OPEN[User Opens ChipiPie POS]
+    START([START: User Access]) --> OPEN[Open ChipiPie POS Portal]
     OPEN --> SESS{Active Session?}
-    SESS -- Yes --> ROLE_CHECK{Identify User Role}
-    SESS -- No --> PORTAL[/Display Login / Registration Screen/]
-
-    PORTAL --> CHOICE{Select Action}
-
-    CHOICE -- Sign In --> CREDS[/Enter Username & Password/]
-    CREDS --> RATE_LIMIT{IP / Rate Limit Check}
-    RATE_LIMIT -- Rate Exceeded --> RET_429[/Display 429: Rate Limit Lockout/]
     
-    RATE_LIMIT -- Allowed --> USER_QUERY{Username in users Table?}
+    SESS -- No --> AUTH_TYPE{Portal Action}
     
-    USER_QUERY -- Not Found --> PENDING_CHECK{Pending in<br/>admin_registration_requests?}
-    PENDING_CHECK -- Yes --> RET_403[/Display 403: Registration Still<br/>Pending Approval/]
-    PENDING_CHECK -- No --> RET_401[/Display 401: Invalid Credentials/]
+    AUTH_TYPE -- Register Staff --> REG[/Fill Registration: Role, Name, Email/]
+    REG --> SUBMIT_REG[Submit Pending Request & Notify Owner]
+    SUBMIT_REG --> PEND_WAIT[/Display: Awaiting Management Approval/]
     
-    USER_QUERY -- Found --> ACTIVE_CHECK{Account Active?<br/>is_active == 1}
-    ACTIVE_CHECK -- No --> RET_DEACT[/Display 403: Account Deactivated.<br/>Contact Administrator/]
+    AUTH_TYPE -- Sign In --> CREDS[/Enter Username & Password/]
+    CREDS --> SEC_GATE{Security & Rate Gate}
     
-    ACTIVE_CHECK -- Yes --> PWD_VERIFY{Verify Password Hash}
-    PWD_VERIFY -- Failed --> COOLDOWN[Record Failed Attempt & Cooldown]
-    COOLDOWN --> RET_401
+    SEC_GATE -- Exceeded / Bad Creds --> ERR_AUTH[/Display Auth Error & Cooldown/]
     
-    PWD_VERIFY -- Passed --> ROLE_CHECK
-
-    ROLE_CHECK -- Cashier --> CON_A((Connector A:<br/>Cashier POS))
-    ROLE_CHECK -- Admin --> SEND_2FA[Generate & Email 6-Digit<br/>2FA Code to Manager]
-    SEND_2FA --> PROMPT_2FA[/Prompt 2FA Verification Modal/]
-    PROMPT_2FA --> VERIFY_2FA{Code Valid &<br/>Not Expired?}
-    VERIFY_2FA -- Passed --> CON_B((Connector B:<br/>Admin Dashboard))
-    VERIFY_2FA -- Failed --> PROMPT_2FA
+    SEC_GATE -- Valid & Active --> SESS_VALID
+    SESS -- Yes --> SESS_VALID[Establish Valid Session Context]
     
-    ROLE_CHECK -- Super Admin --> SA_2FA[Send 2FA to Superadmin Email]
-    SA_2FA --> CON_SA((Connector S:<br/>Super Admin))
-
-    CHOICE -- Register --> REG_FORM[/Fill Registration Form:<br/>Name, Username, Email, Password, Role/]
-    REG_FORM --> REG_SUBMIT[Insert into admin_registration_requests<br/>with role=cashier/admin, status=pending]
-    REG_SUBMIT --> REG_NOTIFY[Send Approval Email with 1-Click<br/>Secure Link to Store Owner]
-    REG_NOTIFY --> REG_MSG[/Display Notice: Registration Submitted.<br/>Awaiting Management Approval/]
+    SESS_VALID --> ROLE_GATE{Identify User Role}
+    
+    ROLE_GATE -- Cashier --> CON_A((Connector A:<br/>Cashier POS))
+    
+    ROLE_GATE -- Store Admin --> SEC_2FA[Email 6-Digit 2FA Token]
+    SEC_2FA --> MODAL_2FA[/Prompt 2FA Modal/]
+    MODAL_2FA --> CHK_2FA{Code Valid?}
+    CHK_2FA -- Invalid --> MODAL_2FA
+    CHK_2FA -- Valid --> CON_B((Connector B:<br/>Admin Dashboard))
+    
+    ROLE_GATE -- Super Admin --> SA_PIPE[Send Super Admin 2FA] --> CON_SA((Connector S:<br/>Super Admin))
         </div>
       </div>
       <div class="sec-note">&#9660; Connector A &rarr; Cashier POS (Page 2) &nbsp;&nbsp;|&nbsp;&nbsp; Connector B &rarr; Admin Dashboard (Page 3)</div>
@@ -472,11 +997,16 @@ flowchart TD
          ============================================================== -->
     <div class="sec" id="fc2a">
       <div class="sec-head">
-        <div class="sec-icon">&#9658;</div>
-        <div>
-          <h2>FC Page 2 of 3: Cashier &mdash; Part 1: Browse &amp; Cart <span class="badge">Flowchart</span></h2>
-          <p>From Connector A &rarr; Category shortcut bar &rarr; Subcategory tabs &rarr; Size variant modal &rarr; Connector F</p>
+        <div class="sec-head-main">
+          <div class="sec-icon">&#9658;</div>
+          <div>
+            <h2>FC Page 2 of 3: Cashier &mdash; Part 1: Browse &amp; Cart <span class="badge">Flowchart</span></h2>
+            <p>From Connector A &rarr; Category shortcut bar &rarr; Subcategory tabs &rarr; Size variant modal &rarr; Connector F</p>
+          </div>
         </div>
+        <button type="button" class="print-single-btn" onclick="printSingleDiagram('fc2a', 'portrait')" title="Print only this diagram on a single clean page">
+          🖨️ Print Diagram
+        </button>
       </div>
       <div class="bg">
         <div class="mermaid">
@@ -488,7 +1018,7 @@ flowchart TD
     SUBCAT_TABS --> GRID[/Browse Menu Item Grid/]
     
     GRID --> ITEM_CLICK[/Click Menu Item Card/]
-    ITEM_CLICK --> CHECK_SIZES{Item Has Size<br/>Pricing JSON?}
+    ITEM_CLICK --> CHECK_SIZES{Size Pricing<br/>JSON?}
     
     CHECK_SIZES -- Yes --> SIZE_MODAL[/Display Size Selection Modal:<br/>Regular, Upsize, 12oz, 16oz/]
     SIZE_MODAL --> SELECT_SIZE[/Cashier Selects Desired Size/]
@@ -516,11 +1046,16 @@ flowchart TD
          ============================================================== -->
     <div class="sec" id="fc2b">
       <div class="sec-head">
-        <div class="sec-icon">&#9658;</div>
-        <div>
-          <h2>FC Page 2 of 3: Cashier &mdash; Part 2: Checkout &amp; Voids <span class="badge">Flowchart</span></h2>
-          <p>From Connector F &rarr; Payment tender &rarr; Stock validation &amp; deduction &rarr; Thermal receipt &rarr; Void requests</p>
+        <div class="sec-head-main">
+          <div class="sec-icon">&#9658;</div>
+          <div>
+            <h2>FC Page 2 of 3: Cashier &mdash; Part 2: Checkout &amp; Voids <span class="badge">Flowchart</span></h2>
+            <p>From Connector F &rarr; Payment tender &rarr; Stock validation &amp; deduction &rarr; Thermal receipt &rarr; Void requests</p>
+          </div>
         </div>
+        <button type="button" class="print-single-btn" onclick="printSingleDiagram('fc2b', 'portrait')" title="Print only this diagram on a single clean page">
+          🖨️ Print Diagram
+        </button>
       </div>
       <div class="bg">
         <div class="mermaid">
@@ -528,40 +1063,31 @@ flowchart TD
     CON_F((Connector F:<br/>Tender & Checkout)) --> CART_VALID{Is Cart Empty?}
     CART_VALID -- Yes --> RET_REG[Return to Register Grid]
     
-    CART_VALID -- No --> PAY_SELECT[/Select Payment Method/]
+    CART_VALID -- No --> PAY_SELECT{Payment Method}
     
-    PAY_SELECT -- Cash Payment --> CASH_INPUT[/Input Cash Amount Tendered/]
-    CASH_INPUT --> CASH_CHECK{Tendered &gt;= Total?}
-    CASH_CHECK -- No --> ERR_INSUFF[/Display: Insufficient Cash Warning/]
-    ERR_INSUFF --> CASH_INPUT
+    PAY_SELECT -- Cash --> CASH_INPUT[/Input Cash Tendered/]
+    CASH_INPUT --> CASH_CHECK{Tendered >=<br/>Total Due?}
+    CASH_CHECK -- No --> ERR_INSUFF[/Display: Insufficient Cash/] --> CASH_INPUT
     CASH_CHECK -- Yes --> CALC_CHANGE[Compute Customer Change Due]
     
-    PAY_SELECT -- GCash Payment --> GCASH_INPUT[/Enter GCash Reference Number/]
+    PAY_SELECT -- GCash --> GCASH_INPUT[/Enter GCash Reference No/]
     
-    CALC_CHANGE --> STOCK_VALIDATE{Validate Stock Levels<br/>in menu_items}
+    CALC_CHANGE --> STOCK_VALIDATE{Validate<br/>Stock Levels?}
     GCASH_INPUT --> STOCK_VALIDATE
     
-    STOCK_VALIDATE -- Stock Insufficient --> ERR_OOS[/Display Out of Stock Alert/]
-    ERR_OOS --> RET_REG
+    STOCK_VALIDATE -- Insufficient --> ERR_OOS[/Display Out of Stock Alert/] --> RET_REG
     
-    STOCK_VALIDATE -- Stock Available --> DEDUCT_STOCK[Deduct Purchased Quantities from menu_items]
-    DEDUCT_STOCK --> GEN_ORDER_ID[Generate Unique Order Number]
-    GEN_ORDER_ID --> INSERT_ORDER[Save to orders & order_items Tables]
+    STOCK_VALIDATE -- In Stock --> DEDUCT_STOCK[Deduct Stock Quantities from menu_items]
+    DEDUCT_STOCK --> INSERT_ORDER[Save Order & Items to Database]
     
-    INSERT_ORDER --> LOW_STOCK_CHECK{Any Item Stock &lt;=<br/>min_stock Threshold?}
-    LOW_STOCK_CHECK -- Yes --> WARN_LOW[/Display Low Stock Warning Toast/]
-    LOW_STOCK_CHECK -- No --> PRINT_RCPT[/Render & Print Official Thermal Receipt/]
-    WARN_LOW --> PRINT_RCPT
+    INSERT_ORDER --> LOW_STOCK_CHECK{Low Stock<br/>Threshold?}
+    LOW_STOCK_CHECK -- Yes --> WARN_LOW[/Display Low Stock Toast/] --> PRINT_RCPT
+    LOW_STOCK_CHECK -- No --> PRINT_RCPT[/Render & Print Thermal Receipt/]
     
-    PRINT_RCPT --> NEXT_STEP{Next Cashier Operation}
+    PRINT_RCPT --> NEXT_STEP{Next Operation}
     NEXT_STEP -- New Transaction --> DASH_RESET[Reset Register for New Customer]
-    NEXT_STEP -- Void / Refund Request --> VOID_PROMPT[/Enter Reason for Order Void or Refund/]
-    VOID_PROMPT --> VOID_SUBMIT[Submit Void Request into system_requests]
-    VOID_SUBMIT --> VOID_WAIT[/Await Manager Authorization Code/]
-    VOID_WAIT --> DASH_RESET
-    
-    NEXT_STEP -- End Shift / Logout --> LOGOUT([Cashier Logout])
-    LOGOUT --> CON_C((Connector C:<br/>Return to Login))
+    NEXT_STEP -- Void Request --> VOID_SUBMIT[Submit Void / Refund Request to Manager] --> DASH_RESET
+    NEXT_STEP -- Close Shift --> LOGOUT([Cashier End Shift / Logout]) --> CON_C((Connector C:<br/>Return to Login))
         </div>
       </div>
       <div class="sec-note">&#9650; From Connector F (Part 1) &nbsp;&nbsp;|&nbsp;&nbsp; Connector C &rarr; Login Portal</div>
@@ -572,49 +1098,64 @@ flowchart TD
          ============================================================== -->
     <div class="sec" id="fc3a">
       <div class="sec-head">
-        <div class="sec-icon">&#9658;</div>
-        <div>
-          <h2>FC Page 3 of 3: Admin &mdash; Menu &amp; Inventory <span class="badge">Flowchart</span></h2>
-          <p>From Connector B &rarr; Add/Edit size-variant items &rarr; Adjust stock &rarr; 15-minute delete bypass token security</p>
+        <div class="sec-head-main">
+          <div class="sec-icon">&#9658;</div>
+          <div>
+            <h2>FC Page 3 of 3: Admin &mdash; Menu &amp; Inventory <span class="badge">Flowchart</span></h2>
+            <p>From Connector B &rarr; Add/Edit size-variant items &rarr; Adjust stock &rarr; 15-minute delete bypass token security</p>
+          </div>
         </div>
+        <button type="button" class="print-single-btn" onclick="printSingleDiagram('fc3a', 'portrait')" title="Print only this diagram on a single clean page">
+          🖨️ Print Diagram
+        </button>
       </div>
-      <div class="bg">
-        <div class="mermaid">
+      <div class="bg dfd-container" style="flex-direction: column; gap: 20px;">
+        <div class="dfd-block">
+          <h3 class="dfd-subtitle">Part 1: Menu Item Catalog &amp; Size Pricing JSON</h3>
+          <div class="mermaid">
 flowchart TD
-    CON_B((Connector B:<br/>Admin Dashboard)) --> ADMIN_DASH([Admin Dashboard])
-    ADMIN_DASH --> TAB_SELECT{Select Workspace}
+    CON_B((Connector B:<br/>Admin Dashboard)) --> TAB_SELECT{Select Workspace}
+    TAB_SELECT -- User Approvals --> CON_E((Connector E:<br/>User Management))
+    TAB_SELECT -- Sales Analytics --> CON_D((Connector D:<br/>Analytics & Orders))
+    TAB_SELECT -- Menu Management --> INV_MENU[Menu Management Grid]
     
-    TAB_SELECT -- Menu & Inventory Tab --> INV_MENU[Menu Management Table]
+    INV_MENU --> ITEM_BRANCH{Catalog Action}
     
-    INV_MENU --> INV_ACTION{Inventory Action}
-    
-    INV_ACTION -- Add New Menu Item --> MODAL_ADD[/Enter Name, Category, Base Price,<br/>Size Variant Prices JSON, Image, Stock, Min Stock/]
+    ITEM_BRANCH -- Add New Item --> MODAL_ADD[/Enter Name, Category, Base Price,<br/>Size Variant Prices JSON, Stock/]
     MODAL_ADD --> COMMIT_ADD[Insert Record into menu_items Table]
     COMMIT_ADD --> INV_SUCCESS[Display Success Notice & Refresh Grid]
-    
-    INV_ACTION -- Edit Item Details --> MODAL_EDIT[/Update Name, Category, Pricing,<br/>Size Prices or Min Stock Threshold/]
+
+    ITEM_BRANCH -- Edit Details --> MODAL_EDIT[/Update Name, Category, Base Price,<br/>Size Prices JSON or Min Stock Threshold/]
     MODAL_EDIT --> COMMIT_EDIT[Update Record in menu_items Table]
     COMMIT_EDIT --> INV_SUCCESS
+
+    ITEM_BRANCH -- Photo Update --> MODAL_PHOTO[/Upload New Photo or Remove Image/]
+    MODAL_PHOTO --> COMMIT_PHOTO[Update image column in DB]
+    COMMIT_PHOTO --> INV_SUCCESS
+          </div>
+        </div>
+
+        <div class="dfd-block">
+          <h3 class="dfd-subtitle">Part 2: Stock Adjustments &amp; 15-Minute Deletion Security</h3>
+          <div class="mermaid">
+flowchart TD
+    INV_START([Menu Management Grid]) --> STOCK_BRANCH{Stock & Security}
     
-    INV_ACTION -- Quick Stock Adjust --> MODAL_STOCK[/Enter Quantity to Add or Set Direct Count/]
+    STOCK_BRANCH -- Quick Stock Adjust --> MODAL_STOCK[/Enter Quantity to Add or Set Count/]
     MODAL_STOCK --> COMMIT_STOCK[Update Stock Quantity in menu_items]
-    COMMIT_STOCK --> INV_SUCCESS
+    COMMIT_STOCK --> INV_SUCCESS[Refresh Inventory Table]
     
-    INV_ACTION -- Toggle Active Status --> TOGGLE_ITEM[Toggle is_available: Active / Hidden from POS]
+    STOCK_BRANCH -- Toggle Status --> TOGGLE_ITEM[Toggle is_available: Active / Hidden]
     TOGGLE_ITEM --> INV_SUCCESS
     
-    INV_ACTION -- Delete Menu Item --> DEL_PROMPT[Protected Item Deletion Triggered]
+    STOCK_BRANCH -- Delete Protected Item --> DEL_PROMPT[Protected Item Deletion Triggered]
     DEL_PROMPT --> BYPASS_REQ[Generate & Email 15-Minute<br/>Bypass Token to Admin]
     BYPASS_REQ --> BYPASS_MODAL[/Enter 6-Digit Bypass Token in Modal/]
-    BYPASS_MODAL --> TOKEN_EVAL{Token Valid &amp;<br/>Within 15 Minutes?}
-    TOKEN_EVAL -- Invalid / Expired --> TOKEN_ERR[/Display: Invalid or Expired Token Error/]
-    TOKEN_ERR --> BYPASS_MODAL
-    TOKEN_EVAL -- Valid --> CONSUME_TOKEN[Mark Token is_used=1 in admin_tokens]
-    CONSUME_TOKEN --> COMMIT_DELETE[Permanently Delete Item & Record System Audit Log]
-    COMMIT_DELETE --> INV_SUCCESS
-
-    TAB_SELECT -- User Approvals & Management --> CON_E((Connector E:<br/>User Management))
-    TAB_SELECT -- Sales Orders & Analytics --> CON_D((Connector D:<br/>Analytics & Orders))
+    BYPASS_MODAL --> TOKEN_EVAL{Token Valid &<br/>In 15 Min?}
+    TOKEN_EVAL -- Invalid / Expired --> TOKEN_ERR[/Display: Invalid Token Error/] --> BYPASS_MODAL
+    TOKEN_EVAL -- Valid --> CONSUME_TOKEN[Mark Token is_used=1 & Delete Item Record]
+    CONSUME_TOKEN --> INV_SUCCESS
+          </div>
         </div>
       </div>
       <div class="sec-note">&#9650; From Connector B (Page 1) &nbsp;&nbsp;|&nbsp;&nbsp; Connector E &rarr; User Management &nbsp;&nbsp;|&nbsp;&nbsp; Connector D &rarr; Analytics &amp; Orders</div>
@@ -625,50 +1166,53 @@ flowchart TD
          ============================================================== -->
     <div class="sec" id="fc3b">
       <div class="sec-head">
-        <div class="sec-icon">&#9658;</div>
-        <div>
-          <h2>FC Page 3 of 3: Admin &mdash; User Approvals &amp; Management <span class="badge">Flowchart</span></h2>
-          <p>From Connector E &rarr; Pending registration approvals (Cashier &amp; Admin) &rarr; Multi-channel authorization</p>
+        <div class="sec-head-main">
+          <div class="sec-icon">&#9658;</div>
+          <div>
+            <h2>FC Page 3 of 3: Admin &mdash; User Approvals &amp; Management <span class="badge">Flowchart</span></h2>
+            <p>From Connector E &rarr; Pending registration approvals (Cashier &amp; Admin) &rarr; Multi-channel authorization</p>
+          </div>
         </div>
+        <button type="button" class="print-single-btn" onclick="printSingleDiagram('fc3b', 'portrait')" title="Print only this diagram on a single clean page">
+          🖨️ Print Diagram
+        </button>
       </div>
-      <div class="bg">
-        <div class="mermaid">
+      <div class="bg dfd-container" style="flex-direction: column; gap: 20px;">
+        <div class="dfd-block">
+          <h3 class="dfd-subtitle">Part 1: Pending Registration Approvals (POS Table &amp; 1-Click Email Link)</h3>
+          <div class="mermaid">
 flowchart TD
-    CON_E((Connector E:<br/>User Management)) --> USER_DASH[User Management View]
-    USER_DASH --> OP_SELECT{Select Operation}
-
-    OP_SELECT -- Review Pending Registrations --> PENDING_TABLE[/Inspect Pending Registrations Table<br/>(Cashiers & Admins)/]
+    CON_E((Connector E:<br/>User Management)) --> PENDING_TABLE[/"Review Pending Registrations Table<br/>(Cashiers & Admins)"/]
     
     PENDING_TABLE --> APPROVE_CHANNEL{Authorization Channel}
     
-    APPROVE_CHANNEL -- Direct POS UI Approval --> UI_APPROVE[Admin Clicks Approve Button in Table]
-    UI_APPROVE --> COMMIT_CASHIER[Insert Record into users Table<br/>with role=cashier, is_active=1]
-    COMMIT_CASHIER --> UPDATE_REQ_UI[Update admin_registration_requests<br/>status=approved, approved_at=NOW]
-    UPDATE_REQ_UI --> EMAIL_USER[Dispatch Welcome & Approval Confirmation Email]
-    EMAIL_USER --> MGMT_REFRESH[Display Success Banner & Refresh Table]
+    APPROVE_CHANNEL -- Direct POS Admin --> UI_APPROVE["Admin Clicks Approve in POS Table"]
+    APPROVE_CHANNEL -- Owner 1-Click Email --> OWNER_CLICK["Owner Clicks Link in Approval Email"]
+    
+    OWNER_CLICK --> TOKEN_CHECK{Token Valid?}
+    TOKEN_CHECK -- Expired --> TOKEN_FAIL[/"Display: Expired Notice"/]
+    TOKEN_CHECK -- Valid --> COMMIT_USER
+    
+    UI_APPROVE --> COMMIT_USER["Create Active Account in users Table<br/>(role=cashier/admin, is_active=1)"]
+    COMMIT_USER --> UPDATE_REQ["Update admin_registration_requests<br/>(status=approved, approved_at=NOW)"]
+    UPDATE_REQ --> EMAIL_USER["Dispatch Welcome Confirmation Email"]
+    EMAIL_USER --> MGMT_REFRESH["Display Success Banner & Refresh Table"]
 
-    APPROVE_CHANNEL -- Owner 1-Click Email Link --> OWNER_CLICK[Store Owner Clicks Approval Link in Email]
-    OWNER_CLICK --> TOKEN_CHECK{Token Valid &amp;<br/>Request Pending?}
-    TOKEN_CHECK -- Valid --> COMMIT_DYNAMIC[Create Active User in users with<br/>Requested Role: Cashier or Admin]
-    COMMIT_DYNAMIC --> UPDATE_REQ_OWNER[Update Request status=approved]
-    UPDATE_REQ_OWNER --> EMAIL_USER
-    TOKEN_CHECK -- Invalid / Used --> TOKEN_FAIL[/Display: Link Expired or Already Processed/]
+    PENDING_TABLE -- Reject / Resend --> EXC_ACT{Action}
+    EXC_ACT -- Reject Request --> REJ_ACT["Set status=rejected"] --> MGMT_REFRESH
+    EXC_ACT -- Resend Token --> RESEND_ACT["Dispatch Fresh Link to Owner"] --> MGMT_REFRESH
+          </div>
+        </div>
 
-    APPROVE_CHANNEL -- Reject Registration --> REJECT_ACT[Admin / Owner Clicks Reject]
-    REJECT_ACT --> UPDATE_REQ_REJ[Update Request status=rejected]
-    UPDATE_REQ_REJ --> MGMT_REFRESH
-
-    APPROVE_CHANNEL -- Resend Owner Token --> RESEND_ACT[Admin Clicks Resend Approval Link]
-    RESEND_ACT --> DISPATCH_NEW_TOKEN[Email Fresh Approval Link to Store Owner]
-    DISPATCH_NEW_TOKEN --> MGMT_REFRESH
-
-    OP_SELECT -- Register Staff Member --> STAFF_MODAL[/Fill Staff Credentials & Choose Role:<br/>Cashier or Admin/]
-    STAFF_MODAL --> SAVE_PENDING_REQ[Insert into admin_registration_requests<br/>status=pending]
-    SAVE_PENDING_REQ --> NOTIFY_OWNER[Send Approval Email with Link to Owner]
-    NOTIFY_OWNER --> MGMT_REFRESH
-
-    OP_SELECT -- Toggle / Delete User Account --> REQ_SUPERADMIN[/Submit Request to Super Admin Panel<br/>via system_requests/]
-    REQ_SUPERADMIN --> MGMT_REFRESH
+        <div class="dfd-block">
+          <h3 class="dfd-subtitle">Part 2: Staff Registration &amp; Governance Controls</h3>
+          <div class="mermaid">
+flowchart TD
+    CON_E2((Connector E:<br/>User Management)) --> STAFF_OPS{Staff & Governance}
+    STAFF_OPS -- Register New Staff --> STAFF_MODAL[/"Fill Staff Credentials & Choose Role:<br/>Cashier or Admin"/]
+    STAFF_MODAL --> SAVE_REQ["Insert Pending Request & Email Owner Link"] --> MGMT_REFRESH2["Refresh Staff Directory"]
+    STAFF_OPS -- Account Control --> REQ_SA[/"Submit System Request to Super Admin<br/>via system_requests"/] --> MGMT_REFRESH2
+          </div>
         </div>
       </div>
       <div class="sec-note">&#9650; From Connector E (Menu Page) &nbsp;&nbsp;|&nbsp;&nbsp; Multi-Channel Authorization Process</div>
@@ -679,39 +1223,39 @@ flowchart TD
          ============================================================== -->
     <div class="sec" id="fc3c">
       <div class="sec-head">
-        <div class="sec-icon">&#9658;</div>
-        <div>
-          <h2>FC Page 3 of 3: Admin &mdash; Orders, Voids &amp; Analytics <span class="badge">Flowchart</span></h2>
-          <p>From Connector D &rarr; Expandable order cards &rarr; Void authorization &rarr; Real-time revenue KPIs &amp; trend charts</p>
+        <div class="sec-head-main">
+          <div class="sec-icon">&#9658;</div>
+          <div>
+            <h2>FC Page 3 of 3: Admin &mdash; Orders, Voids &amp; Analytics <span class="badge">Flowchart</span></h2>
+            <p>From Connector D &rarr; Expandable order cards &rarr; Void authorization &rarr; Real-time revenue KPIs &amp; trend charts</p>
+          </div>
         </div>
+        <button type="button" class="print-single-btn" onclick="printSingleDiagram('fc3c', 'portrait')" title="Print only this diagram on a single clean page">
+          🖨️ Print Diagram
+        </button>
       </div>
       <div class="bg">
         <div class="mermaid">
 flowchart TD
     CON_D((Connector D:<br/>Analytics & Orders)) --> VIEW_CHOICE{Select Subsystem}
 
-    VIEW_CHOICE -- Sales Analytics View --> ANALYTICS_DASH[Sales Analytics Dashboard]
-    ANALYTICS_DASH --> DATE_FILTER[/Select Timeframe: Today, Week, Month, Year/]
-    DATE_FILTER --> QUERY_KPIS[Calculate Real-Time Financial KPIs:<br/>Gross Sales, Order Volume, Cups Sold, Avg Order Value]
-    QUERY_KPIS --> RENDER_CHARTS[Render Hourly Peak Sales & Trend Charts]
-    RENDER_CHARTS --> TOP_ITEMS[Compute & Display Top Selling Menu Products]
-    TOP_ITEMS --> PRINT_REPORT{Print Sales Report?}
-    PRINT_REPORT -- Yes --> THERMAL_PRINT[/Format & Print Official Sales Summary Report/]
+    %% Branch 1: Sales Analytics
+    VIEW_CHOICE -- Sales Analytics --> ANALYTICS_DASH[Sales Analytics Dashboard]
+    ANALYTICS_DASH --> QUERY_KPIS[Calculate Real-Time Financial KPIs:<br/>Gross Sales, Order Volume, Avg Order Value]
+    QUERY_KPIS --> RENDER_CHARTS[Render Hourly Peak Trends & Weekly VS Charts]
+    RENDER_CHARTS --> PRINT_REPORT{Print Report?}
+    PRINT_REPORT -- Yes --> THERMAL_PRINT[/Format & Print Sales Report/] --> ANALYTICS_DASH
     PRINT_REPORT -- No --> ANALYTICS_DASH
 
-    VIEW_CHOICE -- Orders Management View --> ORDERS_DASH[Orders Log View]
-    ORDERS_DASH --> FILTER_ORDERS[/Filter by Date Range, Status, or Order Number/]
-    FILTER_ORDERS --> EXPAND_CARD[/Click Expandable Order Card/]
-    EXPAND_CARD --> VIEW_ITEMS[Inspect Full Item Breakdown:<br/>Item Name, Size Variant, Quantity, Unit Price, Subtotal]
-    VIEW_ITEMS --> VOID_ACTION{Authorize Void / Refund?}
-    VOID_ACTION -- Yes --> VERIFY_AUTH[Verify Authorization Code from Manager]
-    VERIFY_AUTH --> UPDATE_ORDER_VOID[Update Order status=voided or refunded<br/>and Restock Items in menu_items]
-    UPDATE_ORDER_VOID --> LOG_AUDIT[Record Incident in system_logs & Notify Management]
-    LOG_AUDIT --> ORDERS_DASH
+    %% Branch 2: Orders Management
+    VIEW_CHOICE -- Orders Management --> ORDERS_DASH[Orders Log & Card View]
+    ORDERS_DASH --> EXPAND_CARD[/Filter & Expand Order Card Breakdown/]
+    EXPAND_CARD --> VOID_ACTION{Authorize Void?}
+    VOID_ACTION -- Yes --> VERIFY_AUTH[Verify Manager Auth & Restock Items]
+    VERIFY_AUTH --> LOG_AUDIT[Log Audit Record & Void Order] --> ORDERS_DASH
     VOID_ACTION -- No --> ORDERS_DASH
 
-    VIEW_CHOICE -- End Session / Logout --> ADMIN_LOGOUT([Admin Logout])
-    ADMIN_LOGOUT --> CON_C((Connector C:<br/>Return to Login))
+    VIEW_CHOICE -- Logout --> ADMIN_LOGOUT([Admin Logout]) --> CON_C((Connector C:<br/>Return to Login))
         </div>
       </div>
       <div class="sec-note">&#9650; From Connector D (Page 3) &nbsp;&nbsp;|&nbsp;&nbsp; Connector C &rarr; Login Portal</div>
@@ -722,73 +1266,50 @@ flowchart TD
          ============================================================== -->
     <div class="sec" id="fc4">
       <div class="sec-head">
-        <div class="sec-icon">&#9670;</div>
-        <div>
-          <h2>Unified End-to-End System Master Architecture Flow <span class="badge">Master</span></h2>
-          <p>Executive architectural lifecycle: Authentication &rarr; Cashier POS &rarr; Inventory &rarr; Approvals &rarr; Analytics</p>
+        <div class="sec-head-main">
+          <div class="sec-icon">&#9670;</div>
+          <div>
+            <h2>Unified End-to-End System Master Architecture Flow <span class="badge">Master</span></h2>
+            <p>Executive architectural lifecycle: Authentication &rarr; Cashier POS &rarr; Inventory &rarr; Approvals &rarr; Analytics</p>
+          </div>
         </div>
+        <button type="button" class="print-single-btn" onclick="printSingleDiagram('fc4', 'portrait')" title="Print only this diagram on a single clean page">
+          🖨️ Print Diagram
+        </button>
       </div>
       <div class="bg">
         <div class="mermaid">
 flowchart TD
-    START([START: User Accesses System Portal]) --> SESS_CHK{Active Session?}
-
-    SESS_CHK -- No: Guest / New User --> AUTH_GATE{Authentication Choice}
+    START([START: User Access Portal]) --> AUTH_GATE{Authentication Gate}
     
-    AUTH_GATE -- Register (Staff/Admin) --> REG_SUBMIT[Submit Registration Details & Select Role]
-    REG_SUBMIT --> REG_PENDING[Insert into admin_registration_requests with status=pending]
-    REG_PENDING --> OWNER_EMAIL[Dispatch Approval Email with 1-Click Link to Store Owner]
-    OWNER_EMAIL --> WAIT_SCREEN[/Display: Registration Pending Approval Notice/]
+    AUTH_GATE -- Register Staff --> REG_PIPE[Registration Submission -> Owner 1-Click Link Approval]
+    AUTH_GATE -- Sign In --> LOGIN_PIPE[Security Gate -> Password Hash -> 2FA Token Verification]
 
-    AUTH_GATE -- Sign In --> LOGIN_CHECK{Validate Credentials & Security}
-    LOGIN_CHECK -- Check Rate Limits --> RL_EVAL{Under Rate Limit?}
-    RL_EVAL -- Limit Exceeded --> SEC_LOCK[/Display 429: Security Lockout/]
-    RL_EVAL -- Permitted --> CRED_EVAL{User Exists in users Table?}
-    
-    CRED_EVAL -- Not in users --> PEND_EVAL{Is Registration Pending?}
-    PEND_EVAL -- Yes --> PEND_403[/Display 403: Registration Still Pending Approval/]
-    PEND_EVAL -- No --> RET_401[/Display 401: Invalid Credentials/]
-    
-    CRED_EVAL -- In users --> PW_EVAL{Verify Password & Active Status}
-    PW_EVAL -- Verified & Active --> ROLE_ROUTE{Route by User Role}
-    PW_EVAL -- Inactive / Bad Password --> RET_FAIL[/Display Error & Log Security Event/]
+    LOGIN_PIPE --> P1_START[["PHASE 1: CASHIER POS ORDER & CHECKOUT PIPELINE"]]
 
-    ROLE_ROUTE -- Role: Cashier --> CASHIER_PIPELINE
-    ROLE_ROUTE -- Role: Admin --> ADMIN_2FA[Send 6-Digit 2FA Code to Manager Email]
-    ADMIN_2FA --> VERIFY_2FA_CODE{Verify 2FA Token}
-    VERIFY_2FA_CODE -- Valid --> ADMIN_PIPELINE
-    VERIFY_2FA_CODE -- Invalid --> SEC_LOCK
-
-    subgraph CASHIER_PIPELINE [CASHIER POS TRANSACTION PIPELINE]
+    subgraph CASHIER_PIPELINE [" "]
         direction TB
-        C1[Category Shortcuts & Subcategory Tabs] --> C2[Browse Menu Items Grid]
-        C2 --> C3[Size Variant Selection Modal: Regular, Upsize, 12oz, 16oz]
-        C3 --> C4[Order Cart Live Calculation & Review]
-        C4 --> C5[Payment Selection: Cash or GCash]
-        C5 --> C6{Stock Level Validation in DB}
-        C6 -- In Stock --> C7[Automatic Stock Quantity Deduction from menu_items]
-        C7 --> C8[Record Transaction in orders & order_items Tables]
-        C8 --> C9[Low Stock Warning & Thermal Receipt Print]
-        C9 --> C10[Optional Void/Refund Request Submission]
+        C1[Category Shortcuts & Subcategory Tabs] --> C2[Browse Menu Items Grid & Size Variant Modal]
+        C2 --> C3[Order Cart Live Calculation & Review]
+        C3 --> C4[Tender Payment: Cash or GCash]
+        C4 --> C5[Stock Level Check & Auto-Deduction in menu_items]
+        C5 --> C6[Record Transaction in orders & order_items]
+        C6 --> C7[Thermal Receipt Print & Low Stock Alerts]
     end
 
-    subgraph ADMIN_PIPELINE [ADMINISTRATIVE OPERATIONS PIPELINE]
+    P1_START --> C1
+    C7 --> P2_START[["PHASE 2: ADMINISTRATIVE & BACKOFFICE PIPELINE"]]
+
+    subgraph ADMIN_PIPELINE [" "]
         direction TB
-        A1[Admin Dashboard Hub] --> A2{Administrative Workspace}
-        A2 -- Menu & Inventory --> A3[Add/Edit Items with Size Variant Pricing JSON]
-        A3 --> A4[15-Minute Security Bypass Token for Item Deletions]
-        A2 -- User Approvals --> A5[Pending Registrations Table: Cashier UI Approval]
-        A5 --> A6[Store Owner 1-Click Email Token Approval & Super Admin Panel]
-        A2 -- Sales & Analytics --> A7[Real-time Revenue KPIs, Hourly Peak Charts & Sales Reports]
-        A7 --> A8[Expandable Order Cards & Manager Void Authorizations]
+        A1[Admin Dashboard Hub & Security Controls] --> A2[Menu Catalog & 15-Minute Bypass Token Deletion]
+        A2 --> A3[User Approvals: POS UI Table & Owner Email Link]
+        A3 --> A4[Sales Analytics: Revenue KPIs & Hourly Peak Charts]
+        A4 --> A5[Order Card Inspection & Manager Void Authorization]
     end
 
-    C10 --> LOGOUT_CSH([Cashier Logout / End Shift])
-    A4 --> LOGOUT_ADM([Admin Session Finished])
-    A6 --> LOGOUT_ADM
-    A8 --> LOGOUT_ADM
-    LOGOUT_CSH --> TERMINAL([Session Terminated / Returned to Portal])
-    LOGOUT_ADM --> TERMINAL
+    P2_START --> A1
+    A5 --> CLOSE_SYSTEM([Session Audited & Securely Closed])
         </div>
       </div>
       <div class="sec-note">&#9670; Comprehensive End-to-End System Workflow Across All Roles &amp; Security Boundary Gates</div>
@@ -799,16 +1320,22 @@ flowchart TD
          ============================================================== -->
     <div class="sec" id="uc0">
       <div class="sec-head">
-        <div class="sec-icon">&#9678;</div>
-        <div>
-          <h2>Use Case Diagram Level 0: Context System Boundary <span class="badge">Context</span></h2>
-          <p>System boundary, primary actors (Cashier, Admin, Owner, Super Admin, Gmail SMTP) &amp; core use case clusters</p>
+        <div class="sec-head-main">
+          <div class="sec-icon">&#9678;</div>
+          <div>
+            <h2>Use Case Diagram Level 0: Context System Boundary <span class="badge">Context</span></h2>
+            <p>System boundary, primary actors (Cashier, Admin, Owner, Super Admin, Gmail SMTP) &amp; core use case clusters</p>
+          </div>
         </div>
+        <button type="button" class="print-single-btn" onclick="printSingleDiagram('uc0', 'portrait')" title="Print only this diagram on a single clean page">
+          🖨️ Print Diagram
+        </button>
       </div>
       <div class="bg">
         <div class="mermaid">
-flowchart LR
-    subgraph ACTORS [System Actors]
+flowchart TD
+    subgraph ACTORS [System Operational Actors]
+        direction LR
         CSH(["Cashier"])
         ADM(["Admin"])
         OWN(["Store Owner"])
@@ -824,31 +1351,20 @@ flowchart LR
         UC_ORD["UC 5.0: Order History, Expandable Cards & Voids"]
         UC_ANA["UC 6.0: Sales Analytics, KPIs & Summary Reports"]
         UC_SEC["UC 7.0: Security Governance & System Logs"]
+        UC_AUTH --> UC_REG --> UC_INV --> UC_POS --> UC_ORD --> UC_ANA --> UC_SEC
     end
 
-    subgraph SERVICES [External Services]
+    subgraph SERVICES [External Supporting Services]
         EML(["Gmail SMTP Service"])
     end
 
     CSH --- UC_AUTH
-    CSH --- UC_REG
     CSH --- UC_POS
-    CSH --- UC_ORD
-
     ADM --- UC_AUTH
-    ADM --- UC_REG
     ADM --- UC_INV
-    ADM --- UC_POS
-    ADM --- UC_ORD
     ADM --- UC_ANA
-
     OWN --- UC_REG
-    OWN --- UC_AUTH
-    
-    SA --- UC_AUTH
-    SA --- UC_REG
     SA --- UC_SEC
-    SA --- UC_ORD
 
     UC_AUTH --- EML
     UC_REG --- EML
@@ -863,16 +1379,22 @@ flowchart LR
          ============================================================== -->
     <div class="sec" id="uc1a">
       <div class="sec-head">
-        <div class="sec-icon">&#9678;</div>
-        <div>
-          <h2>Use Case L1: Authentication &amp; User Approvals <span class="badge">Level 1</span></h2>
-          <p>Login rate limits, 2FA manager codes, Cashier &amp; Admin registration approvals, owner 1-click links &amp; account controls</p>
+        <div class="sec-head-main">
+          <div class="sec-icon">&#9678;</div>
+          <div>
+            <h2>Use Case L1: Authentication &amp; User Approvals <span class="badge">Level 1</span></h2>
+            <p>Login rate limits, 2FA manager codes, Cashier &amp; Admin registration approvals, owner 1-click links &amp; account controls</p>
+          </div>
         </div>
+        <button type="button" class="print-single-btn" onclick="printSingleDiagram('uc1a', 'portrait')" title="Print only this diagram on a single clean page">
+          🖨️ Print Diagram
+        </button>
       </div>
       <div class="bg">
         <div class="mermaid">
-flowchart LR
-    subgraph ACT_A [Actors]
+flowchart TD
+    subgraph ACT_A [System Actors]
+        direction LR
         CSH(["Cashier"])
         ADM(["Admin"])
         OWN(["Store Owner"])
@@ -880,49 +1402,38 @@ flowchart LR
     end
 
     subgraph SUBSYS_AUTH [Process 1.0: Authentication & Access Control]
-        UC1["Login with Rate Limiting & Lockout"]
-        UC2["Pending Approval Status Verification"]
-        UC3["Admin 2FA Email Code Verification"]
-        UC4["Super Admin 2FA Verification"]
-        UC5["Session Management & Logout"]
+        direction TB
+        UC1["UC 1: Login with Rate Limiting & Lockout"]
+        UC2["UC 2: Pending Approval Status Verification"]
+        UC3["UC 3: Admin 2FA Email Code Verification"]
+        UC4["UC 4: Super Admin 2FA Verification"]
+        UC5["UC 5: Session Management & Secure Logout"]
+        UC1 --> UC2 --> UC3 --> UC4 --> UC5
     end
 
-    subgraph SUBSYS_APPROVE [Process 2.0: Registration & Approvals]
-        UC6["Submit Registration (Cashier or Admin)"]
-        UC7["Owner 1-Click Email Token Approval"]
-        UC8["Admin POS UI Cashier Approval"]
-        UC9["Reject Registration Request"]
-        UC10["Resend Approval Token to Owner"]
-        UC11["Superadmin Account Activation / Deletion"]
+    subgraph SUBSYS_APPROVE [Process 2.0: Registration & Multi-Channel Approvals]
+        direction TB
+        UC6["UC 6: Submit Registration Form (Cashier or Admin)"]
+        UC7["UC 7: Store Owner 1-Click Email Token Approval"]
+        UC8["UC 8: Admin POS UI Direct Cashier Approval"]
+        UC9["UC 9: Reject Registration Request in Dashboard"]
+        UC10["UC 10: Resend Fresh Approval Token to Owner"]
+        UC11["UC 11: Superadmin Account Governance / Deletion"]
+        UC6 --> UC7 --> UC8 --> UC9 --> UC10 --> UC11
     end
 
-    subgraph EXT_MAIL [External Service]
+    subgraph EXT_MAIL [External Supporting Service]
         EML(["Gmail SMTP Service"])
     end
 
-    CSH --> UC1
-    CSH --> UC2
-    CSH --> UC6
-    CSH --> UC5
+    ACT_A --> SUBSYS_AUTH
+    SUBSYS_AUTH --> SUBSYS_APPROVE
+    SUBSYS_APPROVE --> EXT_MAIL
 
-    ADM --> UC1
-    ADM --> UC3
-    ADM --> UC5
-    ADM --> UC6
-    ADM --> UC8
-    ADM --> UC9
-    ADM --> UC10
-
-    OWN --> UC7
-    SA --> UC1
-    SA --> UC4
-    SA --> UC11
-
-    UC3 -.->|Sends 2FA Code| EML
-    UC6 -.->|Sends Approval Link| EML
-    UC7 -.->|Sends Confirmation| EML
-    UC8 -.->|Sends Confirmation| EML
-    UC10 -.->|Resends Token| EML
+    UC3 -.-> EML
+    UC7 -.-> EML
+    UC8 -.-> EML
+    UC10 -.-> EML
         </div>
       </div>
       <div class="sec-note">Granular Functional Use Cases &mdash; Authentication &amp; Multi-Channel Registration Approvals</div>
@@ -933,72 +1444,70 @@ flowchart LR
          ============================================================== -->
     <div class="sec" id="uc1b">
       <div class="sec-head">
-        <div class="sec-icon">&#9678;</div>
-        <div>
-          <h2>Use Case L1: Menu, POS, Orders &amp; Analytics <span class="badge">Level 1</span></h2>
-          <p>Size variants, checkout, inventory deduction, order receipts, void/refund requests, bypass tokens &amp; KPI analytics</p>
+        <div class="sec-head-main">
+          <div class="sec-icon">&#9678;</div>
+          <div>
+            <h2>Use Case L1: Menu, POS, Orders &amp; Analytics <span class="badge">Level 1</span></h2>
+            <p>Size variants, checkout, photo replace/delete modal, void/refund PIN requests, weekly VS analytics &amp; 15-min auto-purge tokens</p>
+          </div>
         </div>
+        <button type="button" class="print-single-btn" onclick="printSingleDiagram('uc1b', 'portrait')" title="Print only this diagram on a single clean page">
+          🖨️ Print Diagram
+        </button>
       </div>
       <div class="bg">
         <div class="mermaid">
 flowchart TD
-    subgraph ACT_B [Operational Actors]
+    subgraph ACT_B [System Operational Actors]
+        direction LR
         CSH(["Cashier"])
         ADM(["Admin"])
+        SA(["Super Admin"])
     end
 
-    subgraph SUBSYS_INV [Process 3.0: Menu & Inventory]
+    subgraph SUBSYS_CAT [Catalog & POS Terminal Subsystem]
         direction TB
-        UC12["Manage Items with Size Price JSON"]
-        UC13["Quick Stock Adjust & Min Thresholds"]
-        UC14["Toggle Item Availability Active/Hidden"]
-        UC15["Request 15-Min Delete Bypass Token"]
-        UC16["Delete Menu Item with Verified Token"]
+        UC12["UC 12: Menu Catalog & Multi-Size Pricing JSON"]
+        UC13["UC 13: Upload, Replace & Delete Photo Modal"]
+        UC14["UC 14: Quick Stock Adjust & Threshold Alerts"]
+        UC15["UC 15: Toggle Availability Active/Hidden"]
+        UC16["UC 16: Request 15-Min Delete Bypass Token"]
+        UC17["UC 17: Category Shortcuts & Subcategory Tabs"]
+        UC18["UC 18: Add Item with Size Variant Modal"]
+        UC19["UC 19: Cart Live Total & Tender Cash/GCash"]
+        UC20["UC 20: Auto Stock Deduction & Thermal Receipts"]
+        UC12 --> UC13 --> UC14 --> UC15 --> UC16 --> UC17 --> UC18 --> UC19 --> UC20
     end
 
-    subgraph SUBSYS_POS [Process 4.0: POS & Checkout]
+    subgraph SUBSYS_OPS [Orders, Requests & Analytics Subsystem]
         direction TB
-        UC17["Category Shortcuts & Subcategory Tabs"]
-        UC18["Add Item with Size Variant Modal"]
-        UC19["Cart Management: Adjust Qty & Remove"]
-        UC20["Process Payment: Cash with Change or GCash"]
-        UC21["Automatic Stock Deduction & Low Stock Alert"]
-        UC22["Print Thermal & Official Receipts"]
+        UC21["UC 21: Expandable Order History Cards"]
+        UC22["UC 22: Submit Void / Refund Request in POS"]
+        UC23["UC 23: Validate 6-Digit PIN for Instant Void"]
+        UC24["UC 24: Super Admin Review System Requests"]
+        UC25["UC 25: Real-Time Financial KPIs & Hourly Charts"]
+        UC26["UC 26: Weekly VS Comparison & Offset"]
+        UC27["UC 27: Formal Sales Summary Reports"]
+        UC28["UC 28: 15-Min Token Auto-Purge"]
+        UC21 --> UC22 --> UC23 --> UC24 --> UC25 --> UC26 --> UC27 --> UC28
     end
 
-    subgraph SUBSYS_ORD [Process 5.0: Orders & Analytics]
-        direction TB
-        UC23["View Expandable Order Cards & Breakdown"]
-        UC24["Submit & Authorize Order Void / Refund"]
-        UC25["Real-Time Financial KPIs & Hourly Peak Charts"]
-        UC26["Print Formal Sales Summary Reports"]
+    subgraph SVCS [External Supporting Services & Automation]
+        direction LR
+        EML(["Gmail SMTP Service"])
+        SCHED(["MySQL 1-Min Auto-Purge Event"])
     end
 
-    ACT_B -.-> SUBSYS_INV
-    ACT_B -.-> SUBSYS_POS
-    ACT_B -.-> SUBSYS_ORD
+    ACT_B --> SUBSYS_CAT
+    SUBSYS_CAT --> SUBSYS_OPS
+    SUBSYS_OPS --> SVCS
 
-    CSH --> UC17
-    CSH --> UC18
-    CSH --> UC19
-    CSH --> UC20
-    CSH --> UC21
-    CSH --> UC22
-    CSH --> UC23
-    CSH --> UC24
-
-    ADM --> UC12
-    ADM --> UC13
-    ADM --> UC14
-    ADM --> UC15
-    ADM --> UC16
-    ADM --> UC23
-    ADM --> UC24
-    ADM --> UC25
-    ADM --> UC26
+    UC16 -.-> EML
+    UC22 -.-> EML
+    UC28 -.-> SCHED
         </div>
       </div>
-      <div class="sec-note">Subsystem Functional Decomposition &mdash; Menu Inventory, POS Checkout &amp; Sales Analytics</div>
+      <div class="sec-note">Subsystem Functional Decomposition &mdash; Menu Inventory, POS Checkout, System Requests &amp; Sales Analytics</div>
     </div>
 
     <!-- ==============================================================
@@ -1006,11 +1515,16 @@ flowchart TD
          ============================================================== -->
     <div class="sec" id="erd-pos">
       <div class="sec-head">
-        <div class="sec-icon">&#9638;</div>
-        <div>
-          <h2>ERD Part 1: POS Catalog, Orders &amp; Transaction Pipeline <span class="badge">Database Schema</span></h2>
-          <p>Relational entities for product catalog, categories, size pricing variants, order headers &amp; line items</p>
+        <div class="sec-head-main">
+          <div class="sec-icon">&#9638;</div>
+          <div>
+            <h2>ERD Part 1: POS Catalog, Orders &amp; Transaction Pipeline <span class="badge">Database Schema</span></h2>
+            <p>Relational entities for product catalog, categories, size pricing variants, order headers &amp; line items</p>
+          </div>
         </div>
+        <button type="button" class="print-single-btn" onclick="printSingleDiagram('erd-pos', 'portrait')" title="Print only this diagram on a single clean page">
+          🖨️ Print Diagram
+        </button>
       </div>
       <div class="bg">
         <div class="mermaid">
@@ -1032,7 +1546,7 @@ erDiagram
         int category_id FK
         decimal price
         text size_prices
-        text image
+        mediumtext image
         int stock
         int min_stock
         tinyint is_available
@@ -1078,24 +1592,29 @@ erDiagram
          ============================================================== -->
     <div class="sec" id="erd-sec">
       <div class="sec-head">
-        <div class="sec-icon">&#9638;</div>
-        <div>
-          <h2>ERD Part 2: Security, Approvals, Requests &amp; Audit Logs <span class="badge">Database Schema</span></h2>
-          <p>Relational entities for registration requests, 2FA/bypass tokens, system requests &amp; comprehensive audit logs</p>
+        <div class="sec-head-main">
+          <div class="sec-icon">&#9638;</div>
+          <div>
+            <h2>ERD Part 2: Security, Approvals, Requests &amp; Audit Logs <span class="badge">Database Schema</span></h2>
+            <p>Relational entities for registration requests, 2FA/bypass tokens, system requests &amp; comprehensive audit logs</p>
+          </div>
         </div>
+        <button type="button" class="print-single-btn" onclick="printSingleDiagram('erd-sec', 'portrait')" title="Print only this diagram on a single clean page">
+          🖨️ Print Diagram
+        </button>
       </div>
       <div class="bg">
         <div class="mermaid">
 erDiagram
     USERS ||--o{ ADMIN_REGISTRATION_REQUESTS : "originates"
-    USERS ||--o{ ADMIN_TOKENS : "authenticates"
+    ADMIN_REGISTRATION_REQUESTS ||--o{ ADMIN_TOKENS : "verifies"
     USERS ||--o{ SYSTEM_REQUESTS : "submits"
-    USERS ||--o{ SYSTEM_LOGS : "logs_activity"
+    SYSTEM_REQUESTS ||--o{ SYSTEM_LOGS : "audits"
+    SYSTEM_SETTINGS ||--o{ SYSTEM_LOGS : "configures"
 
     USERS {
         int id PK
         varchar username UK
-        varchar password
         varchar full_name
         varchar email
         enum role
@@ -1105,12 +1624,9 @@ erDiagram
     ADMIN_REGISTRATION_REQUESTS {
         int id PK
         varchar username
-        varchar full_name
-        varchar email
         varchar role
         varchar approval_token UK
         enum status
-        datetime approved_at
         timestamp created_at
     }
 
@@ -1127,22 +1643,15 @@ erDiagram
         int id PK
         varchar type
         int requested_by FK
-        varchar requester_name
         varchar title
-        text description
-        text payload
         enum status
-        datetime reviewed_at
     }
 
     SYSTEM_LOGS {
         int id PK
         int actor_id FK
-        varchar actor_username
         varchar action
         varchar target_type
-        int target_id
-        varchar ip_address
         timestamp created_at
     }
 
@@ -1161,38 +1670,37 @@ erDiagram
          ============================================================== -->
     <div class="sec" id="dfd0">
       <div class="sec-head">
-        <div class="sec-icon">&#8646;</div>
-        <div>
-          <h2>DFD Level 0: Context System Boundary <span class="badge">Context</span></h2>
-          <p>Global data flows between external entities (Cashier, Admin, Owner, Super Admin, Gmail SMTP) &amp; POS Process 0</p>
+        <div class="sec-head-main">
+          <div class="sec-icon">&#8646;</div>
+          <div>
+            <h2>DFD Level 0: Context System Boundary <span class="badge">Context</span></h2>
+            <p>Global data flows between external entities (Cashier, Admin, Owner, Super Admin, Gmail SMTP) &amp; POS Process 0</p>
+          </div>
         </div>
+        <button type="button" class="print-single-btn" onclick="printSingleDiagram('dfd0', 'portrait')" title="Print only this diagram on a single clean page">
+          🖨️ Print Diagram
+        </button>
       </div>
       <div class="bg">
         <div class="mermaid">
 flowchart TD
-    CSH(["Cashier"])
-    ADM(["Admin"])
-    OWN(["Store Owner"])
-    SA(["Super Admin"])
-    EML(["Gmail SMTP Service"])
+    subgraph STAFF [Store Operational Roles]
+        direction LR
+        CSH(["Cashier"])
+        ADM(["Admin"])
+    end
 
-    SYS["Process 0:
-    ChipiPie Cafe POS System"]
+    subgraph GOV [Store Governance & System Control]
+        direction LR
+        OWN(["Store Owner"])
+        SA(["Super Admin"])
+    end
 
-    CSH -->|"1. Credentials & Orders<br/>2. Payments (Cash/GCash)<br/>3. Void/Refund Requests"| SYS
-    SYS -->|"1. Pending Status & Session<br/>2. Thermal Receipts<br/>3. Out-of-Stock Warnings"| CSH
+    STAFF <-->|"Orders, Tender & Menu Management"| SYS["Process 0:<br/>ChipiPie Cafe POS System Boundary"]
+    GOV <-->|"Staff Approvals & Governance Logs"| SYS
 
-    ADM -->|"1. 2FA Codes & Staff Approvals<br/>2. Menu & Size Variant Updates<br/>3. 15-Min Bypass Token Requests"| SYS
-    SYS -->|"1. Real-Time KPIs & Trend Charts<br/>2. Expandable Order Histories<br/>3. Inventory Low Stock Alerts"| ADM
-
-    OWN -->|"1. 1-Click Email Token Approval"| SYS
-    SYS -->|"1. Account Activated Confirmations"| OWN
-
-    SA -->|"1. System Requests & User Governance"| SYS
-    SYS -->|"1. Comprehensive System Audit Logs"| SA
-
-    SYS -->|"1. Approval Links, 2FA Codes & Bypass Tokens"| EML
-    EML -->|"1. Deliver Security Emails"| OWN
+    SYS -->|"Security 2FA & Notification Emails"| EML(["Gmail SMTP Service"])
+    EML -->|"1-Click Approval Links"| OWN
         </div>
       </div>
       <div class="sec-note">Context Data Flow Level 0: External Entities &amp; Boundary Process</div>
@@ -1203,15 +1711,21 @@ flowchart TD
          ============================================================== -->
     <div class="sec" id="dfd1a">
       <div class="sec-head">
-        <div class="sec-icon">&#8646;</div>
-        <div>
-          <h2>DFD Level 1A: Authentication &amp; Registration <span class="badge">Level 1</span></h2>
-          <p>Process 1.0 (Login, Rate Limits, Lockout, 2FA) &amp; Process 2.0 (Cashier &amp; Admin Registration Approvals)</p>
+        <div class="sec-head-main">
+          <div class="sec-icon">&#8646;</div>
+          <div>
+            <h2>DFD Level 1A: Authentication &amp; Registration <span class="badge">Level 1</span></h2>
+            <p>Process 1.0 (Login, Rate Limits, Lockout, 2FA) &amp; Process 2.0 (Cashier &amp; Admin Registration Approvals)</p>
+          </div>
         </div>
+        <button type="button" class="print-single-btn" onclick="printSingleDiagram('dfd1a', 'portrait')" title="Print only this diagram on a single clean page">
+          🖨️ Print Diagram
+        </button>
       </div>
-      <div class="bg" style="flex-direction: column; gap: 36px;">
-        <h3 style="font-size: 1.05rem; font-weight: 800; border-bottom: 2px solid #000; padding-bottom: 8px; width: 100%; max-width: 820px; text-align: center;">Process 1.0: Authentication &amp; Access Validation</h3>
-        <div class="mermaid">
+      <div class="bg dfd-container" style="flex-direction: column; gap: 20px;">
+        <div class="dfd-block">
+          <h3 class="dfd-subtitle">Process 1.0: Authentication &amp; Access Validation</h3>
+          <div class="mermaid">
 flowchart TD
     CSH(["Cashier"])
     ADM(["Admin"])
@@ -1238,45 +1752,44 @@ flowchart TD
     P1_3 -->|"8. Send 2FA Code Email"| EML
     P1_3 -->|"9. Active Session Context"| P1_4
     P1_4 -->|"10. Cashier / Admin Session"| CSH
+          </div>
         </div>
 
-        <h3 style="font-size: 1.05rem; font-weight: 800; border-bottom: 2px solid #000; padding-bottom: 8px; width: 100%; max-width: 820px; text-align: center;">Process 2.0: Multi-Channel Registration &amp; Staff Approvals</h3>
-        <div class="mermaid">
+        <div class="dfd-block">
+          <h3 class="dfd-subtitle">Process 2.0: Multi-Channel Registration &amp; Staff Approvals</h3>
+          <div class="mermaid">
 flowchart TD
     CSH(["Cashier"])
     ADM(["Admin"])
     OWN(["Store Owner"])
     EML(["Gmail SMTP Service"])
 
-    P2_1["2.1 Submit Staff Registration (Cashier/Admin)"]
-    P2_2["2.2 Process Owner 1-Click Email Approval"]
-    P2_3["2.3 Process POS UI Cashier Direct Approval"]
-    P2_4["2.4 Reject Registration Request"]
-    P2_5["2.5 Resend Approval Token to Owner"]
-
     DS4[("D4: admin_registration_requests")]
     DS1[("D1: users")]
 
-    CSH -->|"1. Submit Registration Form"| P2_1
-    ADM -->|"1. Submit Registration Form"| P2_1
-    P2_1 -->|"2. Insert Pending Request with Role"| DS4
-    P2_1 -->|"3. Dispatch Approval Link"| EML
-    EML -->|"4. Deliver Token Email"| OWN
+    P2_1["2.1 Submit Staff Registration (Cashier/Admin)"]
+    P2_2["2.2 Process Owner 1-Click Email Approval"]
+    P2_3["2.3 Process POS UI Cashier Direct Approval"]
+    P2_4["2.4 Reject / Resend Registration Token"]
 
-    OWN -->|"5. 1-Click Email Token Link"| P2_2
-    P2_2 -->|"6. Update Request Status to Approved"| DS4
-    P2_2 -->|"7. Create Active User Account"| DS1
-    P2_2 -->|"8. Send Approval Confirmation"| EML
+    CSH -->|"1. Submit Form"| P2_1
+    ADM -->|"1. Submit Form"| P2_1
+    P2_1 -->|"2. Insert Pending Request"| DS4
+    P2_1 -->|"3. Dispatch Token Email"| EML
+    EML -->|"4. Deliver Token Link"| OWN
 
-    ADM -->|"9. Direct Approve Cashier in POS Table"| P2_3
-    P2_3 -->|"10. Create Active Cashier Account"| DS1
-    P2_3 -->|"11. Send Confirmation Email"| EML
+    OWN -->|"5. 1-Click Approval Link"| P2_2
+    P2_2 -->|"6. Create Active Account"| DS1
+    P2_2 -->|"7. Update Approved"| DS4
 
-    ADM -->|"12. Reject Request"| P2_4
-    P2_4 -->|"13. Update Request Status to Rejected"| DS4
+    ADM -->|"8. Direct Table Approve"| P2_3
+    P2_3 -->|"9. Create Active Cashier"| DS1
+    P2_3 -->|"10. Update Approved"| DS4
 
-    ADM -->|"14. Resend Token Request"| P2_5
-    P2_5 -->|"15. Dispatch Fresh Token Email"| EML
+    ADM -->|"11. Reject or Resend"| P2_4
+    P2_4 -->|"12. Update Status / Resend Email"| DS4
+    P2_4 -.->|"13. Dispatch Fresh Email"| EML
+          </div>
         </div>
       </div>
       <div class="sec-note">Detailed Subsystem Data Store Transitions &mdash; Authentication &amp; Registration Approvals</div>
@@ -1287,15 +1800,21 @@ flowchart TD
          ============================================================== -->
     <div class="sec" id="dfd1b">
       <div class="sec-head">
-        <div class="sec-icon">&#8646;</div>
-        <div>
-          <h2>DFD Level 1B: Menu, POS, Orders &amp; Analytics <span class="badge">Level 1</span></h2>
-          <p>Process 3.0 (Menu &amp; Bypass Tokens), Process 4.0 (Order Checkout &amp; Stock Deduction) &amp; Process 5.0 (Orders &amp; KPIs)</p>
+        <div class="sec-head-main">
+          <div class="sec-icon">&#8646;</div>
+          <div>
+            <h2>DFD Level 1B: Menu, POS, Orders &amp; Analytics <span class="badge">Level 1</span></h2>
+            <p>Process 3.0 (Menu &amp; Bypass Tokens), Process 4.0 (Order Checkout &amp; Stock Deduction) &amp; Process 5.0 (Orders &amp; KPIs)</p>
+          </div>
         </div>
+        <button type="button" class="print-single-btn" onclick="printSingleDiagram('dfd1b', 'portrait')" title="Print only this diagram on a single clean page">
+          🖨️ Print Diagram
+        </button>
       </div>
-      <div class="bg" style="flex-direction: column; gap: 36px;">
-        <h3 style="font-size: 1.05rem; font-weight: 800; border-bottom: 2px solid #000; padding-bottom: 8px; width: 100%; max-width: 820px; text-align: center;">Process 3.0: Menu Catalog &amp; Protected Deletion</h3>
-        <div class="mermaid">
+      <div class="bg dfd-container" style="flex-direction: column; gap: 20px;">
+        <div class="dfd-block">
+          <h3 class="dfd-subtitle">Process 3.0: Menu Catalog &amp; Protected Deletion</h3>
+          <div class="mermaid">
 flowchart TD
     ADM(["Admin"])
     EML(["Gmail SMTP Service"])
@@ -1319,9 +1838,11 @@ flowchart TD
     P3_3 -->|"8. Verify & Consume Token"| DS5
     P3_3 -->|"9. Delete Item Record & Restock"| DS2
         </div>
+        </div>
 
-        <h3 style="font-size: 1.05rem; font-weight: 800; border-bottom: 2px solid #000; padding-bottom: 8px; width: 100%; max-width: 820px; text-align: center;">Process 4.0: POS Order Processing &amp; Real-Time Stock Deduction</h3>
-        <div class="mermaid">
+        <div class="dfd-block">
+          <h3 class="dfd-subtitle">Process 4.0: POS Order Processing &amp; Real-Time Stock Deduction</h3>
+          <div class="mermaid">
 flowchart TD
     CSH(["Cashier"])
 
@@ -1343,9 +1864,11 @@ flowchart TD
     P4_4 -->|"8. Insert Order & Line Items"| DS3
     P4_4 -->|"9. Render Official Thermal Receipt"| CSH
         </div>
+        </div>
 
-        <h3 style="font-size: 1.05rem; font-weight: 800; border-bottom: 2px solid #000; padding-bottom: 8px; width: 100%; max-width: 820px; text-align: center;">Process 5.0: Orders, Voids &amp; Sales Analytics</h3>
-        <div class="mermaid">
+        <div class="dfd-block">
+          <h3 class="dfd-subtitle">Process 5.0: Orders, Voids &amp; Sales Analytics</h3>
+          <div class="mermaid">
 flowchart TD
     CSH(["Cashier"])
     ADM(["Admin"])
@@ -1372,6 +1895,7 @@ flowchart TD
     P5_3 -->|"9. Sales Summary Dataset"| P5_4
     P5_4 -->|"10. Formatted Thermal Report"| ADM
         </div>
+        </div>
       </div>
       <div class="sec-note">Detailed Subsystem Data Store Transitions &mdash; Menu Inventory, POS Checkout &amp; Sales Analytics</div>
     </div>
@@ -1395,14 +1919,14 @@ flowchart TD
         primaryBorderColor: "#000000",
         lineColor: "#000000",
         secondaryColor: "#ffffff",
-        tertiaryColor: "#f8fafc",
+        tertiaryColor: "#ffffff",
         nodeBorder: "#000000",
-        clusterBkg: "#fafafa",
+        clusterBkg: "#ffffff",
         clusterBorder: "#000000",
         titleColor: "#000000",
         edgeLabelBackground: "#ffffff",
         fontFamily: "'Inter', -apple-system, sans-serif",
-        fontSize: "15px",
+        fontSize: "17px",
         labelTextColor: "#000000",
         nodeTextColor: "#000000",
         actorBkg: "#ffffff",
@@ -1414,11 +1938,63 @@ flowchart TD
         labelBoxBkgColor: "#ffffff",
         labelBoxBorderColor: "#000000",
         attributeBackgroundColorEven: "#ffffff",
-        attributeBackgroundColorOdd: "#f8fafc"
+        attributeBackgroundColorOdd: "#ffffff"
       },
-      flowchart: { curve: "basis", useMaxWidth: true, htmlLabels: true, nodeSpacing: 40, rankSpacing: 45 },
-      er: { useMaxWidth: true, fontSize: 14 }
+      flowchart: { curve: "basis", useMaxWidth: true, htmlLabels: true, nodeSpacing: 50, rankSpacing: 55, padding: 30 },
+      er: { useMaxWidth: true, fontSize: 18 }
     });
+
+    // Dynamic Print Orientation & Printing Helpers
+    function setPrintOrientation(orient) {
+      let styleEl = document.getElementById('dynamic-page-orient');
+      if (!styleEl) {
+        styleEl = document.createElement('style');
+        styleEl.id = 'dynamic-page-orient';
+        document.head.appendChild(styleEl);
+      }
+      styleEl.textContent = `@page { size: A4 ${orient}; margin: 8mm 10mm; }`;
+    }
+
+    function printAllDiagrams(orient = 'portrait') {
+      setPrintOrientation(orient);
+      document.body.classList.remove('printing-single');
+      document.querySelectorAll('.sec').forEach(s => s.classList.remove('print-target'));
+      window.print();
+    }
+
+    function printSingleDiagram(secId, orient = 'portrait') {
+      const target = document.getElementById(secId);
+      if (!target) return;
+      setPrintOrientation(orient);
+      document.body.classList.add('printing-single');
+      document.querySelectorAll('.sec').forEach(s => s.classList.remove('print-target'));
+      target.classList.add('print-target');
+      window.print();
+    }
+
+    window.addEventListener('afterprint', () => {
+      document.body.classList.remove('printing-single');
+      document.querySelectorAll('.sec').forEach(s => s.classList.remove('print-target'));
+    });
+
+    // Zoom Controls (Screen Only)
+    let currentZoom = 1.0;
+    function adjustZoom(delta) {
+      currentZoom = Math.min(1.8, Math.max(0.6, Math.round((currentZoom + delta) * 10) / 10));
+      applyZoom();
+    }
+    function resetZoom() {
+      currentZoom = 1.0;
+      applyZoom();
+    }
+    function applyZoom() {
+      const lbl = document.getElementById('zoom-level');
+      if (lbl) lbl.textContent = Math.round(currentZoom * 100) + '%';
+      document.querySelectorAll('.mermaid svg').forEach(svg => {
+        svg.style.transform = currentZoom === 1.0 ? 'none' : `scale(${currentZoom})`;
+        svg.style.transformOrigin = 'center top';
+      });
+    }
 
     document.addEventListener("DOMContentLoaded", () => {
       const observer = new MutationObserver(() => {

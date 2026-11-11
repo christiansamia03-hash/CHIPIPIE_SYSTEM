@@ -45,6 +45,10 @@ switch ($action) {
     case 'reset_password_link': handleSAResetPasswordLink(); break;
     case 'rate_limits':         handleSAGetRateLimits(); break;
     case 'reset_rate_limits':   handleSAResetRateLimits(); break;
+    case 'chart_weekly_weeks':  handleSAChartWeeklyWeeks(); break;
+    case 'chart_weekly':        handleSAChartWeekly(); break;
+    case 'chart_hourly':        handleSAChartHourly(); break;
+    case 'chart_monthly':       handleSAChartMonthly(); break;
     default:
         jsonResponse(['success' => false, 'message' => 'Invalid action.'], 400);
 }
@@ -111,7 +115,8 @@ function handleSAForgotPassword() {
     $userId    = $saUser['id'] ?? null;
 
     $db->prepare("INSERT INTO admin_tokens (token, user_id, purpose, expires_at) VALUES (?,?,?,?)")
-       ->execute([$token, $userId, 'sa_reset_link', $expiresAt]);
+       ->execute([hashToken($token), $userId, 'sa_reset_link', $expiresAt]);
+    purgeExpiredAdminTokens($db);
 
     $storeName = getSetting('store_name') ?: 'ChipiPie Cafe';
     $host      = ($_SERVER['HTTP_HOST'] ?? 'localhost');
@@ -148,8 +153,8 @@ function handleSAResetPasswordLink() {
 
     $db  = getDB();
     $now = date('Y-m-d H:i:s');
-    $stmt = $db->prepare("SELECT * FROM admin_tokens WHERE token = ? AND purpose = 'sa_reset_link' AND is_used = 0 AND expires_at > ?");
-    $stmt->execute([$token, $now]);
+    $stmt = $db->prepare("SELECT * FROM admin_tokens WHERE (token = ? OR token = ?) AND purpose = 'sa_reset_link' AND is_used = 0 AND expires_at > ?");
+    $stmt->execute([hashToken($token), $token, $now]);
     $row = $stmt->fetch();
 
     if (!$row) {
@@ -163,6 +168,7 @@ function handleSAResetPasswordLink() {
 
     // Mark token used
     $db->prepare("UPDATE admin_tokens SET is_used = 1, used_at = ? WHERE id = ?")->execute([$now, $row['id']]);
+    purgeExpiredAdminTokens($db);
 
     // Update super_admin password
     $hash = password_hash($newPass, PASSWORD_DEFAULT);
@@ -1340,4 +1346,246 @@ function handleSubmitRequest() {
 
     logAction('submit_request', 'system_request', $db->lastInsertId(), "Type: $type — $title");
     jsonResponse(['success' => true, 'message' => 'Request submitted for Super Admin review.']);
+}
+
+
+// =====================================================
+// CHART & ANALYTICS COMPARISON (VS) ENDPOINTS
+// =====================================================
+
+function handleSAChartWeeklyWeeks() {
+    requireSuperAdmin();
+    $db = getDB();
+
+    $curDow = (int)date('w');
+    $daysFromMon = ($curDow + 6) % 7;
+    $currentMonday = date('Y-m-d', strtotime("-{$daysFromMon} days"));
+
+    $rows = $db->query("
+        SELECT 
+            DATE(DATE_SUB(created_at, INTERVAL (DAYOFWEEK(created_at) + 5) % 7 DAY)) as monday,
+            COUNT(*) as order_count,
+            COALESCE(SUM(total), 0) as revenue
+        FROM orders 
+        WHERE status = 'Completed'
+        GROUP BY monday
+        ORDER BY monday DESC
+    ")->fetchAll(PDO::FETCH_ASSOC);
+
+    $weeks = [];
+    $seenCurrent = false;
+
+    foreach ($rows as $r) {
+        $mon = $r['monday'];
+        if ($mon === $currentMonday) $seenCurrent = true;
+        $sun = date('Y-m-d', strtotime($mon . ' +6 days'));
+        $label = date('M j', strtotime($mon)) . ' – ' . date('M j, Y', strtotime($sun));
+        if ($mon === $currentMonday) {
+            $label .= ' (Current Week)';
+        }
+        $weeks[] = [
+            'week_start'  => $mon,
+            'week_end'    => $sun,
+            'label'       => $label,
+            'order_count' => (int)$r['order_count'],
+            'revenue'     => (float)$r['revenue'],
+            'is_current'  => ($mon === $currentMonday)
+        ];
+    }
+
+    if (!$seenCurrent) {
+        $sun = date('Y-m-d', strtotime($currentMonday . ' +6 days'));
+        $label = date('M j', strtotime($currentMonday)) . ' – ' . date('M j, Y', strtotime($sun)) . ' (Current Week)';
+        array_unshift($weeks, [
+            'week_start'  => $currentMonday,
+            'week_end'    => $sun,
+            'label'       => $label,
+            'order_count' => 0,
+            'revenue'     => 0.0,
+            'is_current'  => true
+        ]);
+    }
+
+    jsonResponse([
+        'success'            => true,
+        'weeks'              => $weeks,
+        'current_week_start' => $currentMonday
+    ]);
+}
+
+function handleSAChartWeekly() {
+    requireSuperAdmin();
+    $db = getDB();
+
+    $curDow = (int)date('w');
+    $daysFromMon = ($curDow + 6) % 7;
+    $defaultMon = date('Y-m-d', strtotime("-{$daysFromMon} days"));
+
+    $weekStart = $_GET['week_start'] ?? $defaultMon;
+    if (!preg_match('/^\d{4}-\d{2}-\d{2}$/', $weekStart)) {
+        $weekStart = $defaultMon;
+    }
+
+    $fetchWeek = function($mon) use ($db) {
+        $sun = date('Y-m-d', strtotime($mon . ' +6 days'));
+        $stmt = $db->prepare("
+            SELECT DAYOFWEEK(created_at) as dow, COALESCE(SUM(total),0) as rev
+            FROM orders 
+            WHERE created_at >= ? AND created_at <= ? AND status = 'Completed'
+            GROUP BY DAYOFWEEK(created_at)
+        ");
+        $stmt->execute([$mon . ' 00:00:00', $sun . ' 23:59:59']);
+        $rows = $stmt->fetchAll(PDO::FETCH_ASSOC);
+
+        $data = [0, 0, 0, 0, 0, 0, 0];
+        $total = 0.0;
+        foreach ($rows as $r) {
+            $idx = ($r['dow'] + 5) % 7;
+            $val = floatval($r['rev']);
+            $data[$idx] = $val;
+            $total += $val;
+        }
+
+        $label = date('M j', strtotime($mon)) . ' – ' . date('M j, Y', strtotime($sun));
+        return [
+            'week_start' => $mon,
+            'week_end'   => $sun,
+            'label'      => $label,
+            'data'       => $data,
+            'total'      => round($total, 2)
+        ];
+    };
+
+    $primary = $fetchWeek($weekStart);
+
+    $vsWeekStart = $_GET['vs_week_start'] ?? '';
+    $vsData = null;
+    if ($vsWeekStart && preg_match('/^\d{4}-\d{2}-\d{2}$/', $vsWeekStart)) {
+        $vsData = $fetchWeek($vsWeekStart);
+    }
+
+    jsonResponse([
+        'success' => true,
+        'labels'  => ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'],
+        'primary' => $primary,
+        'vs'      => $vsData
+    ]);
+}
+
+function handleSAChartHourly() {
+    requireSuperAdmin();
+    $db = getDB();
+
+    $date = $_GET['date'] ?? date('Y-m-d');
+    if (!preg_match('/^\d{4}-\d{2}-\d{2}$/', $date)) {
+        $date = date('Y-m-d');
+    }
+
+    $fetchDay = function($targetDate) use ($db) {
+        $stmt = $db->prepare("
+            SELECT HOUR(created_at) as hr, COALESCE(SUM(total),0) as rev
+            FROM orders 
+            WHERE created_at >= ? AND created_at < ? AND status='Completed'
+            GROUP BY HOUR(created_at)
+        ");
+        $start = $targetDate . ' 09:00:00';
+        $end   = date('Y-m-d', strtotime($targetDate . ' +1 day')) . ' 03:00:00';
+        $stmt->execute([$start, $end]);
+        $rows = $stmt->fetchAll(PDO::FETCH_ASSOC);
+
+        $data = array_fill(0, 18, 0);
+        $total = 0.0;
+        foreach ($rows as $r) {
+            $h = intval($r['hr']);
+            $rev = floatval($r['rev']);
+            $total += $rev;
+            if ($h >= 9) {
+                $data[$h - 9] = $rev;
+            } elseif ($h <= 2) {
+                $data[$h + 15] = $rev;
+            }
+        }
+        $label = date('M j, Y', strtotime($targetDate));
+        return [
+            'date'  => $targetDate,
+            'label' => $label,
+            'data'  => $data,
+            'total' => round($total, 2)
+        ];
+    };
+
+    $primary = $fetchDay($date);
+    $vsDate  = $_GET['vs_date'] ?? '';
+    $vsData  = null;
+    if ($vsDate && preg_match('/^\d{4}-\d{2}-\d{2}$/', $vsDate)) {
+        $vsData = $fetchDay($vsDate);
+    }
+
+    $hourLabels = ['9am','10am','11am','12pm','1pm','2pm','3pm','4pm','5pm','6pm','7pm','8pm','9pm','10pm','11pm','12am','1am','2am'];
+
+    jsonResponse([
+        'success' => true,
+        'labels'  => $hourLabels,
+        'primary' => $primary,
+        'vs'      => $vsData
+    ]);
+}
+
+function handleSAChartMonthly() {
+    requireSuperAdmin();
+    $db = getDB();
+
+    $year = intval($_GET['year'] ?? date('Y'));
+    if ($year < 2000 || $year > 2100) $year = (int)date('Y');
+
+    $fetchYear = function($targetYear) use ($db) {
+        $stmt = $db->prepare("
+            SELECT MONTH(created_at) as mo, COALESCE(SUM(total),0) as rev
+            FROM orders 
+            WHERE YEAR(created_at) = ? AND status='Completed'
+            GROUP BY MONTH(created_at)
+        ");
+        $stmt->execute([$targetYear]);
+        $rows = $stmt->fetchAll(PDO::FETCH_ASSOC);
+
+        $data = array_fill(0, 12, 0);
+        $total = 0.0;
+        foreach ($rows as $r) {
+            $val = floatval($r['rev']);
+            $data[intval($r['mo']) - 1] = $val;
+            $total += $val;
+        }
+
+        return [
+            'year'  => $targetYear,
+            'label' => "Year $targetYear",
+            'data'  => $data,
+            'total' => round($total, 2)
+        ];
+    };
+
+    $primary = $fetchYear($year);
+    $vsYear  = isset($_GET['vs_year']) && $_GET['vs_year'] !== '' ? intval($_GET['vs_year']) : null;
+    $vsData  = null;
+    if ($vsYear && $vsYear >= 2000 && $vsYear <= 2100) {
+        $vsData = $fetchYear($vsYear);
+    }
+
+    $years = $db->query("
+        SELECT DISTINCT YEAR(created_at) as yr 
+        FROM orders 
+        WHERE status = 'Completed' 
+        ORDER BY yr DESC
+    ")->fetchAll(PDO::FETCH_COLUMN);
+    if (!in_array((string)$year, array_map('strval', $years))) {
+        array_unshift($years, (int)$year);
+    }
+
+    jsonResponse([
+        'success' => true,
+        'labels'  => ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'],
+        'primary' => $primary,
+        'vs'      => $vsData,
+        'years'   => array_values(array_unique(array_map('intval', $years)))
+    ]);
 }
