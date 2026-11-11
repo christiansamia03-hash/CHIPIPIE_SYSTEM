@@ -2,14 +2,19 @@
 header('Cache-Control: no-store, no-cache, must-revalidate, max-age=0');
 header('Pragma: no-cache');
 header('Expires: 0');
+// Start session and generate CSRF token for this page
+require_once __DIR__ . '/api/db_config.php';
+startChipipieSession();
+$_CSRF_TOKEN = getCsrfToken();
 ?>
+<script>const CSRF_TOKEN = "<?= htmlspecialchars($_CSRF_TOKEN, ENT_QUOTES, 'UTF-8') ?>";</script>
 <!DOCTYPE html>
 <html lang="en">
 
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
-  <title>ChipiPie Cafe — POS System</title>
+  <title>ChipiPie Cafe & Pizza — POS System</title>
 
   <!-- ===== iOS / Apple Touch Icon ===== -->
   <!-- 180×180 for iPhone Retina & iPad -->
@@ -5630,10 +5635,12 @@ header('Expires: 0');
           transform-origin: 70% 95%;
           transform: translateY(60px) rotate(20deg) scale(0.85);
         }
-        /* Covering eyes active state: both arms cover eyes */
+        /* Covering eyes active state: resting rim paws MUST disappear completely! */
         .cat-covering-eyes .rim-paw {
-          opacity: 0;
-          transform: translateY(6px) scale(0.8);
+          opacity: 0 !important;
+          visibility: hidden !important;
+          transform: translateY(10px) scale(0.6) !important;
+          pointer-events: none !important;
         }
         .cat-covering-eyes .pink-arm-left {
           opacity: 1;
@@ -5794,6 +5801,8 @@ header('Expires: 0');
           delay: 0.2,
           onComplete: () => {
             gsap.set([climbL, climbR], { display: 'none' });
+            if (rimL) { rimL.style.opacity = ''; rimL.style.transform = ''; rimL.style.visibility = ''; }
+            if (rimR) { rimR.style.opacity = ''; rimR.style.transform = ''; rimR.style.visibility = ''; }
             scheduleBlink();
             scheduleSaccade();
           }
@@ -5873,7 +5882,10 @@ header('Expires: 0');
         userInput.addEventListener('focus', () => {
           isCoveringEyes = false;
           isPasswordVisible = false;
-          catStage.classList.remove('cat-covering-eyes');
+          catStage.classList.remove('cat-covering-eyes', 'cat-peeking-pass');
+          if (armLeft) armLeft.classList.remove('arm-peeking');
+          if (rimL) { rimL.style.opacity = '1'; rimL.style.visibility = 'visible'; }
+          if (rimR) { rimR.style.opacity = '1'; rimR.style.visibility = 'visible'; }
           if (armRight) armRight.classList.remove('arm-peeking');
           updateGaze();
         });
@@ -5893,7 +5905,10 @@ header('Expires: 0');
         if (document.activeElement === userInput) {
           isCoveringEyes = false;
           isPasswordVisible = false;
-          catStage.classList.remove('cat-covering-eyes');
+          catStage.classList.remove('cat-covering-eyes', 'cat-peeking-pass');
+          if (armLeft) armLeft.classList.remove('arm-peeking');
+          if (rimL) { rimL.style.opacity = '1'; rimL.style.visibility = 'visible'; }
+          if (rimR) { rimR.style.opacity = '1'; rimR.style.visibility = 'visible'; }
           if (armRight) armRight.classList.remove('arm-peeking');
           return;
         }
@@ -5901,6 +5916,9 @@ header('Expires: 0');
         if (isFocused || isToggleActive || isText) {
           isCoveringEyes = true;
           catStage.classList.add('cat-covering-eyes');
+          // Hide resting rim paws completely when paws are up!
+          if (rimL) { rimL.style.opacity = '0'; rimL.style.visibility = 'hidden'; }
+          if (rimR) { rimR.style.opacity = '0'; rimR.style.visibility = 'hidden'; }
 
           if (isText) {
             // SHOW PASSWORD: One paw (left paw) stays covering its eye, right paw lowers to peek!
@@ -5923,7 +5941,10 @@ header('Expires: 0');
           // Blurred away from password without text showing: return paws to rim
           isCoveringEyes = false;
           isPasswordVisible = false;
-          catStage.classList.remove('cat-covering-eyes');
+          catStage.classList.remove('cat-covering-eyes', 'cat-peeking-pass');
+          if (armLeft) armLeft.classList.remove('arm-peeking');
+          if (rimL) { rimL.style.opacity = '1'; rimL.style.visibility = 'visible'; }
+          if (rimR) { rimR.style.opacity = '1'; rimR.style.visibility = 'visible'; }
           if (armRight) armRight.classList.remove('arm-peeking');
           setPupils(0, 0);
         }
@@ -5972,7 +5993,8 @@ header('Expires: 0');
       const opts = { credentials: 'include' };
       opts.headers = {
         'X-Portal': 'pos',
-        'X-Offline': navigator.onLine ? '0' : '1'
+        'X-Offline': navigator.onLine ? '0' : '1',
+        'X-CSRF-Token': (typeof CSRF_TOKEN !== 'undefined' && CSRF_TOKEN ? CSRF_TOKEN : (localStorage.getItem('chipipie_csrf_token') || ''))
       };
       const sid = localStorage.getItem('chipipie_pos_session_id') || localStorage.getItem('chipipie_session_id');
       if (sid) {
@@ -10426,7 +10448,8 @@ header('Expires: 0');
         };
         const res = await fetch('api/superadmin.php?action=submit_request', {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
+          headers: { 'Content-Type': 'application/json',
+            'X-CSRF-Token': (typeof CSRF_TOKEN !== 'undefined' && CSRF_TOKEN ? CSRF_TOKEN : (localStorage.getItem('chipipie_csrf_token') || '')) },
           body: JSON.stringify(reqBody)
         });
         const data = await res.json();
@@ -10517,7 +10540,10 @@ header('Expires: 0');
       try {
         const res = await fetch('api/superadmin.php?action=submit_request', {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
+          headers: {
+            'Content-Type': 'application/json',
+            'X-CSRF-Token': (typeof CSRF_TOKEN !== 'undefined' ? CSRF_TOKEN : (localStorage.getItem('chipipie_csrf_token') || ''))
+          },
           body: JSON.stringify(req)
         });
         const data = await res.json();

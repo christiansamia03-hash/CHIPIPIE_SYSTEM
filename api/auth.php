@@ -461,6 +461,7 @@ function handleLogin() {
         'success'    => true,
         'message'    => 'Login successful.',
         'session_id' => session_id(),
+        'csrf_token' => getCsrfToken(),
         'user' => [
             'id'        => $user['id'],
             'username'  => $user['username'],

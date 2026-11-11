@@ -33,6 +33,51 @@ define('DEV_MODE', true);
 // ============ TOKEN CONFIG ============
 define('TOKEN_EXPIRY_MINUTES', 15);
 
+// ============ CSRF PROTECTION ============
+/**
+ * Start session alias for backward & forward compatibility
+ */
+function startChipipieSession() {
+    ensureSession();
+}
+
+/**
+ * Generate (or retrieve) a CSRF token for the current session.
+ * Token is a 32-byte cryptographically random hex string stored in $_SESSION.
+ */
+function getCsrfToken() {
+    ensureSession();
+    if (empty($_SESSION['csrf_token'])) {
+        $_SESSION['csrf_token'] = bin2hex(random_bytes(32));
+    }
+    return $_SESSION['csrf_token'];
+}
+
+/**
+ * Validate the X-CSRF-Token header on all state-changing (POST/PUT/DELETE) API requests.
+ * Skips validation for CLI scripts, GET, HEAD, and OPTIONS.
+ */
+function validateCsrf() {
+    if (php_sapi_name() === 'cli') return true;
+    $method = $_SERVER['REQUEST_METHOD'] ?? 'GET';
+    if (in_array($method, ['GET', 'OPTIONS', 'HEAD'])) return true;
+
+    ensureSession();
+    $sent     = $_SERVER['HTTP_X_CSRF_TOKEN'] ?? '';
+    $expected = $_SESSION['csrf_token'] ?? '';
+    if (!$expected) {
+        $expected = getCsrfToken();
+    }
+    if (!$sent || !hash_equals($expected, $sent)) {
+        jsonResponse([
+            'success'    => false,
+            'csrf_error' => true,
+            'message'    => 'Invalid or missing CSRF token. Please refresh the page and try again.'
+        ], 403);
+        exit;
+    }
+    return true;
+}
 /**
  * Deterministically hash an authorization token, PIN, or verification code using SHA-256 (64 hex characters).
  * Stored securely in admin_tokens table so plaintext verification codes and reset tokens are not exposed.
@@ -348,6 +393,8 @@ function ensureSession() {
  */
 function requireLogin() {
     ensureSession();
+    // Validate CSRF token first on all state-changing requests
+    validateCsrf();
     if (!isset($_SESSION['user_id'])) {
         jsonResponse(['success' => false, 'message' => 'Not authenticated. Please log in.'], 401);
     }
@@ -879,16 +926,29 @@ function enforceApiRateLimit() {
     recordRateLimitHit('api_rpm', $ip, $rpm, 60, 60);
 }
 
-// Set CORS headers for API access (supports credentials & X-Session-Id for serverless Vercel)
-$origin = $_SERVER['HTTP_ORIGIN'] ?? '';
-if ($origin) {
+// Set CORS headers — only allow same-host and known Vercel deployment origins.
+// Never echo back arbitrary $origin; wildcard is disallowed when credentials are used.
+$origin         = $_SERVER['HTTP_ORIGIN'] ?? '';
+$host           = $_SERVER['HTTP_HOST']   ?? '';
+$allowedOrigins = [
+    'http://'  . $host,
+    'https://' . $host,
+    'http://localhost',
+    'https://localhost',
+    'http://127.0.0.1',
+    'https://127.0.0.1',
+];
+if ($origin && in_array(rtrim($origin, '/'), $allowedOrigins, true)) {
     header("Access-Control-Allow-Origin: $origin");
     header('Access-Control-Allow-Credentials: true');
+} elseif (!$origin) {
+    // Same-origin request (no Origin header) — no CORS header needed
 } else {
-    header('Access-Control-Allow-Origin: *');
+    // Unknown origin — reject preflight, allow response without credentials
+    header('Access-Control-Allow-Origin: null');
 }
-header('Access-Control-Allow-Methods: GET, POST, PUT, DELETE, OPTIONS');
-header('Access-Control-Allow-Headers: Content-Type, Authorization, X-Session-Id, X-Requested-With, X-Portal');
+header('Access-Control-Allow-Methods: GET, POST, OPTIONS');
+header('Access-Control-Allow-Headers: Content-Type, Authorization, X-Session-Id, X-Requested-With, X-Portal, X-CSRF-Token');
 
 if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS') {
     http_response_code(200);

@@ -1,4 +1,13 @@
-﻿<!DOCTYPE html>
+<?php
+header('Cache-Control: no-store, no-cache, must-revalidate, max-age=0');
+header('Pragma: no-cache');
+header('Expires: 0');
+require_once __DIR__ . '/api/db_config.php';
+startChipipieSession();
+$_CSRF_TOKEN = getCsrfToken();
+?>
+<script>const CSRF_TOKEN = "<?= htmlspecialchars($_CSRF_TOKEN, ENT_QUOTES, 'UTF-8') ?>";</script>
+<!DOCTYPE html>
 <html lang="en">
 <head>
   <meta charset="UTF-8">
@@ -2790,7 +2799,8 @@ if (typeof gsap === "undefined") { document.write('<script src="https://cdn.jsde
         method: m,
         headers: { 
           'Content-Type': 'application/json',
-          'X-Portal': 'superadmin'
+          'X-Portal': 'superadmin',
+          'X-CSRF-Token': (typeof CSRF_TOKEN !== 'undefined' && CSRF_TOKEN ? CSRF_TOKEN : (localStorage.getItem('chipipie_csrf_token') || ''))
         },
         credentials: 'include'
       };
@@ -5998,7 +6008,10 @@ if (typeof gsap === "undefined") { document.write('<script src="https://cdn.jsde
         const res = await fetch('api/paymongo.php?action=save_key', {
           method: 'POST',
           credentials: 'include',
-          headers: { 'Content-Type': 'application/json' },
+          headers: {
+            'Content-Type': 'application/json',
+            'X-CSRF-Token': (typeof CSRF_TOKEN !== 'undefined' && CSRF_TOKEN ? CSRF_TOKEN : (localStorage.getItem('chipipie_csrf_token') || ''))
+          },
           body: JSON.stringify({ secret_key: key })
         });
         const data = await res.json();
