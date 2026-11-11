@@ -1,4 +1,4 @@
-﻿<?php
+<?php
 /**
  * ChipiPie Cafe — Authentication API
  * 
@@ -281,17 +281,18 @@ function handleLogin() {
 
         // Generate 6-digit numeric verification token
         $code = sprintf("%06d", mt_rand(100000, 999999));
-        $expiryMin = intval($saSettings['token_expiry_minutes'] ?: 10);
-        if ($expiryMin < 5) $expiryMin = 10;
+        $expiryMin = intval($saSettings['token_expiry_minutes'] ?: TOKEN_EXPIRY_MINUTES);
+        if ($expiryMin < 5) $expiryMin = 15;
         $expiresAt = date('Y-m-d H:i:s', strtotime("+$expiryMin minutes"));
 
         // Invalidate any older unused 2FA tokens for this user
         $db->prepare("UPDATE admin_tokens SET is_used = 1 WHERE user_id = ? AND purpose = 'superadmin_2fa' AND is_used = 0 AND expires_at > NOW() - INTERVAL 1 DAY")
            ->execute([$user['id']]);
 
-        // Save new 2FA token to database
+        // Save new 2FA token to database (securely hashed with SHA-256)
         $stmtToken = $db->prepare("INSERT INTO admin_tokens (token, user_id, purpose, expires_at) VALUES (?, ?, 'superadmin_2fa', ?)");
-        $stmtToken->execute([$code, $user['id'], $expiresAt]);
+        $stmtToken->execute([hashToken($code), $user['id'], $expiresAt]);
+        purgeExpiredAdminTokens($db);
 
         // Save pending 2FA state in session
         $_SESSION['pending_2fa'] = [
@@ -374,17 +375,18 @@ function handleLogin() {
 
         // Generate 6-digit numeric verification token
         $code = sprintf("%06d", mt_rand(100000, 999999));
-        $expiryMin = intval($adminSettings['token_expiry_minutes'] ?: 10);
-        if ($expiryMin < 5) $expiryMin = 10;
+        $expiryMin = intval($adminSettings['token_expiry_minutes'] ?: TOKEN_EXPIRY_MINUTES);
+        if ($expiryMin < 5) $expiryMin = 15;
         $expiresAt = date('Y-m-d H:i:s', strtotime("+$expiryMin minutes"));
 
         // Invalidate any older unused 2FA tokens for this user
         $db->prepare("UPDATE admin_tokens SET is_used = 1 WHERE user_id = ? AND purpose = 'admin_2fa' AND is_used = 0 AND expires_at > NOW() - INTERVAL 1 DAY")
            ->execute([$user['id']]);
 
-        // Save new 2FA token to database
+        // Save new 2FA token to database (securely hashed with SHA-256)
         $stmtToken = $db->prepare("INSERT INTO admin_tokens (token, user_id, purpose, expires_at) VALUES (?, ?, 'admin_2fa', ?)");
-        $stmtToken->execute([$code, $user['id'], $expiresAt]);
+        $stmtToken->execute([hashToken($code), $user['id'], $expiresAt]);
+        purgeExpiredAdminTokens($db);
 
         // Save pending 2FA state in session (recipient is strictly the Admin's registered email)
         $_SESSION['pending_2fa'] = [
@@ -1098,9 +1100,9 @@ function handleVerify2FA() {
         ], 429);
     }
 
-    // Check token in DB or session
-    $stmt = $db->prepare("SELECT id FROM admin_tokens WHERE token = ? AND user_id = ? AND purpose = ? AND is_used = 0 AND expires_at > ? LIMIT 1");
-    $stmt->execute([$code, $pending['user_id'], $purpose, $now]);
+    // Check token in DB or session (supports both SHA-256 hashed and plaintext)
+    $stmt = $db->prepare("SELECT id FROM admin_tokens WHERE (token = ? OR token = ?) AND user_id = ? AND purpose = ? AND is_used = 0 AND expires_at > ? LIMIT 1");
+    $stmt->execute([hashToken($code), $code, $pending['user_id'], $purpose, $now]);
     $tokenRow = $stmt->fetch();
 
     $codeMatches = ($tokenRow || $code === strtoupper($pending['code']));
@@ -1128,8 +1130,9 @@ function handleVerify2FA() {
     if ($tokenRow) {
         $db->prepare("UPDATE admin_tokens SET is_used = 1, used_at = NOW() WHERE id = ?")->execute([$tokenRow['id']]);
     } else {
-        $db->prepare("UPDATE admin_tokens SET is_used = 1, used_at = NOW() WHERE token = ? AND purpose = ?")->execute([$code, $purpose]);
+        $db->prepare("UPDATE admin_tokens SET is_used = 1, used_at = NOW() WHERE (token = ? OR token = ?) AND purpose = ?")->execute([hashToken($code), $code, $purpose]);
     }
+    purgeExpiredAdminTokens($db);
 
     // Fully establish authenticated session
     $_SESSION['user_id']   = $pending['user_id'];
@@ -1203,8 +1206,8 @@ function handleResend2FA() {
     $db = getDB();
 
     $code = sprintf("%06d", mt_rand(100000, 999999));
-    $expiryMin = intval($resendCfg['token_expiry_minutes'] ?: 10);
-    if ($expiryMin < 5) $expiryMin = 10;
+    $expiryMin = intval($resendCfg['token_expiry_minutes'] ?: TOKEN_EXPIRY_MINUTES);
+    if ($expiryMin < 5) $expiryMin = 15;
     $expiresAt = date('Y-m-d H:i:s', strtotime("+$expiryMin minutes"));
     $purpose   = ($pending['role'] === 'super_admin' ? 'superadmin_2fa' : 'admin_2fa');
 
@@ -1212,9 +1215,10 @@ function handleResend2FA() {
     $db->prepare("UPDATE admin_tokens SET is_used = 1 WHERE user_id = ? AND purpose = ? AND is_used = 0 AND expires_at > NOW() - INTERVAL 1 DAY")
        ->execute([$pending['user_id'], $purpose]);
 
-    // Insert new token
+    // Insert new token (securely hashed with SHA-256)
     $db->prepare("INSERT INTO admin_tokens (token, user_id, purpose, expires_at) VALUES (?, ?, ?, ?)")
-       ->execute([$code, $pending['user_id'], $purpose, $expiresAt]);
+       ->execute([hashToken($code), $pending['user_id'], $purpose, $expiresAt]);
+    purgeExpiredAdminTokens($db);
 
     $_SESSION['pending_2fa']['code']       = $code;
     $_SESSION['pending_2fa']['expires_at'] = time() + ($expiryMin * 60);
@@ -1380,9 +1384,10 @@ function handleForgotPassword() {
     $db->prepare("UPDATE admin_tokens SET is_used = 1 WHERE user_id = ? AND purpose IN ('pos_reset_link', 'password_reset') AND is_used = 0")
        ->execute([$user['id']]);
 
-    // Store in admin_tokens
+    // Store in admin_tokens (securely hashed with SHA-256)
     $db->prepare("INSERT INTO admin_tokens (token, user_id, purpose, expires_at) VALUES (?, ?, 'pos_reset_link', ?)")
-       ->execute([$token, $user['id'], $expiresAt]);
+       ->execute([hashToken($token), $user['id'], $expiresAt]);
+    purgeExpiredAdminTokens($db);
 
     $storeName = getSetting('store_name') ?: 'ChipiPie Cafe';
     $host      = ($_SERVER['HTTP_HOST'] ?? 'localhost');
@@ -1434,8 +1439,8 @@ function handleResetPasswordLink() {
 
     $db  = getDB();
     $now = date('Y-m-d H:i:s');
-    $stmt = $db->prepare("SELECT * FROM admin_tokens WHERE token = ? AND purpose = 'pos_reset_link' AND is_used = 0 AND expires_at > ? LIMIT 1");
-    $stmt->execute([$token, $now]);
+    $stmt = $db->prepare("SELECT * FROM admin_tokens WHERE (token = ? OR token = ?) AND purpose = 'pos_reset_link' AND is_used = 0 AND expires_at > ? LIMIT 1");
+    $stmt->execute([hashToken($token), $token, $now]);
     $tokenRow = $stmt->fetch();
 
     if (!$tokenRow || empty($tokenRow['user_id'])) {
@@ -1447,6 +1452,7 @@ function handleResetPasswordLink() {
 
     $db->prepare("UPDATE users SET password = ? WHERE id = ?")->execute([$hashed, $userId]);
     $db->prepare("UPDATE admin_tokens SET is_used = 1, used_at = NOW() WHERE id = ?")->execute([$tokenRow['id']]);
+    purgeExpiredAdminTokens($db);
 
     // Log action
     try {
@@ -1478,8 +1484,8 @@ function handleResetPasswordCode() {
 
     $db = getDB();
     $now = date('Y-m-d H:i:s');
-    $stmt = $db->prepare("SELECT * FROM admin_tokens WHERE token = ? AND purpose = 'password_reset' AND is_used = 0 AND expires_at > ? LIMIT 1");
-    $stmt->execute([$code, $now]);
+    $stmt = $db->prepare("SELECT * FROM admin_tokens WHERE (token = ? OR token = ?) AND purpose = 'password_reset' AND is_used = 0 AND expires_at > ? LIMIT 1");
+    $stmt->execute([hashToken($code), $code, $now]);
     $tokenRow = $stmt->fetch();
 
     if (!$tokenRow) {
@@ -1500,6 +1506,7 @@ function handleResetPasswordCode() {
 
     $db->prepare("UPDATE users SET password = ? WHERE id = ?")->execute([$hashed, $userId]);
     $db->prepare("UPDATE admin_tokens SET is_used = 1, used_at = NOW() WHERE id = ?")->execute([$tokenRow['id']]);
+    purgeExpiredAdminTokens($db);
 
     // Log action
     try {

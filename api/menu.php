@@ -11,6 +11,38 @@
  */
 require_once __DIR__ . '/db_config.php';
 
+function optimizeBase64Image($dataUri, $maxDim = 600, $quality = 85) {
+    if (!$dataUri || !is_string($dataUri) || !preg_match('/^data:image\/(\w+);base64,(.+)$/', $dataUri, $m)) {
+        return $dataUri;
+    }
+    $raw = base64_decode($m[2]);
+    if (!$raw || !extension_loaded('gd')) {
+        return $dataUri;
+    }
+    $src = @imagecreatefromstring($raw);
+    if (!$src) {
+        return $dataUri;
+    }
+    $w = imagesx($src);
+    $h = imagesy($src);
+    $ratio = min(1.0, min($maxDim / $w, $maxDim / $h));
+    $nw = max(1, (int)round($w * $ratio));
+    $nh = max(1, (int)round($h * $ratio));
+    $dst = imagecreatetruecolor($nw, $nh);
+    $white = imagecolorallocate($dst, 255, 255, 255);
+    imagefilledrectangle($dst, 0, 0, $nw, $nh, $white);
+    imagecopyresampled($dst, $src, 0, 0, 0, 0, $nw, $nh, $w, $h);
+    ob_start();
+    imagejpeg($dst, null, $quality);
+    $optRaw = ob_get_clean();
+    imagedestroy($src);
+    imagedestroy($dst);
+    if ($optRaw && (strlen($optRaw) < strlen($raw) || $w > $maxDim || $h > $maxDim)) {
+        return 'data:image/jpeg;base64,' . base64_encode($optRaw);
+    }
+    return $dataUri;
+}
+
 $method = $_SERVER['REQUEST_METHOD'];
 $action = $_GET['action'] ?? '';
 
@@ -72,7 +104,7 @@ function handleAddItem() {
     $name = trim($input['name'] ?? '');
     $categoryId = intval($input['category_id'] ?? 0);
     $price = floatval($input['price'] ?? 0);
-    $image = $input['image'] ?? null;
+    $image = !empty($input['image']) ? optimizeBase64Image($input['image']) : null;
     $stock = intval($input['stock'] ?? 0);
     $minStock = intval($input['min_stock'] ?? 5);
     $sizePrices = $input['size_prices'] ?? null;
@@ -107,8 +139,12 @@ function handleUpdateItem() {
     $db = getDB();
     $fields = []; $params = [];
 
-    foreach (['name', 'emoji', 'image'] as $f) {
+    foreach (['name', 'emoji'] as $f) {
         if (isset($input[$f])) { $fields[] = "$f = ?"; $params[] = $input[$f]; }
+    }
+    if (array_key_exists('image', $input)) {
+        $fields[] = "image = ?";
+        $params[] = ($input['image'] === '' || $input['image'] === null) ? null : optimizeBase64Image($input['image']);
     }
     if (isset($input['category_id'])) { $fields[] = "category_id = ?"; $params[] = intval($input['category_id']); }
     if (isset($input['price'])) { $fields[] = "price = ?"; $params[] = floatval($input['price']); }
@@ -149,14 +185,14 @@ function handleDeleteItem() {
         // Validate token using PHP time (avoids MySQL timezone mismatch)
         $db = getDB();
         $now = date('Y-m-d H:i:s');
-        $stmt = $db->prepare("SELECT * FROM admin_tokens WHERE token = ? AND is_used = 0 AND expires_at > ?");
-        $stmt->execute([$token, $now]);
+        $stmt = $db->prepare("SELECT * FROM admin_tokens WHERE (token = ? OR token = ?) AND is_used = 0 AND expires_at > ?");
+        $stmt->execute([hashToken($token), $token, $now]);
         $tokenRow = $stmt->fetch();
 
         if (!$tokenRow) {
             // Check why it failed for better error message
-            $stmt2 = $db->prepare("SELECT * FROM admin_tokens WHERE token = ?");
-            $stmt2->execute([$token]);
+            $stmt2 = $db->prepare("SELECT * FROM admin_tokens WHERE token = ? OR token = ?");
+            $stmt2->execute([hashToken($token), $token]);
             $ex = $stmt2->fetch();
             if ($ex) {
                 $msg = $ex['is_used'] ? 'This token was already used.' : 'Token expired (expired: ' . $ex['expires_at'] . '). Request a new one.';
@@ -168,6 +204,7 @@ function handleDeleteItem() {
 
         // Use the token
         $db->prepare("UPDATE admin_tokens SET is_used = 1, used_at = ? WHERE id = ?")->execute([$now, $tokenRow['id']]);
+        purgeExpiredAdminTokens($db);
     } else {
         $db = getDB();
     }
@@ -279,7 +316,7 @@ function handleRequestAddMenu() {
     $categoryId = intval($input['category_id'] ?? 1);
     $categoryName = trim($input['category_name'] ?? '');
     $price = floatval($input['price'] ?? 0);
-    $image = $input['image'] ?? null;
+    $image = !empty($input['image']) ? optimizeBase64Image($input['image']) : null;
     $stock = intval($input['stock'] ?? 0);
     $minStock = intval($input['min_stock'] ?? 5);
     $sizePrices = $input['size_prices'] ?? null;
@@ -335,7 +372,8 @@ function handleRequestAddMenu() {
     if ($expiryMin < 5) $expiryMin = 15;
     $expiresAt = date('Y-m-d H:i:s', strtotime("+$expiryMin minutes"));
     $stmt = $db->prepare("INSERT INTO admin_tokens (token, user_id, purpose, expires_at) VALUES (?, ?, ?, ?)");
-    $stmt->execute([$pinCode, $userId, $approvalToken, $expiresAt]);
+    $stmt->execute([hashToken($pinCode), $userId, $approvalToken, $expiresAt]);
+    purgeExpiredAdminTokens($db);
 
     $payload = [
         'action'        => 'add',
@@ -449,7 +487,8 @@ function handleRequestDeleteMenu() {
     if ($expiryMin < 5) $expiryMin = 15;
     $expiresAt = date('Y-m-d H:i:s', strtotime("+$expiryMin minutes"));
     $stmt = $db->prepare("INSERT INTO admin_tokens (token, user_id, purpose, expires_at) VALUES (?, ?, ?, ?)");
-    $stmt->execute([$pinCode, $userId, $approvalToken, $expiresAt]);
+    $stmt->execute([hashToken($pinCode), $userId, $approvalToken, $expiresAt]);
+    purgeExpiredAdminTokens($db);
 
     $payload = [
         'action'   => 'delete',
@@ -565,8 +604,8 @@ function handleExecuteAddWithCode() {
     $now = date('Y-m-d H:i:s');
 
     // Validate PIN in admin_tokens
-    $stmt = $db->prepare("SELECT * FROM admin_tokens WHERE token = ? AND is_used = 0 AND expires_at > ?");
-    $stmt->execute([$token, $now]);
+    $stmt = $db->prepare("SELECT * FROM admin_tokens WHERE (token = ? OR token = ?) AND is_used = 0 AND expires_at > ?");
+    $stmt->execute([hashToken($token), $token, $now]);
     $tokenRow = $stmt->fetch();
 
     if (!$tokenRow) {
@@ -577,6 +616,7 @@ function handleExecuteAddWithCode() {
 
     // Mark token as used
     $db->prepare("UPDATE admin_tokens SET is_used = 1, used_at = ? WHERE id = ?")->execute([$now, $tokenRow['id']]);
+    purgeExpiredAdminTokens($db);
 
     // Fetch pending request
     $stmt = $db->prepare("SELECT * FROM system_requests WHERE approval_token = ? AND status = 'pending'");

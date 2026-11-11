@@ -33,6 +33,28 @@ define('DEV_MODE', true);
 // ============ TOKEN CONFIG ============
 define('TOKEN_EXPIRY_MINUTES', 15);
 
+/**
+ * Deterministically hash an authorization token, PIN, or verification code using SHA-256 (64 hex characters).
+ * Stored securely in admin_tokens table so plaintext verification codes and reset tokens are not exposed.
+ */
+function hashToken($rawToken) {
+    if ($rawToken === null || $rawToken === '') return '';
+    return hash('sha256', trim((string)$rawToken));
+}
+
+/**
+ * Automatically purge expired and stale used admin tokens from the database.
+ * Deletes:
+ * 1) Any token where expires_at <= NOW()
+ * 2) Any used token where used_at <= DATE_SUB(NOW(), INTERVAL 5 MINUTE) OR used_at IS NULL
+ */
+function purgeExpiredAdminTokens($pdo = null) {
+    try {
+        $db = $pdo ?: getDB();
+        $db->exec("DELETE FROM admin_tokens WHERE expires_at <= NOW() OR (is_used = 1 AND (used_at <= DATE_SUB(NOW(), INTERVAL 5 MINUTE) OR used_at IS NULL))");
+    } catch (\Throwable $e) {}
+}
+
 // ============ PDO CONNECTION ============
 function getDB() {
     static $pdo = null;
@@ -51,6 +73,11 @@ function getDB() {
                 $options[PDO::MYSQL_ATTR_SSL_VERIFY_SERVER_CERT] = false;
             }
             $pdo = new PDO($dsn, DB_USER, DB_PASS, $options);
+
+            // Probabilistic auto-purge of expired admin tokens (1 in 5 DB connections)
+            if (mt_rand(1, 5) === 1) {
+                purgeExpiredAdminTokens($pdo);
+            }
         } catch (PDOException $e) {
             http_response_code(500);
             echo json_encode(['success' => false, 'message' => 'Database connection failed: ' . $e->getMessage()]);

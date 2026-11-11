@@ -1,4 +1,9 @@
-﻿<!DOCTYPE html>
+﻿<?php
+header('Cache-Control: no-store, no-cache, must-revalidate, max-age=0');
+header('Pragma: no-cache');
+header('Expires: 0');
+?>
+<!DOCTYPE html>
 <html lang="en">
 
 <head>
@@ -1961,11 +1966,11 @@
       bottom: 0;
       background: linear-gradient(135deg, #1a1514 0%, var(--cafe-brown) 100%);
       display: flex;
-      align-items: center;
+      align-items: flex-start;
       justify-content: center;
       z-index: 10000;
       overflow-y: auto;
-      padding: 24px 16px;
+      padding: 210px 16px 40px;
     }
 
     .login-card {
@@ -1977,7 +1982,7 @@
       border-radius: 20px;
       box-shadow: 0 20px 50px rgba(0, 0, 0, 0.5);
       border: 1px solid rgba(255, 255, 255, 0.2);
-      margin: auto;
+      margin: 0 auto;
     }
 
     .register-card {
@@ -3522,7 +3527,7 @@
       </div>
       <!-- STEP 1: CREDENTIALS -->
       <div id="pos-step-credentials">
-        <form onsubmit="handleLogin(event)">
+        <form onsubmit="event.preventDefault(); handleLogin(event); return false;" action="javascript:void(0);">
           <div class="mb-3">
             <label class="form-label">Username <span class="required-star" title="Required">*</span></label>
             <input type="text" id="login-user" class="form-control" required maxlength="50" minlength="3" autocomplete="username" spellcheck="false">
@@ -3554,7 +3559,7 @@
           </div>
         </div>
 
-        <form onsubmit="handlePosVerify2FA(event)">
+        <form onsubmit="event.preventDefault(); handlePosVerify2FA(event); return false;" action="javascript:void(0);">
           <div class="mb-3 text-center">
             <label class="form-label" style="font-size:12px; font-weight:600; color:#555;">Enter 6-Digit Code <span class="required-star" title="Required">*</span></label>
             <input type="text" id="pos-2fa-code" class="form-control text-center" maxlength="6" placeholder="000000" autocomplete="one-time-code" required
@@ -3595,7 +3600,7 @@
           </div>
         </div>
 
-        <form id="pos-forgot-form" onsubmit="handlePosSendForgotLink(event)">
+        <form id="pos-forgot-form" onsubmit="event.preventDefault(); handlePosSendForgotLink(event); return false;" action="javascript:void(0);">
           <div class="mb-3 text-start">
             <label class="form-label" style="font-size:12.5px;">Username or Email <span class="required-star" title="Required">*</span></label>
             <input type="text" id="pos-forgot-user" class="form-control" placeholder="Enter username or email" required maxlength="100" spellcheck="false">
@@ -4369,6 +4374,15 @@
         <div class="row g-3 mb-3">
           <div class="col-lg-12">
             <div class="kpi-card">
+              <div class="d-flex justify-content-between align-items-center flex-wrap gap-2 mb-2">
+                <span style="font-weight:600; color:var(--cafe-brown); font-size:14px;">Weekly Sales Overview</span>
+                <div class="d-flex align-items-center gap-2 flex-wrap">
+                  <select id="pos-rep-week-picker" onchange="posLoadWeeklyChart(this.value)"
+                    style="font-size:12px; padding:4px 8px; border-radius:8px; border:1px solid #d4c5b9; background:#fff; color:var(--cafe-dark); cursor:pointer; max-width:210px;">
+                    <option value="">Loading weeks…</option>
+                  </select>
+                  <button type="button" onclick="posToggleVs('weekly')" id="pos-btn-vs-weekly"
+                    style="font-size:11px; padding:3px 10px; border-radius:18px; border:1.5px solid #d4c5b9; background:#fff; color:var(--cafe-dark); cursor:pointer; font-weight:600; white-space:nowrap;">
               <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:8px; margin-bottom:8px;">
                 <span style="font-weight:600; color:var(--cafe-brown); font-size:14px;">Weekly Sales Overview</span>
                 <div style="display:flex; align-items:center; gap:8px; flex-wrap:wrap;">
@@ -4382,6 +4396,16 @@
                   </button>
                 </div>
               </div>
+              <div id="pos-vs-row-weekly" style="display:none; align-items:center; gap:8px; flex-wrap:wrap; margin-bottom:10px; padding:6px 12px; background:rgba(217,119,6,0.08); border-radius:8px; border:1px dashed #d97706;">
+                <span style="font-size:11.5px; font-weight:600; color:#d97706; white-space:nowrap;">Compare with:</span>
+                <select id="pos-rep-week-picker-vs" onchange="posLoadWeeklyChart(document.getElementById('pos-rep-week-picker').value)"
+                  style="font-size:12px; padding:4px 8px; border-radius:8px; border:1px solid #d97706; background:#fff; color:var(--cafe-dark); cursor:pointer; max-width:210px;">
+                  <option value="">Select week to compare…</option>
+                </select>
+                <div id="pos-weekly-legend" style="display:none; gap:12px; font-size:11.5px; align-items:center; margin-left:auto;">
+                  <span style="display:flex; align-items:center; gap:5px;"><span style="display:inline-block; width:10px; height:10px; border-radius:2px; background:#5c3d2e;"></span><strong id="pos-weekly-legend-a" style="color:var(--cafe-brown);"></strong></span>
+                  <span style="font-weight:700; color:#888;">vs</span>
+                  <span style="display:flex; align-items:center; gap:5px;"><span style="display:inline-block; width:10px; height:10px; border-radius:2px; background:#d97706;"></span><strong id="pos-weekly-legend-b" style="color:#d97706;"></strong></span>
               <div id="vs-row-weekly" style="display:none; align-items:center; gap:8px; flex-wrap:wrap; margin-bottom:10px; padding:6px 12px; background:#fffbf0; border-radius:8px; border:1px dashed #f59e0b;">
                 <span style="font-size:11px; font-weight:600; color:#92400e; white-space:nowrap;">Compare with:</span>
                 <select id="rep-week-picker-vs" onchange="loadWeeklyChart(document.getElementById('rep-week-picker').value)"
@@ -4404,6 +4428,13 @@
         <div class="row g-3 mb-3">
           <div class="col-lg-6">
             <div class="kpi-card">
+              <div class="d-flex justify-content-between align-items-center flex-wrap gap-2 mb-2">
+                <span style="font-weight:600; color:var(--cafe-brown); font-size:14px;">Hourly Sales</span>
+                <div class="d-flex align-items-center gap-2 flex-wrap">
+                  <input type="date" id="pos-rep-day-picker" onchange="posLoadHourlyChart(this.value)"
+                    style="font-size:12px; padding:3px 8px; border-radius:8px; border:1px solid #d4c5b9; background:#fff; color:var(--cafe-dark); cursor:pointer;">
+                  <button type="button" onclick="posToggleVs('hourly')" id="pos-btn-vs-hourly"
+                    style="font-size:11px; padding:3px 10px; border-radius:18px; border:1.5px solid #d4c5b9; background:#fff; color:var(--cafe-dark); cursor:pointer; font-weight:600; white-space:nowrap;">
               <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:8px; margin-bottom:8px;">
                 <span style="font-weight:600; color:var(--cafe-brown); font-size:14px;" id="hourly-chart-title">Hourly Sales — Today</span>
                 <div style="display:flex; align-items:center; gap:8px; flex-wrap:wrap;">
@@ -4415,6 +4446,14 @@
                   </button>
                 </div>
               </div>
+              <div id="pos-vs-row-hourly" style="display:none; align-items:center; gap:8px; flex-wrap:wrap; margin-bottom:10px; padding:6px 12px; background:rgba(37,99,235,0.08); border-radius:8px; border:1px dashed #2563eb;">
+                <span style="font-size:11.5px; font-weight:600; color:#2563eb; white-space:nowrap;">Compare with:</span>
+                <input type="date" id="pos-rep-day-picker-vs" onchange="posLoadHourlyChart(document.getElementById('pos-rep-day-picker').value)"
+                  style="font-size:12px; padding:3px 8px; border-radius:8px; border:1px solid #2563eb; background:#fff; color:var(--cafe-dark); cursor:pointer;">
+                <div id="pos-hourly-legend" style="display:none; gap:12px; font-size:11.5px; align-items:center; margin-left:auto;">
+                  <span style="display:flex; align-items:center; gap:5px;"><span style="display:inline-block; width:10px; height:10px; border-radius:2px; background:#2563eb;"></span><strong id="pos-hourly-legend-a" style="color:#2563eb;"></strong></span>
+                  <span style="font-weight:700; color:#888;">vs</span>
+                  <span style="display:flex; align-items:center; gap:5px;"><span style="display:inline-block; width:10px; height:10px; border-radius:2px; background:#10b981;"></span><strong id="pos-hourly-legend-b" style="color:#10b981;"></strong></span>
               <div id="vs-row-hourly" style="display:none; align-items:center; gap:8px; flex-wrap:wrap; margin-bottom:10px; padding:6px 12px; background:#fffbf0; border-radius:8px; border:1px dashed #f59e0b;">
                 <span style="font-size:11px; font-weight:600; color:#92400e; white-space:nowrap;">Compare with:</span>
                 <input type="date" id="rep-day-picker-vs" onchange="loadHourlyChart(document.getElementById('rep-day-picker').value)"
@@ -4432,6 +4471,15 @@
           </div>
           <div class="col-lg-6">
             <div class="kpi-card">
+              <div class="d-flex justify-content-between align-items-center flex-wrap gap-2 mb-2">
+                <span style="font-weight:600; color:var(--cafe-brown); font-size:14px;">Monthly Revenue Trend</span>
+                <div class="d-flex align-items-center gap-2 flex-wrap">
+                  <select id="pos-rep-year-picker" onchange="posLoadMonthlyChart(this.value)"
+                    style="font-size:12px; padding:4px 8px; border-radius:8px; border:1px solid #d4c5b9; background:#fff; color:var(--cafe-dark); cursor:pointer;">
+                    <option value="">Year…</option>
+                  </select>
+                  <button type="button" onclick="posToggleVs('monthly')" id="pos-btn-vs-monthly"
+                    style="font-size:11px; padding:3px 10px; border-radius:18px; border:1.5px solid #d4c5b9; background:#fff; color:var(--cafe-dark); cursor:pointer; font-weight:600; white-space:nowrap;">
               <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:8px; margin-bottom:8px;">
                 <span style="font-weight:600; color:var(--cafe-brown); font-size:14px;">Monthly Revenue Trend</span>
                 <div style="display:flex; align-items:center; gap:8px; flex-wrap:wrap;">
@@ -4445,6 +4493,16 @@
                   </button>
                 </div>
               </div>
+              <div id="pos-vs-row-monthly" style="display:none; align-items:center; gap:8px; flex-wrap:wrap; margin-bottom:10px; padding:6px 12px; background:rgba(16,185,129,0.08); border-radius:8px; border:1px dashed #10b981;">
+                <span style="font-size:11.5px; font-weight:600; color:#10b981; white-space:nowrap;">Compare with:</span>
+                <select id="pos-rep-year-picker-vs" onchange="posLoadMonthlyChart(document.getElementById('pos-rep-year-picker').value)"
+                  style="font-size:12px; padding:4px 8px; border-radius:8px; border:1px solid #10b981; background:#fff; color:var(--cafe-dark); cursor:pointer;">
+                  <option value="">Select year to compare…</option>
+                </select>
+                <div id="pos-monthly-legend" style="display:none; gap:12px; font-size:11.5px; align-items:center; margin-left:auto;">
+                  <span style="display:flex; align-items:center; gap:5px;"><span style="display:inline-block; width:10px; height:10px; border-radius:2px; background:#10b981;"></span><strong id="pos-monthly-legend-a" style="color:#10b981;"></strong></span>
+                  <span style="font-weight:700; color:#888;">vs</span>
+                  <span style="display:flex; align-items:center; gap:5px;"><span style="display:inline-block; width:10px; height:10px; border-radius:2px; background:#d97706;"></span><strong id="pos-monthly-legend-b" style="color:#d97706;"></strong></span>
               <div id="vs-row-monthly" style="display:none; align-items:center; gap:8px; flex-wrap:wrap; margin-bottom:10px; padding:6px 12px; background:#fffbf0; border-radius:8px; border:1px dashed #f59e0b;">
                 <span style="font-size:11px; font-weight:600; color:#92400e; white-space:nowrap;">Compare with:</span>
                 <select id="rep-year-picker-vs" onchange="loadMonthlyChart(document.getElementById('rep-year-picker').value)"
@@ -5032,30 +5090,78 @@
     </div>
   </div>
 
-  <!-- PHOTO UPLOAD MODAL (POS Admin) -->
+  <!-- PHOTO UPLOAD / REPLACE / DELETE MODAL (POS Admin) -->
   <div class="modal fade" id="posPhotoModal" tabindex="-1">
-    <div class="modal-dialog modal-dialog-centered">
+    <div class="modal-dialog modal-dialog-centered" style="max-width:440px;">
       <div class="modal-content">
         <div class="modal-header" style="border-bottom: 1px solid var(--cafe-tan);">
           <h5 class="modal-title" style="color: var(--cafe-brown); font-size:16px;">
-            <i class="bi bi-camera-fill me-2"></i>Upload Item Photo
+            <i class="bi bi-camera-fill me-2"></i>Item Photo
           </h5>
           <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
         </div>
         <div class="modal-body p-4">
-          <p id="pos-photo-item-label" style="font-size:13px; color:#64748b; margin-bottom:12px;"></p>
-          <div id="pos-photo-preview-wrap" style="text-align:center; margin-bottom:14px; display:none;">
-            <img id="pos-photo-preview" src="" style="max-width:100%; max-height:180px; border-radius:10px; border:1px solid var(--cafe-tan); object-fit:cover;">
+          <p id="pos-photo-item-label" style="font-size:13px; color:var(--cafe-dark); margin-bottom:12px; font-weight:600;"></p>
+          
+          <!-- Current Photo Section -->
+          <div id="pos-photo-current-wrap" style="text-align:center; margin-bottom:16px; padding:12px; background:#faf7f5; border-radius:12px; border:1px solid var(--cafe-tan);">
+            <div style="font-size:11px; font-weight:600; text-transform:uppercase; color:#888; margin-bottom:8px; letter-spacing:0.5px;">Current Photo</div>
+            <img id="pos-photo-current-img" src="" style="max-width:100%; max-height:160px; border-radius:8px; object-fit:cover; border:1px solid var(--cafe-tan); display:block; margin:0 auto 10px;">
+            <div id="pos-photo-no-img" style="display:none; padding:18px; color:#999; font-size:12.5px;">
+              <i class="bi bi-image" style="font-size:32px; display:block; margin-bottom:6px; opacity:0.4;"></i>
+              No photo uploaded for this item yet
+            </div>
+            <button type="button" class="btn btn-sm btn-outline-danger" id="pos-photo-delete-btn" onclick="posDeletePhoto()" style="font-size:12px; margin:0 auto; display:none;">
+              <i class="bi bi-trash-fill me-1"></i>Delete Photo
+            </button>
           </div>
+
+          <!-- Replace / Upload Photo Section -->
           <div class="mb-3">
-            <label class="form-label">Choose Photo <span class="required-star" title="Required">*</span></label>
+            <label class="form-label" id="pos-photo-upload-label" style="font-weight:600; font-size:13px;">Replace with New Photo</label>
             <input type="file" class="form-control" id="pos-photo-file" accept="image/*" onchange="posPreviewPhoto(this)">
           </div>
+          <div id="pos-photo-preview-wrap" style="text-align:center; margin-top:10px; margin-bottom:6px; display:none;">
+            <div style="font-size:11px; font-weight:600; text-transform:uppercase; color:var(--cafe-brown); margin-bottom:6px; letter-spacing:0.5px;">New Preview</div>
+            <img id="pos-photo-preview" src="" style="max-width:100%; max-height:140px; border-radius:8px; border:1.5px dashed var(--cafe-brown); object-fit:cover;">
+          </div>
         </div>
-        <div class="modal-footer" style="border-top: 1px solid var(--cafe-tan); gap: 8px;">
+        <div class="modal-footer" style="border-top: 1px solid var(--cafe-tan); display:flex; justify-content:space-between; align-items:center;">
           <button class="btn btn-outline-secondary btn-sm" data-bs-dismiss="modal">Cancel</button>
           <button class="btn btn-sm" id="pos-photo-submit-btn" style="background: var(--cafe-brown); color:#fff;" onclick="posSubmitPhoto()">
-            <i class="bi bi-upload me-1"></i>Upload Photo
+            <i class="bi bi-upload me-1"></i><span id="pos-photo-submit-text">Upload Photo</span>
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- DELETE PHOTO CONFIRMATION MODAL (POS Admin) -->
+  <div class="modal fade" id="deletePhotoModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered" style="max-width: 420px;">
+      <div class="modal-content" style="border-radius:16px; overflow:hidden; border:1px solid var(--cafe-tan);">
+        <div class="modal-header" style="background:#fdf2f2; border-bottom:1px solid #fecaca; padding:16px 20px;">
+          <h5 class="modal-title" style="color:#991b1b; font-size:16px; font-weight:700;">
+            <i class="bi bi-trash3-fill me-2" style="color:#dc2626;"></i>Delete Item Photo
+          </h5>
+          <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+        </div>
+        <div class="modal-body p-4 text-center">
+          <div style="margin-bottom:14px;">
+            <img id="del-photo-modal-preview" src="" style="width:110px; height:110px; border-radius:12px; object-fit:cover; border:2px solid #fecaca; box-shadow:0 4px 14px rgba(220,38,38,0.15); display:inline-block;">
+          </div>
+          <h6 id="del-photo-modal-name" style="font-weight:700; color:var(--cafe-dark); margin-bottom:6px; font-size:15px;">Item Name</h6>
+          <p style="font-size:13px; color:#666; line-height:1.45; margin-bottom:0;">
+            Are you sure you want to delete this photo?<br>
+            <span style="font-size:12px; color:#888;">The item will revert to its default placeholder.</span>
+          </p>
+        </div>
+        <div class="modal-footer" style="border-top:1px solid var(--cafe-tan); padding:12px 20px; display:flex; justify-content:space-between;">
+          <button type="button" class="btn btn-outline-secondary btn-sm" onclick="cancelDeletePhotoModal()" style="border-radius:8px; padding:7px 16px;">
+            Cancel
+          </button>
+          <button type="button" class="btn btn-sm" id="del-photo-modal-confirm-btn" onclick="confirmDeletePhotoSubmit()" style="background:linear-gradient(135deg, #dc2626, #b91c1c); color:#fff; border:none; border-radius:8px; padding:7px 18px; font-weight:600;">
+            <i class="bi bi-trash-fill me-1"></i>Delete Photo
           </button>
         </div>
       </div>
@@ -5592,9 +5698,28 @@
           opacity: 1;
           transform: translateY(32px) rotate(-18deg) scale(1.12);
         }
-        /* Show password: ONLY right paw lowers a little to peek! Left paw stays covering! */
+        /* Show password: Left paw stays covering its eye, right paw lowers to peek at password! */
+        .cat-covering-eyes.cat-peeking-pass .pink-arm-left,
+        .cat-peeking-pass .pink-arm-left {
+          opacity: 1 !important;
+          transform: translateY(36px) rotate(18deg) scale(1.12) !important;
+        }
+        .cat-covering-eyes.cat-peeking-pass .pink-arm-right,
+        .cat-peeking-pass .pink-arm-right,
         .cat-covering-eyes .pink-arm-right.arm-peeking {
-          transform: translateY(42px) rotate(-14deg) scale(1.05);
+          opacity: 1 !important;
+          transform: translateY(64px) rotate(-6deg) scale(0.96) !important;
+        }
+        /* Right eye eyelid tucked away so right eye is wide and peeking over its lowered paw */
+        .cat-peeking-pass .cat-eye-right .cat-eyelid,
+        .cat-covering-eyes.cat-peeking-pass .cat-eye-right .cat-eyelid {
+          transform: translateY(-110%) !important;
+        }
+        /* Head leans forward slightly over the rim to peek down at the password */
+        .cat-peeking-pass .cartoon-cat-head-img,
+        .cat-covering-eyes.cat-peeking-pass .cartoon-cat-head-img {
+          transform: translateY(5px);
+          transition: transform 0.35s cubic-bezier(0.34, 1.25, 0.64, 1);
         }
       `;
 
@@ -5670,6 +5795,7 @@
       const rimR      = catStage.querySelector('.rim-paw-right');
       const pupilL    = catStage.querySelector('.cat-pupil-left');
       const pupilR    = catStage.querySelector('.cat-pupil-right');
+      const armLeft   = catStage.querySelector('.pink-arm-left');
       const armRight  = catStage.querySelector('.pink-arm-right');
       const userInput = target.querySelector('#login-user, #sa-login-user, input[type=text]');
       const passInput = target.querySelector('#login-pass, #sa-login-pass, input[type=password]');
@@ -5804,7 +5930,8 @@
         userInput.addEventListener('focus', () => {
           isCoveringEyes = false;
           isPasswordVisible = false;
-          catStage.classList.remove('cat-covering-eyes');
+          catStage.classList.remove('cat-covering-eyes', 'cat-peeking-pass');
+          if (armLeft) armLeft.classList.remove('arm-peeking');
           if (rimL) { rimL.style.opacity = '1'; rimL.style.visibility = 'visible'; }
           if (rimR) { rimR.style.opacity = '1'; rimR.style.visibility = 'visible'; }
           if (armRight) armRight.classList.remove('arm-peeking');
@@ -5826,7 +5953,8 @@
         if (document.activeElement === userInput) {
           isCoveringEyes = false;
           isPasswordVisible = false;
-          catStage.classList.remove('cat-covering-eyes');
+          catStage.classList.remove('cat-covering-eyes', 'cat-peeking-pass');
+          if (armLeft) armLeft.classList.remove('arm-peeking');
           if (rimL) { rimL.style.opacity = '1'; rimL.style.visibility = 'visible'; }
           if (rimR) { rimR.style.opacity = '1'; rimR.style.visibility = 'visible'; }
           if (armRight) armRight.classList.remove('arm-peeking');
@@ -5841,13 +5969,19 @@
           if (rimR) { rimR.style.opacity = '0'; rimR.style.visibility = 'hidden'; }
 
           if (isText) {
-            // SHOW PASSWORD: Only 1 paw (right paw) lowers a little to peek! Left paw stays covering!
+            // SHOW PASSWORD: One paw (left paw) stays covering its eye, right paw lowers to peek!
             isPasswordVisible = true;
+            catStage.classList.add('cat-peeking-pass');
+            if (armLeft) armLeft.classList.remove('arm-peeking');
             if (armRight) armRight.classList.add('arm-peeking');
-            setPupils(3.5, 5.0); // peek down at revealed password
+            const len = passInput ? passInput.value.length : 0;
+            const lookX = Math.min(Math.max((len - 7) * 0.45, -2.0), 4.5);
+            setPupils(lookX, 7.5); // right eye looks down at revealed password!
           } else {
-            // HIDE PASSWORD: Right paw goes back up to cover right eye! Both paws covering!
+            // HIDE PASSWORD: Paws go back up to completely cover eyes!
             isPasswordVisible = false;
+            catStage.classList.remove('cat-peeking-pass');
+            if (armLeft) armLeft.classList.remove('arm-peeking');
             if (armRight) armRight.classList.remove('arm-peeking');
             setPupils(0, 0);
           }
@@ -5855,7 +5989,8 @@
           // Blurred away from password without text showing: return paws to rim
           isCoveringEyes = false;
           isPasswordVisible = false;
-          catStage.classList.remove('cat-covering-eyes');
+          catStage.classList.remove('cat-covering-eyes', 'cat-peeking-pass');
+          if (armLeft) armLeft.classList.remove('arm-peeking');
           if (rimL) { rimL.style.opacity = '1'; rimL.style.visibility = 'visible'; }
           if (rimR) { rimR.style.opacity = '1'; rimR.style.visibility = 'visible'; }
           if (armRight) armRight.classList.remove('arm-peeking');
@@ -5863,13 +5998,20 @@
         }
       }
 
-      // Password input focus / blur handlers
+      window.updateCatPasswordState = updatePasswordPawState;
+
+      // Password input focus / blur / input handlers
       if (passInput) {
         passInput.addEventListener('focus', () => {
           updatePasswordPawState();
         });
         passInput.addEventListener('blur', () => {
           setTimeout(updatePasswordPawState, 150);
+        });
+        passInput.addEventListener('input', () => {
+          if (passInput.type === 'text') {
+            updatePasswordPawState();
+          }
         });
       }
 
@@ -5887,8 +6029,10 @@
 
     const playCatCoffeeLoginAnimation = initPeekingCatLogin;
     const playWaterDropLoginAnimation = initPeekingCatLogin;
-if (typeof gsap === "undefined") { document.write('<script src="https://cdn.jsdelivr.net/npm/gsap@3.12.5/dist/gsap.min.js"><\/script>'); }</script>
-  <script>
+    window.playCatCoffeeLoginAnimation = initPeekingCatLogin;
+    window.playWaterDropLoginAnimation = initPeekingCatLogin;
+    window.initPeekingCatLogin = initPeekingCatLogin;
+
 
     /* ========== API HELPERS ========== */
     const API = 'api/';
@@ -6156,7 +6300,7 @@ if (typeof gsap === "undefined") { document.write('<script src="https://cdn.jsde
   <div class="col-6 col-md-4 col-xl-3" style="margin-bottom:8px;">
     <div class="${cardClass}" onclick="${clickHandler}" style="min-height:110px;">
       ${item.image
-        ? `<img src="${item.image}" style="width:36px;height:36px;object-fit:cover;border-radius:50%;margin:0 auto 6px auto;display:block;">`
+        ? `<img src="${item.image}" style="width:36px;height:36px;object-fit:cover;border-radius:50%;margin:0 auto 6px auto;display:block;" onerror="this.onerror=null;this.style.display=\`'none\`';if(this.nextElementSibling)this.nextElementSibling.style.display=\`'block\`';"><span class="prod-emoji" style="display:none;"><i class="bi bi-cup-hot-fill" style="font-size:24px;color:var(--cafe-brown);"></i></span>`
         : `<span class="prod-emoji"><i class="bi bi-cup-hot-fill" style="font-size:24px;color:var(--cafe-brown);"></i></span>`}
       <div class="prod-name">${item.name}</div>
       <div class="prod-price">${priceDisplay}</div>
@@ -8700,28 +8844,165 @@ if (typeof gsap === "undefined") { document.write('<script src="https://cdn.jsde
     // Legacy alias kept for any leftover references
     async function addMenuItem() { addMenuItemSubmit(); }
 
-    /* --- Photo Upload (POS admin) --- */
+    /* ── Photo Upload / Delete / Replace Modal (POS) ── */
     let _posPhotoItemId = null;
+    let _posPhotoItemObj = null;
 
     function posOpenPhotoModal(id, name) {
       _posPhotoItemId = id;
+      _posPhotoItemObj = (typeof menuItems !== 'undefined' && Array.isArray(menuItems))
+        ? menuItems.find(m => m.id == id)
+        : null;
+
       document.getElementById('pos-photo-item-label').textContent = 'Item: ' + name;
       document.getElementById('pos-photo-file').value = '';
       document.getElementById('pos-photo-preview').src = '';
       document.getElementById('pos-photo-preview-wrap').style.display = 'none';
+
+      const currentImg = document.getElementById('pos-photo-current-img');
+      const noImg = document.getElementById('pos-photo-no-img');
+      const delBtn = document.getElementById('pos-photo-delete-btn');
+      const uploadLabel = document.getElementById('pos-photo-upload-label');
+      const submitText = document.getElementById('pos-photo-submit-text');
+      const submitIcon = document.querySelector('#pos-photo-submit-btn i');
+
+      if (_posPhotoItemObj && _posPhotoItemObj.image) {
+        currentImg.src = _posPhotoItemObj.image;
+        currentImg.style.display = 'block';
+        noImg.style.display = 'none';
+        delBtn.style.display = 'inline-flex';
+        uploadLabel.textContent = 'Replace Photo';
+        submitText.textContent = 'Replace Photo';
+        if (submitIcon) submitIcon.className = 'bi bi-arrow-repeat me-1';
+      } else {
+        currentImg.src = '';
+        currentImg.style.display = 'none';
+        noImg.style.display = 'block';
+        delBtn.style.display = 'none';
+        uploadLabel.textContent = 'Choose Photo';
+        submitText.textContent = 'Upload Photo';
+        if (submitIcon) submitIcon.className = 'bi bi-upload me-1';
+      }
+
       const modal = new bootstrap.Modal(document.getElementById('posPhotoModal'));
       modal.show();
     }
 
-    function posPreviewPhoto(input) {
+    function compressImageFile(file, maxWidth = 600, maxHeight = 600, quality = 0.85) {
+      return new Promise((resolve, reject) => {
+        if (!file || !file.type || !file.type.startsWith('image/')) {
+          return reject(new Error('Selected file is not an image.'));
+        }
+        const reader = new FileReader();
+        reader.onerror = reject;
+        reader.onload = ev => {
+          const img = new Image();
+          img.onerror = () => resolve(ev.target.result);
+          img.onload = () => {
+            try {
+              let w = img.width;
+              let h = img.height;
+              if (w > maxWidth || h > maxHeight) {
+                const ratio = Math.min(maxWidth / w, maxHeight / h);
+                w = Math.round(w * ratio);
+                h = Math.round(h * ratio);
+              }
+              const canvas = document.createElement('canvas');
+              canvas.width = w;
+              canvas.height = h;
+              const ctx = canvas.getContext('2d');
+              ctx.drawImage(img, 0, 0, w, h);
+              const compressed = canvas.toDataURL('image/jpeg', quality);
+              resolve(compressed);
+            } catch (err) {
+              resolve(ev.target.result);
+            }
+          };
+          img.src = ev.target.result;
+        };
+        reader.readAsDataURL(file);
+      });
+    }
+
+    async function posPreviewPhoto(input) {
       const wrap = document.getElementById('pos-photo-preview-wrap');
       const img  = document.getElementById('pos-photo-preview');
       if (input.files && input.files[0]) {
-        const reader = new FileReader();
-        reader.onload = ev => { img.src = ev.target.result; wrap.style.display = 'block'; };
-        reader.readAsDataURL(input.files[0]);
+        try {
+          const dataUrl = await compressImageFile(input.files[0]);
+          img.src = dataUrl;
+          wrap.style.display = 'block';
+        } catch (e) {
+          wrap.style.display = 'none';
+        }
       } else {
         wrap.style.display = 'none';
+      }
+    }
+
+        function posDeletePhoto() {
+      if (!_posPhotoItemId) return;
+      const itemName = _posPhotoItemObj ? _posPhotoItemObj.name : 'this item';
+      const itemImg = (_posPhotoItemObj && _posPhotoItemObj.image) ? _posPhotoItemObj.image : '';
+
+      document.getElementById('del-photo-modal-name').textContent = itemName;
+      const previewImg = document.getElementById('del-photo-modal-preview');
+      if (itemImg) {
+        previewImg.src = itemImg;
+        previewImg.style.display = 'inline-block';
+      } else {
+        previewImg.src = '';
+        previewImg.style.display = 'none';
+      }
+
+      // Hide parent photo modal and open delete confirmation modal
+      const photoModalEl = document.getElementById('posPhotoModal');
+      bootstrap.Modal.getInstance(photoModalEl)?.hide();
+
+      setTimeout(() => {
+        const delModal = new bootstrap.Modal(document.getElementById('deletePhotoModal'));
+        delModal.show();
+      }, 150);
+    }
+
+    function cancelDeletePhotoModal() {
+      const delModalEl = document.getElementById('deletePhotoModal');
+      bootstrap.Modal.getInstance(delModalEl)?.hide();
+
+      // Re-open photo modal
+      setTimeout(() => {
+        const photoModalEl = document.getElementById('posPhotoModal');
+        const m = bootstrap.Modal.getOrCreateInstance(photoModalEl);
+        m.show();
+      }, 200);
+    }
+
+    async function confirmDeletePhotoSubmit() {
+      if (!_posPhotoItemId) return;
+      const btn = document.getElementById('del-photo-modal-confirm-btn');
+      if (btn) {
+        btn.disabled = true;
+        btn.innerHTML = '<span class="spinner-border spinner-border-sm me-1"></span>Deleting...';
+      }
+      try {
+        const res = await api('menu.php?action=update', { id: _posPhotoItemId, image: null });
+        if (res.success) {
+          const delModalEl = document.getElementById('deletePhotoModal');
+          bootstrap.Modal.getInstance(delModalEl)?.hide();
+          showToast('✓ Photo deleted successfully!');
+          if (_posPhotoItemObj) _posPhotoItemObj.image = null;
+          await loadMenuFromDB();
+          renderMenuTable();
+        } else {
+          showToast('⚠ ' + (res.message || 'Failed to delete photo.'));
+        }
+      } catch (err) {
+        showToast('⚠ Error deleting photo.');
+      } finally {
+        if (btn) {
+          btn.disabled = false;
+          btn.innerHTML = '<i class="bi bi-trash-fill me-1"></i>Delete Photo';
+        }
       }
     }
 
@@ -8734,20 +9015,17 @@ if (typeof gsap === "undefined") { document.write('<script src="https://cdn.jsde
       }
       const btn = document.getElementById('pos-photo-submit-btn');
       btn.disabled = true;
+      btn.innerHTML = '<span class="spinner-border spinner-border-sm me-1"></span>Processing...';
       try {
-        const imageSrc = await new Promise(resolve => {
-          const reader = new FileReader();
-          reader.onload = ev => resolve(ev.target.result);
-          reader.readAsDataURL(fileInput.files[0]);
-        });
+        const imageSrc = await compressImageFile(fileInput.files[0]);
         const res = await api('menu.php?action=update', { id: _posPhotoItemId, image: imageSrc });
         if (res.success) {
-          bootstrap.Modal.getInstance(document.getElementById('posPhotoModal')).hide();
-          // Update local cache so table refreshes with new image
-          const item = menuItems.find(m => m.id == _posPhotoItemId);
-          if (item) item.image = imageSrc;
+          bootstrap.Modal.getInstance(document.getElementById('posPhotoModal'))?.hide();
+          const isReplace = _posPhotoItemObj && _posPhotoItemObj.image;
+          showToast(isReplace ? '✓ Photo replaced successfully!' : '✓ Photo uploaded successfully!');
+          if (_posPhotoItemObj) _posPhotoItemObj.image = imageSrc;
+          await loadMenuFromDB();
           renderMenuTable();
-          showToast('✓ Photo updated successfully!');
         } else {
           showToast('⚠ ' + (res.message || 'Failed to update photo.'));
         }
@@ -8755,10 +9033,272 @@ if (typeof gsap === "undefined") { document.write('<script src="https://cdn.jsde
         showToast('⚠ Error uploading photo.');
       } finally {
         btn.disabled = false;
+        btn.innerHTML = '<i class="bi bi-upload me-1"></i><span id="pos-photo-submit-text">Upload Photo</span>';
       }
     }
 
     /* ========== REPORTS ========== */
+    /* =====================================================
+       CHART WEEK/DAY/YEAR PICKER & VS COMPARISON SYSTEM (POS)
+       ===================================================== */
+    let posAvailableWeeks = [];
+    let posVsActive = { weekly: false, hourly: false, monthly: false };
+
+    async function posInitChartPickers() {
+      try {
+        const res = await api('orders.php?action=chart_weekly_weeks');
+        if (res && res.success && Array.isArray(res.weeks)) {
+          posAvailableWeeks = res.weeks;
+          
+          const wp = document.getElementById('pos-rep-week-picker');
+          const wpVs = document.getElementById('pos-rep-week-picker-vs');
+          if (wp) {
+            wp.innerHTML = posAvailableWeeks.map((w, idx) => 
+              `<option value="${w.week_start}" ${idx === 0 ? 'selected' : ''}>${w.label}</option>`
+            ).join('');
+          }
+          if (wpVs) {
+            wpVs.innerHTML = `<option value="">Select week to compare…</option>` + 
+              posAvailableWeeks.map((w, idx) => 
+                `<option value="${w.week_start}" ${idx === 1 ? 'selected' : ''}>${w.label}</option>`
+              ).join('');
+          }
+        }
+      } catch (e) {
+        console.error('Failed to load POS chart weeks:', e);
+      }
+
+      const hp = document.getElementById('pos-rep-day-picker');
+      const hpVs = document.getElementById('pos-rep-day-picker-vs');
+      const todayStr = new Date().toISOString().split('T')[0];
+      const yestDate = new Date(Date.now() - 86400000);
+      const yestStr = yestDate.toISOString().split('T')[0];
+      if (hp && !hp.value) hp.value = todayStr;
+      if (hpVs && !hpVs.value) hpVs.value = yestStr;
+
+      try {
+        const curYear = new Date().getFullYear();
+        const resMo = await api('orders.php?action=chart_monthly&year=' + curYear);
+        const yp = document.getElementById('pos-rep-year-picker');
+        const ypVs = document.getElementById('pos-rep-year-picker-vs');
+        const years = (resMo && resMo.success && Array.isArray(resMo.years) && resMo.years.length) ? resMo.years : [curYear, curYear - 1];
+        if (yp) {
+          yp.innerHTML = years.map(y => `<option value="${y}" ${y === curYear ? 'selected' : ''}>${y}</option>`).join('');
+        }
+        if (ypVs) {
+          ypVs.innerHTML = `<option value="">Select year to compare…</option>` + 
+            years.map(y => `<option value="${y}" ${y === (curYear - 1) ? 'selected' : ''}>${y}</option>`).join('');
+        }
+      } catch (e) {
+        console.error('Failed to load POS chart years:', e);
+      }
+    }
+
+    function posToggleVs(type) {
+      posVsActive[type] = !posVsActive[type];
+      const active = posVsActive[type];
+      const btn = document.getElementById('pos-btn-vs-' + type);
+      const row = document.getElementById('pos-vs-row-' + type);
+      const legend = document.getElementById('pos-' + type + '-legend');
+
+      if (btn) {
+        btn.textContent = active ? '− VS' : '+ VS';
+        btn.style.background = active ? '#d97706' : '#fff';
+        btn.style.color = active ? '#fff' : 'var(--cafe-dark)';
+        btn.style.borderColor = active ? '#d97706' : '#d4c5b9';
+      }
+      if (row) row.style.display = active ? 'flex' : 'none';
+      if (legend) legend.style.display = active ? 'flex' : 'none';
+
+      if (type === 'weekly') {
+        const pVal = document.getElementById('pos-rep-week-picker')?.value || '';
+        posLoadWeeklyChart(pVal);
+      } else if (type === 'hourly') {
+        const pVal = document.getElementById('pos-rep-day-picker')?.value || '';
+        posLoadHourlyChart(pVal);
+      } else if (type === 'monthly') {
+        const pVal = document.getElementById('pos-rep-year-picker')?.value || '';
+        posLoadMonthlyChart(pVal);
+      }
+    }
+
+    async function posLoadWeeklyChart(weekStart) {
+      const vsActive = posVsActive.weekly;
+      const vsVal = vsActive ? (document.getElementById('pos-rep-week-picker-vs')?.value || '') : '';
+      let url = 'orders.php?action=chart_weekly';
+      if (weekStart) url += '&week_start=' + encodeURIComponent(weekStart);
+      if (vsVal)     url += '&vs_week_start=' + encodeURIComponent(vsVal);
+
+      try {
+        const res = await api(url);
+        if (!res || !res.success) return;
+
+        const prim = res.primary;
+        const datasets = [{
+          label: prim.label || 'Primary Week',
+          data: prim.data,
+          backgroundColor: vsActive && res.vs ? 'rgba(92,61,46,0.85)' : ['#3b82f6','#8b5cf6','#10b981','#f59e0b','#ef4444','#14b8a6','#ec4899'],
+          borderRadius: 6
+        }];
+
+        if (vsActive && res.vs) {
+          datasets.push({
+            label: res.vs.label || 'Compare Week',
+            data: res.vs.data,
+            backgroundColor: 'rgba(217,119,6,0.85)',
+            borderRadius: 6
+          });
+
+          const legA = document.getElementById('pos-weekly-legend-a');
+          const legB = document.getElementById('pos-weekly-legend-b');
+          if (legA) legA.textContent = `${prim.label} (₱${Number(prim.total||0).toLocaleString()})`;
+          if (legB) legB.textContent = `${res.vs.label} (₱${Number(res.vs.total||0).toLocaleString()})`;
+        }
+
+        const ctx = document.getElementById('repWeeklyChart');
+        if (ctx) {
+          if (window.repWeeklyChartIns) window.repWeeklyChartIns.destroy();
+          window.repWeeklyChartIns = new Chart(ctx.getContext('2d'), {
+            type: 'bar',
+            data: { labels: res.labels, datasets },
+            options: {
+              responsive: true, maintainAspectRatio: false,
+              plugins: {
+                legend: { display: false },
+                tooltip: {
+                  callbacks: {
+                    label: ctx => (ctx.dataset.label ? ctx.dataset.label + ': ' : '') + '₱' + Number(ctx.raw || 0).toLocaleString('en-PH', {minimumFractionDigits: 2, maximumFractionDigits: 2})
+                  }
+                }
+              },
+              scales: {
+                y: { beginAtZero: true, grid: { color: 'rgba(0,0,0,0.06)' } },
+                x: { grid: { display: false } }
+              }
+            }
+          });
+        }
+      } catch (e) { console.error('Failed to load POS weekly chart:', e); }
+    }
+
+    async function posLoadHourlyChart(day) {
+      const vsActive = posVsActive.hourly;
+      const vsVal = vsActive ? (document.getElementById('pos-rep-day-picker-vs')?.value || '') : '';
+      let url = 'orders.php?action=chart_hourly';
+      if (day)   url += '&date=' + encodeURIComponent(day);
+      if (vsVal) url += '&vs_date=' + encodeURIComponent(vsVal);
+
+      try {
+        const res = await api(url);
+        if (!res || !res.success) return;
+
+        const prim = res.primary;
+        const datasets = [{
+          label: prim.label || 'Primary Day',
+          data: prim.data,
+          backgroundColor: 'rgba(37,99,235,0.7)',
+          borderRadius: 4
+        }];
+
+        if (vsActive && res.vs) {
+          datasets.push({
+            label: res.vs.label || 'Compare Day',
+            data: res.vs.data,
+            backgroundColor: 'rgba(16,185,129,0.7)',
+            borderRadius: 4
+          });
+
+          const legA = document.getElementById('pos-hourly-legend-a');
+          const legB = document.getElementById('pos-hourly-legend-b');
+          if (legA) legA.textContent = `${prim.label} (₱${Number(prim.total||0).toLocaleString()})`;
+          if (legB) legB.textContent = `${res.vs.label} (₱${Number(res.vs.total||0).toLocaleString()})`;
+        }
+
+        const ctx = document.getElementById('hourlyChart');
+        if (ctx) {
+          if (window.hourlyChartIns) window.hourlyChartIns.destroy();
+          window.hourlyChartIns = new Chart(ctx.getContext('2d'), {
+            type: 'bar',
+            data: { labels: res.labels, datasets },
+            options: {
+              responsive: true, maintainAspectRatio: false,
+              plugins: {
+                legend: { display: false },
+                tooltip: {
+                  callbacks: {
+                    label: ctx => (ctx.dataset.label ? ctx.dataset.label + ': ' : '') + '₱' + Number(ctx.raw || 0).toLocaleString('en-PH', {minimumFractionDigits: 2, maximumFractionDigits: 2})
+                  }
+                }
+              },
+              scales: {
+                y: { beginAtZero: true, grid: { color: 'rgba(0,0,0,0.06)' } },
+                x: { grid: { display: false } }
+              }
+            }
+          });
+        }
+      } catch (e) { console.error('Failed to load POS hourly chart:', e); }
+    }
+
+    async function posLoadMonthlyChart(year) {
+      const vsActive = posVsActive.monthly;
+      const vsVal = vsActive ? (document.getElementById('pos-rep-year-picker-vs')?.value || '') : '';
+      let url = 'orders.php?action=chart_monthly';
+      if (year)  url += '&year=' + encodeURIComponent(year);
+      if (vsVal) url += '&vs_year=' + encodeURIComponent(vsVal);
+
+      try {
+        const res = await api(url);
+        if (!res || !res.success) return;
+
+        const prim = res.primary;
+        const datasets = [{
+          label: prim.label || 'Primary Year',
+          data: prim.data,
+          backgroundColor: 'rgba(16,185,129,0.7)',
+          borderRadius: 4
+        }];
+
+        if (vsActive && res.vs) {
+          datasets.push({
+            label: res.vs.label || 'Compare Year',
+            data: res.vs.data,
+            backgroundColor: 'rgba(217,119,6,0.7)',
+            borderRadius: 4
+          });
+
+          const legA = document.getElementById('pos-monthly-legend-a');
+          const legB = document.getElementById('pos-monthly-legend-b');
+          if (legA) legA.textContent = `${prim.label} (₱${Number(prim.total||0).toLocaleString()})`;
+          if (legB) legB.textContent = `${res.vs.label} (₱${Number(res.vs.total||0).toLocaleString()})`;
+        }
+
+        const ctx = document.getElementById('monthlyChart');
+        if (ctx) {
+          if (window.monthlyChartIns) window.monthlyChartIns.destroy();
+          window.monthlyChartIns = new Chart(ctx.getContext('2d'), {
+            type: 'bar',
+            data: { labels: res.labels, datasets },
+            options: {
+              responsive: true, maintainAspectRatio: false,
+              plugins: {
+                legend: { display: false },
+                tooltip: {
+                  callbacks: {
+                    label: ctx => (ctx.dataset.label ? ctx.dataset.label + ': ' : '') + '₱' + Number(ctx.raw || 0).toLocaleString('en-PH', {minimumFractionDigits: 2, maximumFractionDigits: 2})
+                  }
+                }
+              },
+              scales: {
+                y: { beginAtZero: true, grid: { color: 'rgba(0,0,0,0.06)' } },
+                x: { grid: { display: false } }
+              }
+            }
+          });
+        }
+      } catch (e) { console.error('Failed to load POS monthly chart:', e); }
+    }
+
     async function renderReports() {
       try {
         const stats = await api('orders.php?action=stats');
@@ -8865,6 +9405,9 @@ if (typeof gsap === "undefined") { document.write('<script src="https://cdn.jsde
           window.hourlyChartIns.update();
         }
 
+        // Pickers and VS charts
+        if (!posAvailableWeeks || posAvailableWeeks.length === 0) {
+          await posInitChartPickers();
         // Weekly chart in reports — only set initially if picker not yet loaded
         if (window.repWeeklyChartIns && stats.weekly_chart && !document.getElementById('rep-week-picker')?.value) {
           window.repWeeklyChartIns.data.datasets[0].data = stats.weekly_chart;
@@ -8877,6 +9420,12 @@ if (typeof gsap === "undefined") { document.write('<script src="https://cdn.jsde
           window.monthlyChartIns.data.datasets[0].data = stats.monthly_chart;
           window.monthlyChartIns.update();
         }
+        const selW = document.getElementById('pos-rep-week-picker')?.value || '';
+        posLoadWeeklyChart(selW);
+        const selD = document.getElementById('pos-rep-day-picker')?.value || '';
+        posLoadHourlyChart(selD);
+        const selY = document.getElementById('pos-rep-year-picker')?.value || '';
+        posLoadMonthlyChart(selY);
 
         // Initialize chart filter pickers (async, non-blocking)
         initChartPickers();
@@ -10076,6 +10625,9 @@ if (typeof gsap === "undefined") { document.write('<script src="https://cdn.jsde
       const icon = btn.querySelector('i');
       if (icon) {
         icon.className = isPass ? 'bi bi-eye-slash' : 'bi bi-eye';
+      }
+      if (typeof window.updateCatPasswordState === 'function') {
+        window.updateCatPasswordState();
       }
     }
 

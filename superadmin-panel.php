@@ -1,4 +1,4 @@
-<!DOCTYPE html>
+﻿<!DOCTYPE html>
 <html lang="en">
 <head>
   <meta charset="UTF-8">
@@ -1091,7 +1091,7 @@
 
       <!-- STEP 1: CREDENTIALS -->
       <div id="sa-step-credentials">
-        <form onsubmit="saHandleLogin(event)">
+        <form onsubmit="event.preventDefault(); saHandleLogin(event); return false;" action="javascript:void(0);">
           <div class="sa-form-row">
             <label class="sa-label">Username <span class="required-star" title="Required">*</span></label>
             <input type="text" id="sa-login-user" class="sa-input" placeholder="superadmin" autocomplete="username" required maxlength="50" minlength="3" spellcheck="false">
@@ -1124,7 +1124,7 @@
           </div>
         </div>
 
-        <form onsubmit="saHandleVerify2FA(event)">
+        <form onsubmit="event.preventDefault(); saHandleVerify2FA(event); return false;" action="javascript:void(0);">
           <div class="sa-form-row">
             <label class="sa-label" style="text-align:center; display:block; font-size:12px;">Enter 6-Digit Code <span class="required-star" title="Required">*</span></label>
             <input type="text" id="sa-2fa-code" class="sa-input" maxlength="6" placeholder="000000" autocomplete="one-time-code" required
@@ -1185,7 +1185,7 @@
           <div style="font-size:12px; color:var(--sa-muted);">Enter and confirm your new Super Admin password.</div>
         </div>
 
-        <form onsubmit="saHandleResetViaLink(event)">
+        <form onsubmit="event.preventDefault(); saHandleResetViaLink(event); return false;" action="javascript:void(0);">
           <div class="sa-form-row">
             <label class="sa-label">New Password <span class="required-star" title="Required">*</span></label>
             <div class="sa-pass-wrap">
@@ -1353,7 +1353,31 @@
           </div>
 
           <div class="sa-card" style="margin-bottom: 20px;">
-            <div class="sa-card-title"><i class="bi bi-bar-chart-fill"></i> Weekly Revenue</div>
+            <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px;margin-bottom:8px;">
+              <div class="sa-card-title" style="margin-bottom:0;"><i class="bi bi-bar-chart-fill"></i> Weekly Revenue</div>
+              <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;">
+                <select id="sa-dash-week-picker" onchange="saLoadDashboardWeeklyChart(this.value)"
+                  style="font-size:12px;padding:5px 9px;border-radius:8px;border:1px solid var(--sa-border);background:var(--sa-surface);color:var(--sa-text);cursor:pointer;max-width:210px;font-weight:500;">
+                  <option value="">Loading weeks…</option>
+                </select>
+                <button type="button" onclick="saToggleDashVs()" id="sa-btn-vs-dash"
+                  style="font-size:11px;padding:4px 10px;border-radius:18px;border:1.5px solid var(--sa-border);background:var(--sa-surface);color:var(--sa-text);cursor:pointer;font-weight:600;white-space:nowrap;transition:all 0.2s;">
+                  + VS
+                </button>
+              </div>
+            </div>
+            <div id="sa-dash-vs-row" style="display:none;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:10px;padding:6px 12px;background:rgba(245,158,11,0.08);border-radius:8px;border:1px dashed #f59e0b;">
+              <span style="font-size:11.5px;font-weight:600;color:#f59e0b;white-space:nowrap;">Compare with:</span>
+              <select id="sa-dash-week-picker-vs" onchange="saLoadDashboardWeeklyChart(document.getElementById('sa-dash-week-picker').value)"
+                style="font-size:12px;padding:4px 8px;border-radius:8px;border:1px solid #f59e0b;background:var(--sa-surface);color:var(--sa-text);cursor:pointer;max-width:210px;font-weight:500;">
+                <option value="">Select week to compare…</option>
+              </select>
+              <div id="sa-dash-weekly-legend" style="display:none;gap:12px;font-size:11.5px;align-items:center;margin-left:auto;">
+                <span style="display:flex;align-items:center;gap:5px;"><span style="display:inline-block;width:10px;height:10px;border-radius:2px;background:#a855f7;"></span><strong id="sa-dash-legend-a" style="color:#c084fc;"></strong></span>
+                <span style="font-weight:700;color:var(--sa-muted);">vs</span>
+                <span style="display:flex;align-items:center;gap:5px;"><span style="display:inline-block;width:10px;height:10px;border-radius:2px;background:#f59e0b;"></span><strong id="sa-dash-legend-b" style="color:#fbbf24;"></strong></span>
+              </div>
+            </div>
             <div style="height:250px; width:100%;">
               <canvas id="saWeeklyChart"></canvas>
             </div>
@@ -1380,7 +1404,6 @@
                 <option value="pending">Pending</option>
                 <option value="approved">Approved</option>
                 <option value="rejected">Rejected</option>
-                <option value="cancelled">Cancelled</option>
                 <option value="all">All</option>
               </select>
               <button class="sa-btn sa-btn-ghost" onclick="loadRequests()">
@@ -1673,24 +1696,98 @@
             </div>
           </div>
 
-          <!-- Weekly + Hourly Charts -->
+          <!-- Weekly + Hourly Charts with Week/Day Chooser & VS Comparison -->
           <div style="display:grid;grid-template-columns:1fr 1fr;gap:20px;margin-bottom:20px;">
+            <!-- Weekly Sales Overview -->
             <div class="sa-card">
-              <div class="sa-card-title"><i class="bi bi-bar-chart-fill"></i> Weekly Sales Overview</div>
+              <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px;margin-bottom:8px;">
+                <div class="sa-card-title" style="margin-bottom:0;"><i class="bi bi-bar-chart-fill"></i> Weekly Sales Overview</div>
+                <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;">
+                  <select id="sa-rep-week-picker" onchange="saLoadWeeklyChart(this.value)"
+                    style="font-size:12px;padding:5px 9px;border-radius:8px;border:1px solid var(--sa-border);background:var(--sa-surface);color:var(--sa-text);cursor:pointer;max-width:210px;font-weight:500;">
+                    <option value="">Loading weeks…</option>
+                  </select>
+                  <button type="button" onclick="saToggleVs('weekly')" id="sa-btn-vs-weekly"
+                    style="font-size:11px;padding:4px 10px;border-radius:18px;border:1.5px solid var(--sa-border);background:var(--sa-surface);color:var(--sa-text);cursor:pointer;font-weight:600;white-space:nowrap;transition:all 0.2s;">
+                    + VS
+                  </button>
+                </div>
+              </div>
+              <div id="sa-vs-row-weekly" style="display:none;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:10px;padding:6px 12px;background:rgba(245,158,11,0.08);border-radius:8px;border:1px dashed #f59e0b;">
+                <span style="font-size:11.5px;font-weight:600;color:#f59e0b;white-space:nowrap;">Compare with:</span>
+                <select id="sa-rep-week-picker-vs" onchange="saLoadWeeklyChart(document.getElementById('sa-rep-week-picker').value)"
+                  style="font-size:12px;padding:4px 8px;border-radius:8px;border:1px solid #f59e0b;background:var(--sa-surface);color:var(--sa-text);cursor:pointer;max-width:210px;font-weight:500;">
+                  <option value="">Select week to compare…</option>
+                </select>
+                <div id="sa-weekly-legend" style="display:none;gap:12px;font-size:11.5px;align-items:center;margin-left:auto;">
+                  <span style="display:flex;align-items:center;gap:5px;"><span style="display:inline-block;width:10px;height:10px;border-radius:2px;background:#a855f7;"></span><strong id="sa-weekly-legend-a" style="color:#c084fc;"></strong></span>
+                  <span style="font-weight:700;color:var(--sa-muted);">vs</span>
+                  <span style="display:flex;align-items:center;gap:5px;"><span style="display:inline-block;width:10px;height:10px;border-radius:2px;background:#f59e0b;"></span><strong id="sa-weekly-legend-b" style="color:#fbbf24;"></strong></span>
+                </div>
+              </div>
               <div style="height:230px;"><canvas id="sa-weekly-chart"></canvas></div>
             </div>
+
+            <!-- Hourly Sales -->
             <div class="sa-card">
-              <div class="sa-card-title"><i class="bi bi-clock-fill"></i> Hourly Sales — Today</div>
+              <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px;margin-bottom:8px;">
+                <div class="sa-card-title" style="margin-bottom:0;"><i class="bi bi-clock-fill"></i> Hourly Sales</div>
+                <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;">
+                  <input type="date" id="sa-rep-day-picker" onchange="saLoadHourlyChart(this.value)"
+                    style="font-size:12px;padding:4px 8px;border-radius:8px;border:1px solid var(--sa-border);background:var(--sa-surface);color:var(--sa-text);cursor:pointer;font-weight:500;">
+                  <button type="button" onclick="saToggleVs('hourly')" id="sa-btn-vs-hourly"
+                    style="font-size:11px;padding:4px 10px;border-radius:18px;border:1.5px solid var(--sa-border);background:var(--sa-surface);color:var(--sa-text);cursor:pointer;font-weight:600;white-space:nowrap;transition:all 0.2s;">
+                    + VS
+                  </button>
+                </div>
+              </div>
+              <div id="sa-vs-row-hourly" style="display:none;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:10px;padding:6px 12px;background:rgba(59,130,246,0.08);border-radius:8px;border:1px dashed #3b82f6;">
+                <span style="font-size:11.5px;font-weight:600;color:#3b82f6;white-space:nowrap;">Compare with:</span>
+                <input type="date" id="sa-rep-day-picker-vs" onchange="saLoadHourlyChart(document.getElementById('sa-rep-day-picker').value)"
+                  style="font-size:12px;padding:4px 8px;border-radius:8px;border:1px solid #3b82f6;background:var(--sa-surface);color:var(--sa-text);cursor:pointer;font-weight:500;">
+                <div id="sa-hourly-legend" style="display:none;gap:12px;font-size:11.5px;align-items:center;margin-left:auto;">
+                  <span style="display:flex;align-items:center;gap:5px;"><span style="display:inline-block;width:10px;height:10px;border-radius:2px;background:#3b82f6;"></span><strong id="sa-hourly-legend-a" style="color:#60a5fa;"></strong></span>
+                  <span style="font-weight:700;color:var(--sa-muted);">vs</span>
+                  <span style="display:flex;align-items:center;gap:5px;"><span style="display:inline-block;width:10px;height:10px;border-radius:2px;background:#10b981;"></span><strong id="sa-hourly-legend-b" style="color:#34d399;"></strong></span>
+                </div>
+              </div>
               <div style="height:230px;"><canvas id="sa-hourly-chart"></canvas></div>
             </div>
           </div>
 
-          <!-- Monthly + Item Performance Charts -->
+          <!-- Monthly + Item Performance Charts with Year Chooser & VS Comparison -->
           <div style="display:grid;grid-template-columns:1fr 1fr;gap:20px;margin-bottom:20px;">
+            <!-- Monthly Revenue Trend -->
             <div class="sa-card">
-              <div class="sa-card-title"><i class="bi bi-calendar3"></i> Monthly Revenue Trend</div>
+              <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px;margin-bottom:8px;">
+                <div class="sa-card-title" style="margin-bottom:0;"><i class="bi bi-calendar3"></i> Monthly Revenue Trend</div>
+                <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;">
+                  <select id="sa-rep-year-picker" onchange="saLoadMonthlyChart(this.value)"
+                    style="font-size:12px;padding:5px 9px;border-radius:8px;border:1px solid var(--sa-border);background:var(--sa-surface);color:var(--sa-text);cursor:pointer;font-weight:500;">
+                    <option value="">Year…</option>
+                  </select>
+                  <button type="button" onclick="saToggleVs('monthly')" id="sa-btn-vs-monthly"
+                    style="font-size:11px;padding:4px 10px;border-radius:18px;border:1.5px solid var(--sa-border);background:var(--sa-surface);color:var(--sa-text);cursor:pointer;font-weight:600;white-space:nowrap;transition:all 0.2s;">
+                    + VS
+                  </button>
+                </div>
+              </div>
+              <div id="sa-vs-row-monthly" style="display:none;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:10px;padding:6px 12px;background:rgba(16,185,129,0.08);border-radius:8px;border:1px dashed #10b981;">
+                <span style="font-size:11.5px;font-weight:600;color:#10b981;white-space:nowrap;">Compare with:</span>
+                <select id="sa-rep-year-picker-vs" onchange="saLoadMonthlyChart(document.getElementById('sa-rep-year-picker').value)"
+                  style="font-size:12px;padding:4px 8px;border-radius:8px;border:1px solid #10b981;background:var(--sa-surface);color:var(--sa-text);cursor:pointer;font-weight:500;">
+                  <option value="">Select year to compare…</option>
+                </select>
+                <div id="sa-monthly-legend" style="display:none;gap:12px;font-size:11.5px;align-items:center;margin-left:auto;">
+                  <span style="display:flex;align-items:center;gap:5px;"><span style="display:inline-block;width:10px;height:10px;border-radius:2px;background:#10b981;"></span><strong id="sa-monthly-legend-a" style="color:#34d399;"></strong></span>
+                  <span style="font-weight:700;color:var(--sa-muted);">vs</span>
+                  <span style="display:flex;align-items:center;gap:5px;"><span style="display:inline-block;width:10px;height:10px;border-radius:2px;background:#f59e0b;"></span><strong id="sa-monthly-legend-b" style="color:#fbbf24;"></strong></span>
+                </div>
+              </div>
               <div style="height:230px;"><canvas id="sa-monthly-chart"></canvas></div>
             </div>
+
+            <!-- Item Sales Performance -->
             <div class="sa-card">
               <div class="sa-card-title"><i class="bi bi-bar-chart-steps"></i> Item Sales Performance</div>
               <div style="height:230px;"><canvas id="sa-item-chart"></canvas></div>
@@ -2168,27 +2265,43 @@
     </div>
   </div>
 
-  <!-- ── UPLOAD PHOTO MODAL ── -->
+  <!-- ── ITEM PHOTO MODAL (Upload / Replace / Delete) ── -->
   <div class="sa-modal-overlay" id="sa-photo-modal">
-    <div class="sa-modal" style="max-width:420px;">
+    <div class="sa-modal" style="max-width:440px;">
       <div class="sa-modal-header">
-        <h3><i class="bi bi-camera-fill me-2" style="color:var(--sa-accent2);"></i>Upload Item Photo</h3>
+        <h3 id="sa-photo-modal-title"><i class="bi bi-camera-fill me-2" style="color:var(--sa-accent2);"></i>Item Photo</h3>
         <button class="sa-modal-close" onclick="closeModal('sa-photo-modal')"><i class="bi bi-x-lg"></i></button>
       </div>
       <div class="sa-modal-body">
-        <p id="sa-photo-item-label" style="font-size:13px;color:var(--sa-muted);margin-bottom:12px;"></p>
-        <div id="sa-photo-preview-wrap" style="text-align:center;margin-bottom:14px;display:none;">
-          <img id="sa-photo-preview" src="" style="max-width:100%;max-height:180px;border-radius:10px;border:1px solid var(--sa-border);object-fit:cover;">
+        <p id="sa-photo-item-label" style="font-size:13px;color:var(--sa-text);font-weight:600;margin-bottom:12px;"></p>
+        
+        <!-- Current Photo Section -->
+        <div id="sa-photo-current-wrap" style="text-align:center;margin-bottom:16px;padding:12px;background:var(--sa-surface);border-radius:12px;border:1px solid var(--sa-border);">
+          <div style="font-size:11px;font-weight:600;text-transform:uppercase;color:var(--sa-muted);margin-bottom:8px;letter-spacing:0.5px;">Current Photo</div>
+          <img id="sa-photo-current-img" src="" style="max-width:100%;max-height:160px;border-radius:8px;object-fit:cover;border:1px solid var(--sa-border);display:block;margin:0 auto 10px;">
+          <div id="sa-photo-no-img" style="display:none;padding:18px;color:var(--sa-muted);font-size:12.5px;">
+            <i class="bi bi-image" style="font-size:32px;display:block;margin-bottom:6px;opacity:0.4;"></i>
+            No photo uploaded for this item yet
+          </div>
+          <button type="button" class="sa-btn sa-btn-danger" id="sa-photo-delete-btn" onclick="saDeletePhoto()" style="padding:5px 12px;font-size:12px;margin:0 auto;display:none;">
+            <i class="bi bi-trash-fill"></i> Delete Photo
+          </button>
         </div>
+
+        <!-- Replace / Upload Photo Section -->
         <div class="sa-form-row">
-          <label class="sa-label">Choose Photo <span class="required-star" title="Required">*</span></label>
+          <label class="sa-label" id="sa-photo-upload-label">Replace with New Photo</label>
           <input type="file" id="sa-photo-file" class="sa-input" accept="image/*" onchange="saPreviewPhoto(this)">
         </div>
+        <div id="sa-photo-preview-wrap" style="text-align:center;margin-top:10px;margin-bottom:6px;display:none;">
+          <div style="font-size:11px;font-weight:600;text-transform:uppercase;color:var(--sa-accent2);margin-bottom:6px;letter-spacing:0.5px;">New Preview</div>
+          <img id="sa-photo-preview" src="" style="max-width:100%;max-height:140px;border-radius:8px;border:1.5px dashed var(--sa-accent2);object-fit:cover;">
+        </div>
       </div>
-      <div class="sa-modal-footer">
+      <div class="sa-modal-footer" style="display:flex;justify-content:space-between;align-items:center;">
         <button class="sa-btn sa-btn-ghost" onclick="closeModal('sa-photo-modal')">Cancel</button>
         <button class="sa-btn sa-btn-primary" id="sa-photo-submit-btn" onclick="saSubmitPhoto()">
-          <i class="bi bi-upload"></i> Upload Photo
+          <i class="bi bi-upload"></i> <span id="sa-photo-submit-text">Upload Photo</span>
         </button>
       </div>
     </div>
@@ -2269,7 +2382,7 @@
       // ── 1. FIX: Restore correct step visibility inside the card ──
       const sCreds     = target.querySelector('#pos-step-credentials, #sa-step-credentials');
       const s2fa       = target.querySelector('#pos-step-2fa, #sa-step-2fa');
-      const sForgotReq = target.querySelector('#pos-step-forgot-request, #sa-step-forgot');
+      const sForgotReq = target.querySelector('#pos-step-forgot-request, #sa-step-forgot, #sa-step-forgot-request');
       const sForgotRes = target.querySelector('#pos-step-forgot-reset');
 
       if (sCreds && sCreds.style.display === 'none') {
@@ -2461,17 +2574,31 @@
           opacity: 1;
           transform: translateY(18px) rotate(-18deg) scale(1.12);
         }
-        /* Password peek active state (right paw lowers so right eye peeks out) */
-        .cat-peeking-pass .rim-paw {
-          opacity: 0;
+        /* Password peek active state: Left paw stays covering its eye, right paw lowers to peek! */
+        .cat-peeking-pass .rim-paw,
+        .cat-covering-eyes .rim-paw {
+          opacity: 0 !important;
+          visibility: hidden !important;
         }
-        .cat-peeking-pass .pink-arm-left {
-          opacity: 1;
-          transform: translateY(22px) rotate(18deg) scale(1.12);
+        .cat-peeking-pass .pink-arm-left,
+        .cat-covering-eyes.cat-peeking-pass .pink-arm-left {
+          opacity: 1 !important;
+          transform: translateY(22px) rotate(18deg) scale(1.12) !important;
         }
-        .cat-peeking-pass .pink-arm-right {
-          opacity: 1;
-          transform: translateY(62px) rotate(16deg) scale(0.88);
+        .cat-peeking-pass .pink-arm-right,
+        .cat-covering-eyes.cat-peeking-pass .pink-arm-right {
+          opacity: 1 !important;
+          transform: translateY(64px) rotate(-6deg) scale(0.96) !important;
+        }
+        /* Right eye eyelid tucked away so right eye is wide and peeking over its lowered paw */
+        .cat-peeking-pass .cat-eye-right .cat-eyelid,
+        .cat-covering-eyes.cat-peeking-pass .cat-eye-right .cat-eyelid {
+          transform: translateY(-110%) !important;
+        }
+        .cat-peeking-pass .cartoon-cat-head-img,
+        .cat-covering-eyes.cat-peeking-pass .cartoon-cat-head-img {
+          transform: translateY(5px);
+          transition: transform 0.35s cubic-bezier(0.34, 1.25, 0.64, 1);
         }
       `;
 
@@ -2595,41 +2722,54 @@
         userInput.addEventListener('input', updateGaze);
       }
 
-      // ── 9. Password Focus: CAT COVERS ITS EYES WITH PROPORTIONATE PINK PAWS! ──
-      if (passInput) {
-        passInput.addEventListener('focus', () => {
+      // ── 9. Password Focus & Peek Controller ──
+      function updateSAPasswordPawState() {
+        const isFocused = (document.activeElement === passInput);
+        const isToggleActive = (document.activeElement === passToggle || (passToggle && passToggle.contains(document.activeElement)));
+        const isText = (passInput && passInput.type === 'text');
+
+        if (document.activeElement === userInput) {
+          isCoveringEyes = false;
+          isPasswordVisible = false;
+          catStage.classList.remove('cat-covering-eyes', 'cat-peeking-pass');
+          setPupils(0, 0);
+          return;
+        }
+
+        if (isFocused || isToggleActive || isText) {
           isCoveringEyes = true;
-          if (!isPasswordVisible) {
+          if (isText) {
+            isPasswordVisible = true;
+            catStage.classList.add('cat-covering-eyes', 'cat-peeking-pass');
+            const len = passInput ? passInput.value.length : 0;
+            const lookX = Math.min(Math.max((len - 7) * 0.45, -2.0), 4.5);
+            setPupils(lookX, 7.5); // right eye looks down at revealed password!
+          } else {
+            isPasswordVisible = false;
+            catStage.classList.remove('cat-peeking-pass');
             catStage.classList.add('cat-covering-eyes');
             setPupils(0, 0);
           }
-        });
-
-        passInput.addEventListener('blur', () => {
+        } else {
           isCoveringEyes = false;
+          isPasswordVisible = false;
           catStage.classList.remove('cat-covering-eyes', 'cat-peeking-pass');
           setPupils(0, 0);
-        });
+        }
+      }
+      window.updateSACatPasswordState = updateSAPasswordPawState;
+
+      if (passInput) {
+        passInput.addEventListener('focus', updateSAPasswordPawState);
+        passInput.addEventListener('blur', () => { setTimeout(updateSAPasswordPawState, 150); });
+        passInput.addEventListener('input', () => { if (passInput.type === 'text') updateSAPasswordPawState(); });
       }
 
-      // ── 10. Password Visibility Toggle: PEEK THROUGH PAW! ──
+      // ── 10. Password Visibility Toggle: PEEK AT PASSWORD ──
       if (passToggle) {
+        passToggle.addEventListener('mousedown', (e) => { e.preventDefault(); });
         passToggle.addEventListener('click', () => {
-          setTimeout(() => {
-            if (passInput && passInput.type === 'text') {
-              isPasswordVisible = true;
-              catStage.classList.remove('cat-covering-eyes');
-              catStage.classList.add('cat-peeking-pass');
-              setPupils(3.5, 6.0); // peek down at revealed password
-            } else {
-              isPasswordVisible = false;
-              catStage.classList.remove('cat-peeking-pass');
-              if (document.activeElement === passInput) {
-                catStage.classList.add('cat-covering-eyes');
-              }
-              setPupils(0, 0);
-            }
-          }, 50);
+          setTimeout(updateSAPasswordPawState, 25);
         });
       }
     }
@@ -2700,6 +2840,9 @@ if (typeof gsap === "undefined") { document.write('<script src="https://cdn.jsde
       const icon = btn.querySelector('i');
       if (icon) {
         icon.className = isPass ? 'bi bi-eye-slash' : 'bi bi-eye';
+      }
+      if (typeof window.updateSACatPasswordState === 'function') {
+        window.updateSACatPasswordState();
       }
     }
 
@@ -3186,45 +3329,15 @@ if (typeof gsap === "undefined") { document.write('<script src="https://cdn.jsde
           `;
         }
 
-        // Render Weekly Chart
-        if (res.weekly_chart) {
-          const wdata = res.weekly_chart;
-          if (window.saChartIns) {
-            window.saChartIns.data.datasets[0].data = wdata;
-            window.saChartIns.update();
-          } else {
-            const ctx = document.getElementById('saWeeklyChart');
-            if (ctx) {
-              window.saChartIns = new Chart(ctx.getContext('2d'), {
-                type: 'line',
-                data: {
-                  labels: ['Mon','Tue','Wed','Thu','Fri','Sat','Sun'],
-                  datasets: [{
-                    label: 'Revenue (₱)',
-                    data: wdata,
-                    borderColor: '#a855f7',
-                    backgroundColor: 'rgba(168, 85, 247, 0.15)',
-                    borderWidth: 3,
-                    fill: true,
-                    tension: 0.4,
-                    pointBackgroundColor: '#fff',
-                    pointBorderColor: '#a855f7',
-                    pointBorderWidth: 2,
-                    pointRadius: 4
-                  }]
-                },
-                options: { 
-                  responsive: true, 
-                  maintainAspectRatio: false,
-                  plugins: { legend: { display: false } },
-                  scales: {
-                    y: { beginAtZero: true, grid: { color: '#f1f5f9' }, border: { dash: [4, 4] } },
-                    x: { grid: { display: false } }
-                  }
-                }
-              });
-            }
-          }
+        // Render Weekly Chart (Integrated with Week Picker & VS comparison)
+        if (!saAvailableWeeks || saAvailableWeeks.length === 0) {
+          saInitChartPickers().then(() => {
+            const dwp = document.getElementById('sa-dash-week-picker');
+            saLoadDashboardWeeklyChart(dwp?.value || '');
+          });
+        } else {
+          const dwp = document.getElementById('sa-dash-week-picker');
+          saLoadDashboardWeeklyChart(dwp?.value || '');
         }
 
       } catch (e) { console.error('Dashboard load failed:', e); }
@@ -3989,7 +4102,7 @@ if (typeof gsap === "undefined") { document.write('<script src="https://cdn.jsde
             <td>
               <div style="display:flex;align-items:center;gap:10px;">
                 ${item.image 
-                  ? `<img src="${item.image}" style="width:34px;height:34px;border-radius:8px;object-fit:cover;border:1px solid var(--sa-border);">`
+                  ? `<img src="${item.image}" style="width:34px;height:34px;border-radius:8px;object-fit:cover;border:1px solid var(--sa-border);" onerror="this.onerror=null;this.style.display=\`'none\`';if(this.nextElementSibling)this.nextElementSibling.style.display=\`'flex\`';"><div style="display:none;width:34px;height:34px;border-radius:8px;background:rgba(109,40,217,0.15);align-items:center;justify-content:center;font-size:16px;">☕</div>`
                   : `<div style="width:34px;height:34px;border-radius:8px;background:rgba(109,40,217,0.15);display:flex;align-items:center;justify-content:center;font-size:16px;">☕</div>`}
                 <div>
                   <span style="font-weight:600;color:var(--sa-text);">${item.name}</span>
@@ -4181,31 +4294,132 @@ if (typeof gsap === "undefined") { document.write('<script src="https://cdn.jsde
       openModal('sa-add-item-modal');
     }
 
-    /* ── Photo Upload Modal ── */
+    /* ── Photo Upload / Delete / Replace Modal (Super Admin) ── */
     let _saPhotoItemId = null;
+    let _saPhotoItemObj = null;
 
     function saOpenPhotoModal(id, name) {
       _saPhotoItemId = id;
+      _saPhotoItemObj = (typeof saMenuItems !== 'undefined' && Array.isArray(saMenuItems)) 
+        ? saMenuItems.find(m => m.id == id) 
+        : null;
+
       document.getElementById('sa-photo-item-label').textContent = `Item: ${name}`;
       document.getElementById('sa-photo-file').value = '';
       document.getElementById('sa-photo-preview').src = '';
       document.getElementById('sa-photo-preview-wrap').style.display = 'none';
+
+      const currentImg = document.getElementById('sa-photo-current-img');
+      const noImg = document.getElementById('sa-photo-no-img');
+      const delBtn = document.getElementById('sa-photo-delete-btn');
+      const uploadLabel = document.getElementById('sa-photo-upload-label');
+      const submitText = document.getElementById('sa-photo-submit-text');
+      const submitIcon = document.querySelector('#sa-photo-submit-btn i');
+
+      if (_saPhotoItemObj && _saPhotoItemObj.image) {
+        currentImg.src = _saPhotoItemObj.image;
+        currentImg.style.display = 'block';
+        noImg.style.display = 'none';
+        delBtn.style.display = 'inline-flex';
+        uploadLabel.textContent = 'Replace Photo';
+        submitText.textContent = 'Replace Photo';
+        if (submitIcon) submitIcon.className = 'bi bi-arrow-repeat';
+      } else {
+        currentImg.src = '';
+        currentImg.style.display = 'none';
+        noImg.style.display = 'block';
+        delBtn.style.display = 'none';
+        uploadLabel.textContent = 'Choose Photo';
+        submitText.textContent = 'Upload Photo';
+        if (submitIcon) submitIcon.className = 'bi bi-upload';
+      }
+
       openModal('sa-photo-modal');
     }
 
-    function saPreviewPhoto(input) {
+    function compressImageFile(file, maxWidth = 600, maxHeight = 600, quality = 0.85) {
+      return new Promise((resolve, reject) => {
+        if (!file || !file.type || !file.type.startsWith('image/')) {
+          return reject(new Error('Selected file is not an image.'));
+        }
+        const reader = new FileReader();
+        reader.onerror = reject;
+        reader.onload = ev => {
+          const img = new Image();
+          img.onerror = () => resolve(ev.target.result);
+          img.onload = () => {
+            try {
+              let w = img.width;
+              let h = img.height;
+              if (w > maxWidth || h > maxHeight) {
+                const ratio = Math.min(maxWidth / w, maxHeight / h);
+                w = Math.round(w * ratio);
+                h = Math.round(h * ratio);
+              }
+              const canvas = document.createElement('canvas');
+              canvas.width = w;
+              canvas.height = h;
+              const ctx = canvas.getContext('2d');
+              ctx.drawImage(img, 0, 0, w, h);
+              const compressed = canvas.toDataURL('image/jpeg', quality);
+              resolve(compressed);
+            } catch (err) {
+              resolve(ev.target.result);
+            }
+          };
+          img.src = ev.target.result;
+        };
+        reader.readAsDataURL(file);
+      });
+    }
+
+    async function saPreviewPhoto(input) {
       const previewWrap = document.getElementById('sa-photo-preview-wrap');
       const preview = document.getElementById('sa-photo-preview');
       if (input.files && input.files[0]) {
-        const reader = new FileReader();
-        reader.onload = ev => {
-          preview.src = ev.target.result;
+        try {
+          const dataUrl = await compressImageFile(input.files[0]);
+          preview.src = dataUrl;
           previewWrap.style.display = 'block';
-        };
-        reader.readAsDataURL(input.files[0]);
+        } catch (e) {
+          previewWrap.style.display = 'none';
+        }
       } else {
         previewWrap.style.display = 'none';
       }
+    }
+
+        async function saDeletePhoto() {
+      if (!_saPhotoItemId) return;
+      const itemName = _saPhotoItemObj ? _saPhotoItemObj.name : 'this item';
+      const itemImg = (_saPhotoItemObj && _saPhotoItemObj.image) ? _saPhotoItemObj.image : '';
+      const imgPreviewHtml = itemImg
+        ? '<div style="text-align:center;margin-bottom:14px;"><img src="' + itemImg + '" style="width:100px;height:100px;border-radius:12px;object-fit:cover;border:2px solid rgba(239,68,68,0.35);box-shadow:0 4px 12px rgba(239,68,68,0.18);"></div>'
+        : '';
+      openConfirmModal(
+        '<i class="bi bi-trash-fill" style="color:#ef4444;margin-right:8px;"></i>Delete Item Photo',
+        imgPreviewHtml + 'Are you sure you want to delete the photo for <strong>' + escapeHtml(itemName) + '</strong>?<br><br><span style="font-size:12px;color:var(--sa-muted);">The item will revert to its default category placeholder.</span>',
+        async () => {
+          const btn = document.getElementById('sa-photo-delete-btn');
+          if (btn) btn.disabled = true;
+          try {
+            const res = await saApi('menu.php?action=update', { id: _saPhotoItemId, image: null });
+            if (res.success) {
+              closeModal('sa-photo-modal');
+              saToast('Photo deleted successfully!', 'success');
+              if (_saPhotoItemObj) _saPhotoItemObj.image = null;
+              saLoadMenu();
+            } else {
+              saToast(res.message || 'Failed to delete photo.', 'error');
+            }
+          } catch (err) {
+            saToast('Error deleting photo.', 'error');
+          } finally {
+            if (btn) btn.disabled = false;
+          }
+        },
+        '#ef4444'
+      );
     }
 
     async function saSubmitPhoto() {
@@ -4217,16 +4431,15 @@ if (typeof gsap === "undefined") { document.write('<script src="https://cdn.jsde
       }
       const btn = document.getElementById('sa-photo-submit-btn');
       btn.disabled = true;
+      btn.innerHTML = '<span class="spinner-border spinner-border-sm me-1"></span>Uploading...';
       try {
-        const imageSrc = await new Promise(resolve => {
-          const reader = new FileReader();
-          reader.onload = ev => resolve(ev.target.result);
-          reader.readAsDataURL(fileInput.files[0]);
-        });
+        const imageSrc = await compressImageFile(fileInput.files[0]);
         const res = await saApi('menu.php?action=update', { id: _saPhotoItemId, image: imageSrc });
         if (res.success) {
           closeModal('sa-photo-modal');
-          saToast('Photo updated successfully!', 'success');
+          const isReplace = _saPhotoItemObj && _saPhotoItemObj.image;
+          saToast(isReplace ? 'Photo replaced successfully!' : 'Photo uploaded successfully!', 'success');
+          if (_saPhotoItemObj) _saPhotoItemObj.image = imageSrc;
           saLoadMenu();
         } else {
           saToast(res.message || 'Failed to update photo.', 'error');
@@ -4235,6 +4448,7 @@ if (typeof gsap === "undefined") { document.write('<script src="https://cdn.jsde
         saToast('Error uploading photo.', 'error');
       } finally {
         btn.disabled = false;
+        btn.innerHTML = '<i class="bi bi-upload"></i> <span id="sa-photo-submit-text">Upload Photo</span>';
       }
     }
 
@@ -4499,6 +4713,409 @@ if (typeof gsap === "undefined") { document.write('<script src="https://cdn.jsde
       window.saAnCharts[id] = new Chart(ctx.getContext('2d'), config);
     }
 
+    /* =====================================================
+       CHART WEEK PICKER & VS COMPARISON SYSTEM (Super Admin)
+       ===================================================== */
+    let saAvailableWeeks = [];
+    let saVsActive = { weekly: false, hourly: false, monthly: false, dash: false };
+
+    async function saInitChartPickers() {
+      try {
+        const res = await saApi('superadmin.php?action=chart_weekly_weeks');
+        if (res && res.success && Array.isArray(res.weeks)) {
+          saAvailableWeeks = res.weeks;
+          
+          // Populate Weekly Pickers (Analytics)
+          const wp = document.getElementById('sa-rep-week-picker');
+          const wpVs = document.getElementById('sa-rep-week-picker-vs');
+          if (wp) {
+            wp.innerHTML = saAvailableWeeks.map((w, idx) => 
+              `<option value="${w.week_start}" ${idx === 0 ? 'selected' : ''}>${w.label}</option>`
+            ).join('');
+          }
+          if (wpVs) {
+            wpVs.innerHTML = `<option value="">Select week to compare…</option>` + 
+              saAvailableWeeks.map((w, idx) => 
+                `<option value="${w.week_start}" ${idx === 1 ? 'selected' : ''}>${w.label}</option>`
+              ).join('');
+          }
+
+          // Populate Dashboard Pickers
+          const dwp = document.getElementById('sa-dash-week-picker');
+          const dwpVs = document.getElementById('sa-dash-week-picker-vs');
+          if (dwp) {
+            dwp.innerHTML = saAvailableWeeks.map((w, idx) => 
+              `<option value="${w.week_start}" ${idx === 0 ? 'selected' : ''}>${w.label}</option>`
+            ).join('');
+          }
+          if (dwpVs) {
+            dwpVs.innerHTML = `<option value="">Select week to compare…</option>` + 
+              saAvailableWeeks.map((w, idx) => 
+                `<option value="${w.week_start}" ${idx === 1 ? 'selected' : ''}>${w.label}</option>`
+              ).join('');
+          }
+        }
+      } catch (e) {
+        console.error('Failed to load chart weeks:', e);
+      }
+
+      // Populate Hourly Pickers (default to today)
+      const hp = document.getElementById('sa-rep-day-picker');
+      const hpVs = document.getElementById('sa-rep-day-picker-vs');
+      const todayStr = new Date().toISOString().split('T')[0];
+      const yestDate = new Date(Date.now() - 86400000);
+      const yestStr = yestDate.toISOString().split('T')[0];
+      if (hp && !hp.value) hp.value = todayStr;
+      if (hpVs && !hpVs.value) hpVs.value = yestStr;
+
+      // Populate Monthly Pickers (load years)
+      try {
+        const curYear = new Date().getFullYear();
+        const resMo = await saApi('superadmin.php?action=chart_monthly&year=' + curYear);
+        const yp = document.getElementById('sa-rep-year-picker');
+        const ypVs = document.getElementById('sa-rep-year-picker-vs');
+        const years = (resMo && resMo.success && Array.isArray(resMo.years) && resMo.years.length) ? resMo.years : [curYear, curYear - 1];
+        if (yp) {
+          yp.innerHTML = years.map(y => `<option value="${y}" ${y === curYear ? 'selected' : ''}>${y}</option>`).join('');
+        }
+        if (ypVs) {
+          ypVs.innerHTML = `<option value="">Select year to compare…</option>` + 
+            years.map(y => `<option value="${y}" ${y === (curYear - 1) ? 'selected' : ''}>${y}</option>`).join('');
+        }
+      } catch (e) {
+        console.error('Failed to load chart years:', e);
+      }
+    }
+
+    function saToggleVs(type) {
+      saVsActive[type] = !saVsActive[type];
+      const active = saVsActive[type];
+      const btn = document.getElementById('sa-btn-vs-' + type);
+      const row = document.getElementById('sa-vs-row-' + type);
+      const legend = document.getElementById('sa-' + type + '-legend');
+
+      if (btn) {
+        btn.textContent = active ? '− VS' : '+ VS';
+        btn.style.background = active ? '#f59e0b' : 'var(--sa-surface)';
+        btn.style.color = active ? '#000' : 'var(--sa-text)';
+        btn.style.borderColor = active ? '#f59e0b' : 'var(--sa-border)';
+      }
+      if (row) {
+        row.style.display = active ? 'flex' : 'none';
+      }
+      if (legend) {
+        legend.style.display = active ? 'flex' : 'none';
+      }
+
+      if (type === 'weekly') {
+        const pVal = document.getElementById('sa-rep-week-picker')?.value || '';
+        saLoadWeeklyChart(pVal);
+      } else if (type === 'hourly') {
+        const pVal = document.getElementById('sa-rep-day-picker')?.value || '';
+        saLoadHourlyChart(pVal);
+      } else if (type === 'monthly') {
+        const pVal = document.getElementById('sa-rep-year-picker')?.value || '';
+        saLoadMonthlyChart(pVal);
+      }
+    }
+
+    function saToggleDashVs() {
+      saVsActive.dash = !saVsActive.dash;
+      const active = saVsActive.dash;
+      const btn = document.getElementById('sa-btn-vs-dash');
+      const row = document.getElementById('sa-dash-vs-row');
+      const legend = document.getElementById('sa-dash-weekly-legend');
+
+      if (btn) {
+        btn.textContent = active ? '− VS' : '+ VS';
+        btn.style.background = active ? '#f59e0b' : 'var(--sa-surface)';
+        btn.style.color = active ? '#000' : 'var(--sa-text)';
+        btn.style.borderColor = active ? '#f59e0b' : 'var(--sa-border)';
+      }
+      if (row) row.style.display = active ? 'flex' : 'none';
+      if (legend) legend.style.display = active ? 'flex' : 'none';
+
+      const pVal = document.getElementById('sa-dash-week-picker')?.value || '';
+      saLoadDashboardWeeklyChart(pVal);
+    }
+
+    async function saLoadWeeklyChart(weekStart) {
+      const vsActive = saVsActive.weekly;
+      const vsVal = vsActive ? (document.getElementById('sa-rep-week-picker-vs')?.value || '') : '';
+      let url = 'superadmin.php?action=chart_weekly';
+      if (weekStart) url += '&week_start=' + encodeURIComponent(weekStart);
+      if (vsVal)     url += '&vs_week_start=' + encodeURIComponent(vsVal);
+
+      try {
+        const res = await saApi(url);
+        if (!res || !res.success) return;
+
+        const baseOpts = {
+          responsive: true, maintainAspectRatio: false,
+          plugins: { 
+            legend: { display: false },
+            tooltip: {
+              callbacks: {
+                label: ctx => (ctx.dataset.label ? ctx.dataset.label + ': ' : '') + '₱' + Number(ctx.raw || 0).toLocaleString('en-PH', {minimumFractionDigits: 2, maximumFractionDigits: 2})
+              }
+            }
+          },
+          scales: {
+            y: { beginAtZero: true, grid: { color: 'rgba(255,255,255,0.06)' }, ticks: { color: '#94a3b8', font:{size:10} } },
+            x: { grid: { display: false }, ticks: { color: '#94a3b8', font:{size:10} } }
+          }
+        };
+
+        const datasets = [];
+        const prim = res.primary;
+        datasets.push({
+          label: prim.label || 'Primary Week',
+          data: prim.data,
+          borderColor: '#a855f7',
+          backgroundColor: vsActive && res.vs ? 'rgba(168,85,247,0.08)' : 'rgba(168,85,247,0.15)',
+          borderWidth: 3,
+          fill: true,
+          tension: 0.4,
+          pointRadius: 4,
+          pointBackgroundColor: '#fff',
+          pointBorderColor: '#a855f7',
+          pointBorderWidth: 2
+        });
+
+        if (vsActive && res.vs) {
+          datasets.push({
+            label: res.vs.label || 'Compare Week',
+            data: res.vs.data,
+            borderColor: '#f59e0b',
+            backgroundColor: 'rgba(245,158,11,0.08)',
+            borderWidth: 3,
+            fill: true,
+            tension: 0.4,
+            pointRadius: 4,
+            pointBackgroundColor: '#fff',
+            pointBorderColor: '#f59e0b',
+            pointBorderWidth: 2
+          });
+
+          const legA = document.getElementById('sa-weekly-legend-a');
+          const legB = document.getElementById('sa-weekly-legend-b');
+          if (legA) legA.textContent = `${prim.label} (₱${Number(prim.total||0).toLocaleString()})`;
+          if (legB) legB.textContent = `${res.vs.label} (₱${Number(res.vs.total||0).toLocaleString()})`;
+        }
+
+        saUpsertChart('sa-weekly-chart', {
+          type: 'line',
+          data: { labels: res.labels || ['Mon','Tue','Wed','Thu','Fri','Sat','Sun'], datasets },
+          options: baseOpts
+        });
+
+      } catch (e) {
+        console.error('Failed to load weekly chart:', e);
+      }
+    }
+
+    async function saLoadDashboardWeeklyChart(weekStart) {
+      const vsActive = saVsActive.dash;
+      const vsVal = vsActive ? (document.getElementById('sa-dash-week-picker-vs')?.value || '') : '';
+      let url = 'superadmin.php?action=chart_weekly';
+      if (weekStart) url += '&week_start=' + encodeURIComponent(weekStart);
+      if (vsVal)     url += '&vs_week_start=' + encodeURIComponent(vsVal);
+
+      try {
+        const res = await saApi(url);
+        if (!res || !res.success) return;
+
+        const prim = res.primary;
+        const datasets = [{
+          label: prim.label || 'Revenue (₱)',
+          data: prim.data,
+          borderColor: '#a855f7',
+          backgroundColor: vsActive && res.vs ? 'rgba(168, 85, 247, 0.08)' : 'rgba(168, 85, 247, 0.15)',
+          borderWidth: 3,
+          fill: true,
+          tension: 0.4,
+          pointBackgroundColor: '#fff',
+          pointBorderColor: '#a855f7',
+          pointBorderWidth: 2,
+          pointRadius: 4
+        }];
+
+        if (vsActive && res.vs) {
+          datasets.push({
+            label: res.vs.label || 'Compare (₱)',
+            data: res.vs.data,
+            borderColor: '#f59e0b',
+            backgroundColor: 'rgba(245, 158, 11, 0.08)',
+            borderWidth: 3,
+            fill: true,
+            tension: 0.4,
+            pointBackgroundColor: '#fff',
+            pointBorderColor: '#f59e0b',
+            pointBorderWidth: 2,
+            pointRadius: 4
+          });
+
+          const legA = document.getElementById('sa-dash-legend-a');
+          const legB = document.getElementById('sa-dash-legend-b');
+          if (legA) legA.textContent = `${prim.label} (₱${Number(prim.total||0).toLocaleString()})`;
+          if (legB) legB.textContent = `${res.vs.label} (₱${Number(res.vs.total||0).toLocaleString()})`;
+        }
+
+        const ctx = document.getElementById('saWeeklyChart');
+        if (ctx) {
+          if (window.saChartIns) {
+            window.saChartIns.destroy();
+          }
+          window.saChartIns = new Chart(ctx.getContext('2d'), {
+            type: 'line',
+            data: {
+              labels: res.labels || ['Mon','Tue','Wed','Thu','Fri','Sat','Sun'],
+              datasets: datasets
+            },
+            options: {
+              responsive: true,
+              maintainAspectRatio: false,
+              plugins: { 
+                legend: { display: false },
+                tooltip: {
+                  callbacks: {
+                    label: ctx => (ctx.dataset.label ? ctx.dataset.label + ': ' : '') + '₱' + Number(ctx.raw || 0).toLocaleString('en-PH', {minimumFractionDigits: 2, maximumFractionDigits: 2})
+                  }
+                }
+              },
+              scales: {
+                y: { beginAtZero: true, grid: { color: 'rgba(255,255,255,0.06)' } },
+                x: { grid: { display: false } }
+              }
+            }
+          });
+        }
+
+      } catch (e) {
+        console.error('Failed to load dashboard weekly chart:', e);
+      }
+    }
+
+    async function saLoadHourlyChart(day) {
+      const vsActive = saVsActive.hourly;
+      const vsVal = vsActive ? (document.getElementById('sa-rep-day-picker-vs')?.value || '') : '';
+      let url = 'superadmin.php?action=chart_hourly';
+      if (day)   url += '&date=' + encodeURIComponent(day);
+      if (vsVal) url += '&vs_date=' + encodeURIComponent(vsVal);
+
+      try {
+        const res = await saApi(url);
+        if (!res || !res.success) return;
+
+        const baseOpts = {
+          responsive: true, maintainAspectRatio: false,
+          plugins: { 
+            legend: { display: false },
+            tooltip: {
+              callbacks: {
+                label: ctx => (ctx.dataset.label ? ctx.dataset.label + ': ' : '') + '₱' + Number(ctx.raw || 0).toLocaleString('en-PH', {minimumFractionDigits: 2, maximumFractionDigits: 2})
+              }
+            }
+          },
+          scales: {
+            y: { beginAtZero: true, grid: { color: 'rgba(255,255,255,0.06)' }, ticks: { color: '#94a3b8', font:{size:10} } },
+            x: { grid: { display: false }, ticks: { color: '#94a3b8', font:{size:10} } }
+          }
+        };
+
+        const prim = res.primary;
+        const datasets = [{
+          label: prim.label || 'Primary Day',
+          data: prim.data,
+          backgroundColor: 'rgba(59,130,246,0.7)',
+          borderRadius: 4
+        }];
+
+        if (vsActive && res.vs) {
+          datasets.push({
+            label: res.vs.label || 'Compare Day',
+            data: res.vs.data,
+            backgroundColor: 'rgba(16,185,129,0.7)',
+            borderRadius: 4
+          });
+
+          const legA = document.getElementById('sa-hourly-legend-a');
+          const legB = document.getElementById('sa-hourly-legend-b');
+          if (legA) legA.textContent = `${prim.label} (₱${Number(prim.total||0).toLocaleString()})`;
+          if (legB) legB.textContent = `${res.vs.label} (₱${Number(res.vs.total||0).toLocaleString()})`;
+        }
+
+        saUpsertChart('sa-hourly-chart', {
+          type: 'bar',
+          data: { labels: res.labels, datasets },
+          options: baseOpts
+        });
+
+      } catch (e) {
+        console.error('Failed to load hourly chart:', e);
+      }
+    }
+
+    async function saLoadMonthlyChart(year) {
+      const vsActive = saVsActive.monthly;
+      const vsVal = vsActive ? (document.getElementById('sa-rep-year-picker-vs')?.value || '') : '';
+      let url = 'superadmin.php?action=chart_monthly';
+      if (year)  url += '&year=' + encodeURIComponent(year);
+      if (vsVal) url += '&vs_year=' + encodeURIComponent(vsVal);
+
+      try {
+        const res = await saApi(url);
+        if (!res || !res.success) return;
+
+        const baseOpts = {
+          responsive: true, maintainAspectRatio: false,
+          plugins: { 
+            legend: { display: false },
+            tooltip: {
+              callbacks: {
+                label: ctx => (ctx.dataset.label ? ctx.dataset.label + ': ' : '') + '₱' + Number(ctx.raw || 0).toLocaleString('en-PH', {minimumFractionDigits: 2, maximumFractionDigits: 2})
+              }
+            }
+          },
+          scales: {
+            y: { beginAtZero: true, grid: { color: 'rgba(255,255,255,0.06)' }, ticks: { color: '#94a3b8', font:{size:10} } },
+            x: { grid: { display: false }, ticks: { color: '#94a3b8', font:{size:10} } }
+          }
+        };
+
+        const prim = res.primary;
+        const datasets = [{
+          label: prim.label || 'Primary Year',
+          data: prim.data,
+          backgroundColor: 'rgba(16,185,129,0.7)',
+          borderRadius: 4
+        }];
+
+        if (vsActive && res.vs) {
+          datasets.push({
+            label: res.vs.label || 'Compare Year',
+            data: res.vs.data,
+            backgroundColor: 'rgba(245,158,11,0.7)',
+            borderRadius: 4
+          });
+
+          const legA = document.getElementById('sa-monthly-legend-a');
+          const legB = document.getElementById('sa-monthly-legend-b');
+          if (legA) legA.textContent = `${prim.label} (₱${Number(prim.total||0).toLocaleString()})`;
+          if (legB) legB.textContent = `${res.vs.label} (₱${Number(res.vs.total||0).toLocaleString()})`;
+        }
+
+        saUpsertChart('sa-monthly-chart', {
+          type: 'bar',
+          data: { labels: res.labels, datasets },
+          options: baseOpts
+        });
+
+      } catch (e) {
+        console.error('Failed to load monthly chart:', e);
+      }
+    }
+
     async function loadAnalytics() {
       try {
         const res = await saApi('superadmin.php?action=dashboard');
@@ -4517,6 +5134,20 @@ if (typeof gsap === "undefined") { document.write('<script src="https://cdn.jsde
           document.getElementById('an-top-seller-sub').textContent = 'No sales yet';
         }
 
+        // Initialize pickers & load selectable / VS charts
+        if (!saAvailableWeeks || saAvailableWeeks.length === 0) {
+          await saInitChartPickers();
+        }
+
+        const selWeek = document.getElementById('sa-rep-week-picker')?.value || '';
+        saLoadWeeklyChart(selWeek);
+
+        const selDay = document.getElementById('sa-rep-day-picker')?.value || '';
+        saLoadHourlyChart(selDay);
+
+        const selYear = document.getElementById('sa-rep-year-picker')?.value || '';
+        saLoadMonthlyChart(selYear);
+
         const baseOpts = {
           responsive: true, maintainAspectRatio: false,
           plugins: { legend: { display: false } },
@@ -4525,31 +5156,6 @@ if (typeof gsap === "undefined") { document.write('<script src="https://cdn.jsde
             x: { grid: { display: false }, ticks: { color: '#94a3b8', font:{size:10} } }
           }
         };
-
-        // ── Weekly ──
-        saUpsertChart('sa-weekly-chart', {
-          type: 'line',
-          data: { labels: ['Mon','Tue','Wed','Thu','Fri','Sat','Sun'],
-            datasets: [{ label:'Revenue', data: res.weekly_chart, borderColor:'#a855f7', backgroundColor:'rgba(168,85,247,0.15)', borderWidth:3, fill:true, tension:0.4, pointRadius:4, pointBackgroundColor:'#fff', pointBorderColor:'#a855f7', pointBorderWidth:2 }] },
-          options: { ...baseOpts }
-        });
-
-        // ── Hourly ──
-        const hourLabels = ['9am','10am','11am','12pm','1pm','2pm','3pm','4pm','5pm','6pm','7pm','8pm','9pm','10pm','11pm','12am','1am','2am'];
-        saUpsertChart('sa-hourly-chart', {
-          type: 'bar',
-          data: { labels: hourLabels,
-            datasets: [{ label:'Revenue', data: res.hourly_chart, backgroundColor:'rgba(59,130,246,0.7)', borderRadius:4 }] },
-          options: { ...baseOpts }
-        });
-
-        // ── Monthly ──
-        saUpsertChart('sa-monthly-chart', {
-          type: 'bar',
-          data: { labels: ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'],
-            datasets: [{ label:'Revenue', data: res.monthly_chart, backgroundColor:'rgba(16,185,129,0.7)', borderRadius:4 }] },
-          options: { ...baseOpts }
-        });
 
         // ── Item Performance ──
         if (res.item_performance && res.item_performance.length) {

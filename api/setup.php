@@ -48,7 +48,9 @@ try {
             expires_at DATETIME NOT NULL,
             used_at DATETIME DEFAULT NULL,
             created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-            FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE SET NULL
+            FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE SET NULL,
+            INDEX idx_expires_at (expires_at),
+            INDEX idx_purpose_used (purpose, is_used)
         ) ENGINE=InnoDB
     ");
 
@@ -86,7 +88,7 @@ try {
             category_id INT NOT NULL,
             price DECIMAL(10, 2) NOT NULL,
             emoji VARCHAR(10) DEFAULT '🍽️',
-            image TEXT DEFAULT NULL,
+            image MEDIUMTEXT DEFAULT NULL,
             stock INT NOT NULL DEFAULT 0,
             min_stock INT NOT NULL DEFAULT 5,
             is_available TINYINT(1) NOT NULL DEFAULT 1,
@@ -105,7 +107,9 @@ try {
             payment_method VARCHAR(20) NOT NULL DEFAULT 'Cash',
             status VARCHAR(20) NOT NULL DEFAULT 'Completed',
             created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-            FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE SET NULL
+            FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE SET NULL,
+            INDEX idx_expires_at (expires_at),
+            INDEX idx_purpose_used (purpose, is_used)
         ) ENGINE=InnoDB
     ");
 
