@@ -151,7 +151,7 @@ try {
     $stmt->execute(['cashier1', $cashierHash, 'Staff 1', 'cashier1@chipipiecafe.com', 'cashier']);
 
     // Seed categories
-    $pdo->exec("INSERT IGNORE INTO categories (name) VALUES ('Pies'), ('Drinks'), ('Snacks'), ('Add-ons')");
+    // Legacy seed categories removed
 
     // Seed menu items
     $menuData = [

@@ -111,7 +111,7 @@ CREATE TABLE `categories` (
 
 LOCK TABLES `categories` WRITE;
 /*!40000 ALTER TABLE `categories` DISABLE KEYS */;
-INSERT INTO `categories` VALUES (1,'Hot Coffee','2026-05-20 11:14:07'),(2,'Iced Coffee','2026-05-20 11:14:07'),(3,'Classic Milktea','2026-05-20 11:14:07'),(4,'Virgin Mojito','2026-05-20 11:14:07'),(5,'Citrus Popping Boba','2026-05-20 11:14:07'),(6,'Soda Float','2026-05-20 11:14:07'),(7,'Matcha Series','2026-05-20 11:14:07'),(8,'Frappé','2026-05-20 11:14:07'),(9,'Fork and Fun','2026-05-20 11:14:07'),(10,'Pizza','2026-08-07 11:36:40'),(11,'Quesadilla','2026-08-07 11:36:40'),(12,'Patatas','2026-08-07 11:36:40'),(13,'Pasta','2026-08-07 11:36:40'),(14,'Chickenpops','2026-08-07 11:36:40'),(15,'Combo','2026-08-07 11:36:40'),(16,'Gipitmeal','2026-08-07 11:36:40'),(17,'Pies','2026-08-26 15:10:50'),(18,'Drinks','2026-08-26 15:10:50'),(19,'Snacks','2026-08-26 15:10:50'),(20,'Add-ons','2026-08-26 15:10:50');
+INSERT INTO `categories` VALUES (1,'Hot Coffee','2026-05-20 11:14:07'),(2,'Iced Coffee','2026-05-20 11:14:07'),(3,'Classic Milktea','2026-05-20 11:14:07'),(4,'Virgin Mojito','2026-05-20 11:14:07'),(5,'Citrus Popping Boba','2026-05-20 11:14:07'),(6,'Soda Float','2026-05-20 11:14:07'),(7,'Matcha Series','2026-05-20 11:14:07'),(8,'Frappé','2026-05-20 11:14:07'),(9,'Fork and Fun','2026-05-20 11:14:07'),(10,'Pizza','2026-08-07 11:36:40'),(11,'Quesadilla','2026-08-07 11:36:40'),(12,'Patatas','2026-08-07 11:36:40'),(13,'Pasta','2026-08-07 11:36:40'),(14,'Chickenpops','2026-08-07 11:36:40'),(15,'Combo','2026-08-07 11:36:40'),(16,'Gipitmeal','2026-08-07 11:36:40');
 /*!40000 ALTER TABLE `categories` ENABLE KEYS */;
 UNLOCK TABLES;
 

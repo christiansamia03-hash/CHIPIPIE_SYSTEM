@@ -935,9 +935,55 @@ $_CSRF_TOKEN = getCsrfToken();
       background: var(--cafe-tan);
       border-radius: 4px;
     }
-    .menu-table-card {
+    /* ── Menu filter dropdowns ── */
+    .menu-filter-row { display:flex; align-items:center; gap:8px; flex-wrap:wrap; padding:6px 0 2px 0; }
+    .menu-dd-wrap { position:relative; }
+    .menu-dd-btn {
+      display:inline-flex; align-items:center; gap:2px; padding:7px 14px;
+      border-radius:20px; border:1.5px solid var(--cafe-tan);
+      background:var(--cafe-cream); color:var(--cafe-brown);
+      font-weight:700; font-size:13px; cursor:pointer;
+      transition:background 0.15s, border-color 0.15s; white-space:nowrap;
+    }
+    .menu-dd-btn:hover, .menu-dd-btn.active { background:var(--cafe-tan); border-color:var(--cafe-brown); }
+    .menu-dd-chevron { font-size:11px; transition:transform 0.2s; }
+    .menu-dd-btn.open .menu-dd-chevron { transform:rotate(-180deg); }
+    .menu-dd-list {
+      display:none; position:absolute; top:calc(100% + 4px); left:0;
+      min-width:190px; background:#fff; border:1.5px solid var(--cafe-tan);
+      border-radius:10px; box-shadow:0 4px 18px rgba(0,0,0,0.12);
+      z-index:999; padding:4px 0;
+    }
+    .menu-dd-list.open { display:block; }
+    .menu-dd-item {
+      padding:9px 16px; cursor:pointer; font-size:13px;
+      color:var(--cafe-dark); transition:background 0.12s; white-space:nowrap;
+      display:flex; justify-content:space-between; align-items:center;
+    }
+    .menu-dd-item:hover { background:var(--cafe-cream); }
+    .menu-dd-item.selected { font-weight:700; color:var(--cafe-brown); background:var(--cafe-cream); }
+    .menu-dd-item.dd-all { border-bottom:1px solid var(--cafe-tan); font-weight:600; }
+    .menu-filter-label {
+      font-size:12px; color:var(--cafe-brown); font-weight:600;
+      background:var(--cafe-cream); border-radius:20px;
+      padding:4px 10px; border:1px solid var(--cafe-tan); display:none;
+    }
+    .menu-filter-label.visible { display:inline-block; }
+    .menu-filter-clear {
+      font-size:12px; padding:4px 10px; border-radius:20px;
+      border:1px solid #fca5a5; background:#fee2e2; color:#b91c1c;
+      cursor:pointer; font-weight:600;
+    }
+    .menu-filter-clear:hover { background:#fecaca; }
+        .menu-table-card {
       padding: 14px 16px;
-      overflow: hidden;
+      overflow: visible;
+    }
+    .menu-branch-body .menu-table-card {
+      border-top-left-radius: 0 !important;
+      border-top-right-radius: 0 !important;
+      border-top: none !important;
+      margin-top: -1px;
     }
     .table-responsive-wrapper {
       width: 100%;
@@ -4096,17 +4142,15 @@ $_CSRF_TOKEN = getCsrfToken();
       <div id="view-orders" class="view">
         <!-- Filter Tabs + Print -->
         <div class="d-flex justify-content-between align-items-center mb-3 flex-wrap gap-2">
-          <div class="d-flex gap-2 flex-wrap" id="order-filter-tabs">
-            <button id="ofilter-today" class="cat-pill active" onclick="setOrderFilter('today', this)">Today</button>
-            <button id="ofilter-week" class="cat-pill" onclick="setOrderFilter('week',  this)">This Week</button>
-            <button id="ofilter-month" class="cat-pill" onclick="setOrderFilter('month', this)">This Month</button>
-            <button id="ofilter-year" class="cat-pill" onclick="setOrderFilter('year',  this)">This Year</button>
-            <!-- Separator -->
-            <span style="width:1px;background:#ddd;margin:0 4px;align-self:stretch;"></span>
-            <button id="ofilter-pick-date"  class="cat-pill" onclick="setOrderPickerMode('date')"><i class="bi bi-calendar-event"></i> Date</button>
+          <div id="order-filter-tabs" style="display:flex;gap:8px;flex-wrap:wrap;">
+            <button id="ofilter-pick-date"  class="cat-pill active" onclick="setOrderPickerMode('date')"><i class="bi bi-calendar-event"></i> Date</button>
             <button id="ofilter-pick-week"  class="cat-pill" onclick="setOrderPickerMode('week')"><i class="bi bi-calendar-range"></i> Week</button>
             <button id="ofilter-pick-month" class="cat-pill" onclick="setOrderPickerMode('month')"><i class="bi bi-calendar-month"></i> Month</button>
             <button id="ofilter-pick-year"  class="cat-pill" onclick="setOrderPickerMode('year')"><i class="bi bi-calendar"></i> Year</button>
+          </div>
+          <!-- Cashier Single Tab (Today only) -->
+          <div id="order-cashier-tab" style="display:none;gap:8px;flex-wrap:wrap;">
+            <button class="cat-pill active" style="cursor:default;"><i class="bi bi-clock-history me-1"></i>Today</button>
           </div>
           <div class="d-flex align-items-center gap-2">
             <span class="badge-success" id="orders-count-badge">0 orders</span>
@@ -4118,14 +4162,14 @@ $_CSRF_TOKEN = getCsrfToken();
         </div>
 
         <!-- Orders Date Picker Card -->
-        <div id="order-picker-card" class="kpi-card mb-3" style="display:none;padding:12px 16px;">
+        <div id="order-picker-card" class="kpi-card mb-3" style="display:block;padding:12px 16px;">
           <div style="display:flex;align-items:center;gap:8px;margin-bottom:10px;">
             <i class="bi bi-calendar3" style="color:var(--cafe-brown);font-size:15px;"></i>
             <span style="font-size:13px;font-weight:700;color:var(--cafe-brown);">Custom Date Filter</span>
             <span id="order-picker-summary" style="font-size:12px;color:#888;margin-left:6px;"></span>
           </div>
           <!-- DATE -->
-          <div id="order-picker-date" class="order-picker-section" style="display:none;">
+          <div id="order-picker-date" class="order-picker-section" style="display:block;">
             <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;">
               <label style="font-size:12px;font-weight:600;color:#555;">Choose Date:</label>
               <button type="button" onclick="shiftOrderDate(-1)" style="background:#f3f4f6;border:1px solid #e5e7eb;border-radius:6px;padding:4px 8px;cursor:pointer;font-size:13px;"><i class="bi bi-chevron-left"></i></button>
@@ -4320,8 +4364,26 @@ $_CSRF_TOKEN = getCsrfToken();
               <i class="bi bi-plus-circle me-1"></i><span>Add Item</span>
             </button>
           </div>
-          <div class="menu-mgmt-tabs-scroll" id="menu-mgmt-filter-tabs">
-            <!-- Dynamically populated in renderMenuTable -->
+          <!-- Two dropdown filter buttons -->
+          <div class="menu-filter-row">
+            <div class="menu-dd-wrap" id="menu-dd-cafe">
+              <button class="menu-dd-btn" id="menu-dd-btn-cafe" onclick="toggleMenuDropdown('cafe')">
+                <i class="bi bi-cup-hot-fill me-1"></i>Coffee Side
+                <i class="bi bi-chevron-down ms-1 menu-dd-chevron"></i>
+              </button>
+              <div class="menu-dd-list" id="menu-dd-list-cafe"></div>
+            </div>
+            <div class="menu-dd-wrap" id="menu-dd-pizza">
+              <button class="menu-dd-btn" id="menu-dd-btn-pizza" onclick="toggleMenuDropdown('pizza')">
+                <i class="bi bi-circle-fill me-1" style="color:var(--cafe-amber);font-size:11px;"></i>Pizza Side
+                <i class="bi bi-chevron-down ms-1 menu-dd-chevron"></i>
+              </button>
+              <div class="menu-dd-list" id="menu-dd-list-pizza"></div>
+            </div>
+            <span class="menu-filter-label" id="menu-filter-label"></span>
+            <button class="menu-filter-clear" id="menu-filter-clear" onclick="clearMenuFilter()" style="display:none;">
+              <i class="bi bi-x-circle me-1"></i>Show All
+            </button>
           </div>
         </div>
         <div class="kpi-card menu-table-card">
@@ -4342,7 +4404,6 @@ $_CSRF_TOKEN = getCsrfToken();
           </div>
         </div>
       </div>
-
       <!-- REPORTS VIEW -->
       <div id="view-reports" class="view">
                 <div class="row g-3 mb-3 align-items-stretch">
@@ -4388,15 +4449,6 @@ $_CSRF_TOKEN = getCsrfToken();
                   </select>
                   <button type="button" onclick="posToggleVs('weekly')" id="pos-btn-vs-weekly"
                     style="font-size:11px; padding:3px 10px; border-radius:18px; border:1.5px solid #d4c5b9; background:#fff; color:var(--cafe-dark); cursor:pointer; font-weight:600; white-space:nowrap;">
-              <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:8px; margin-bottom:8px;">
-                <span style="font-weight:600; color:var(--cafe-brown); font-size:14px;">Weekly Sales Overview</span>
-                <div style="display:flex; align-items:center; gap:8px; flex-wrap:wrap;">
-                  <select id="rep-week-picker" onchange="loadWeeklyChart(this.value)"
-                    style="font-size:12px; padding:4px 8px; border-radius:8px; border:1px solid #d4c5b0; background:#fdf8f4; color:var(--cafe-brown); cursor:pointer; max-width:210px;">
-                    <option value="">Loading weeks…</option>
-                  </select>
-                  <button type="button" onclick="toggleVs('weekly')" id="btn-vs-weekly"
-                    style="font-size:11px; padding:3px 10px; border-radius:20px; border:1.5px solid #d4c5b0; background:#fdf8f4; color:var(--cafe-brown); cursor:pointer; font-weight:600; white-space:nowrap;">
                     + VS
                   </button>
                 </div>
@@ -4411,16 +4463,6 @@ $_CSRF_TOKEN = getCsrfToken();
                   <span style="display:flex; align-items:center; gap:5px;"><span style="display:inline-block; width:10px; height:10px; border-radius:2px; background:#5c3d2e;"></span><strong id="pos-weekly-legend-a" style="color:var(--cafe-brown);"></strong></span>
                   <span style="font-weight:700; color:#888;">vs</span>
                   <span style="display:flex; align-items:center; gap:5px;"><span style="display:inline-block; width:10px; height:10px; border-radius:2px; background:#d97706;"></span><strong id="pos-weekly-legend-b" style="color:#d97706;"></strong></span>
-              <div id="vs-row-weekly" style="display:none; align-items:center; gap:8px; flex-wrap:wrap; margin-bottom:10px; padding:6px 12px; background:#fffbf0; border-radius:8px; border:1px dashed #f59e0b;">
-                <span style="font-size:11px; font-weight:600; color:#92400e; white-space:nowrap;">Compare with:</span>
-                <select id="rep-week-picker-vs" onchange="loadWeeklyChart(document.getElementById('rep-week-picker').value)"
-                  style="font-size:12px; padding:4px 8px; border-radius:8px; border:1px solid #f59e0b; background:#ffffff; color:#92400e; cursor:pointer; max-width:210px;">
-                  <option value="">Select week to compare…</option>
-                </select>
-                <div id="weekly-legend" style="display:none; gap:12px; font-size:11.5px; align-items:center; margin-left:auto;">
-                  <span style="display:flex;align-items:center;gap:4px;"><span style="display:inline-block;width:10px;height:10px;border-radius:2px;background:#2563eb;"></span><strong id="weekly-legend-a" style="color:#1d4ed8;"></strong></span>
-                  <span style="font-weight:700;color:#888;">vs</span>
-                  <span style="display:flex;align-items:center;gap:4px;"><span style="display:inline-block;width:10px;height:10px;border-radius:2px;background:#f59e0b;"></span><strong id="weekly-legend-b" style="color:#b45309;"></strong></span>
                 </div>
               </div>
               <div class="chart-box" style="height:210px;">
@@ -4440,13 +4482,6 @@ $_CSRF_TOKEN = getCsrfToken();
                     style="font-size:12px; padding:3px 8px; border-radius:8px; border:1px solid #d4c5b9; background:#fff; color:var(--cafe-dark); cursor:pointer;">
                   <button type="button" onclick="posToggleVs('hourly')" id="pos-btn-vs-hourly"
                     style="font-size:11px; padding:3px 10px; border-radius:18px; border:1.5px solid #d4c5b9; background:#fff; color:var(--cafe-dark); cursor:pointer; font-weight:600; white-space:nowrap;">
-              <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:8px; margin-bottom:8px;">
-                <span style="font-weight:600; color:var(--cafe-brown); font-size:14px;" id="hourly-chart-title">Hourly Sales — Today</span>
-                <div style="display:flex; align-items:center; gap:8px; flex-wrap:wrap;">
-                  <input type="date" id="rep-day-picker" onchange="loadHourlyChart(this.value)"
-                    style="font-size:12px; padding:4px 8px; border-radius:8px; border:1px solid #d4c5b0; background:#fdf8f4; color:var(--cafe-brown); cursor:pointer;">
-                  <button type="button" onclick="toggleVs('hourly')" id="btn-vs-hourly"
-                    style="font-size:11px; padding:3px 10px; border-radius:20px; border:1.5px solid #d4c5b0; background:#fdf8f4; color:var(--cafe-brown); cursor:pointer; font-weight:600; white-space:nowrap;">
                     + VS
                   </button>
                 </div>
@@ -4459,14 +4494,6 @@ $_CSRF_TOKEN = getCsrfToken();
                   <span style="display:flex; align-items:center; gap:5px;"><span style="display:inline-block; width:10px; height:10px; border-radius:2px; background:#2563eb;"></span><strong id="pos-hourly-legend-a" style="color:#2563eb;"></strong></span>
                   <span style="font-weight:700; color:#888;">vs</span>
                   <span style="display:flex; align-items:center; gap:5px;"><span style="display:inline-block; width:10px; height:10px; border-radius:2px; background:#10b981;"></span><strong id="pos-hourly-legend-b" style="color:#10b981;"></strong></span>
-              <div id="vs-row-hourly" style="display:none; align-items:center; gap:8px; flex-wrap:wrap; margin-bottom:10px; padding:6px 12px; background:#fffbf0; border-radius:8px; border:1px dashed #f59e0b;">
-                <span style="font-size:11px; font-weight:600; color:#92400e; white-space:nowrap;">Compare with:</span>
-                <input type="date" id="rep-day-picker-vs" onchange="loadHourlyChart(document.getElementById('rep-day-picker').value)"
-                  style="font-size:12px; padding:4px 8px; border-radius:8px; border:1px solid #f59e0b; background:#ffffff; color:#92400e; cursor:pointer;">
-                <div id="hourly-legend" style="display:none; gap:12px; font-size:11.5px; align-items:center; margin-left:auto;">
-                  <span style="display:flex;align-items:center;gap:4px;"><span style="display:inline-block;width:10px;height:10px;border-radius:2px;background:#0891b2;"></span><strong id="hourly-legend-a" style="color:#0e7490;"></strong></span>
-                  <span style="font-weight:700;color:#888;">vs</span>
-                  <span style="display:flex;align-items:center;gap:4px;"><span style="display:inline-block;width:10px;height:10px;border-radius:2px;background:#f59e0b;"></span><strong id="hourly-legend-b" style="color:#b45309;"></strong></span>
                 </div>
               </div>
               <div class="chart-box" style="height:210px;">
@@ -4485,15 +4512,6 @@ $_CSRF_TOKEN = getCsrfToken();
                   </select>
                   <button type="button" onclick="posToggleVs('monthly')" id="pos-btn-vs-monthly"
                     style="font-size:11px; padding:3px 10px; border-radius:18px; border:1.5px solid #d4c5b9; background:#fff; color:var(--cafe-dark); cursor:pointer; font-weight:600; white-space:nowrap;">
-              <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:8px; margin-bottom:8px;">
-                <span style="font-weight:600; color:var(--cafe-brown); font-size:14px;">Monthly Revenue Trend</span>
-                <div style="display:flex; align-items:center; gap:8px; flex-wrap:wrap;">
-                  <select id="rep-year-picker" onchange="loadMonthlyChart(this.value)"
-                    style="font-size:12px; padding:4px 8px; border-radius:8px; border:1px solid #d4c5b0; background:#fdf8f4; color:var(--cafe-brown); cursor:pointer;">
-                    <option value="">Loading…</option>
-                  </select>
-                  <button type="button" onclick="toggleVs('monthly')" id="btn-vs-monthly"
-                    style="font-size:11px; padding:3px 10px; border-radius:20px; border:1.5px solid #d4c5b0; background:#fdf8f4; color:var(--cafe-brown); cursor:pointer; font-weight:600; white-space:nowrap;">
                     + VS
                   </button>
                 </div>
@@ -4508,16 +4526,6 @@ $_CSRF_TOKEN = getCsrfToken();
                   <span style="display:flex; align-items:center; gap:5px;"><span style="display:inline-block; width:10px; height:10px; border-radius:2px; background:#10b981;"></span><strong id="pos-monthly-legend-a" style="color:#10b981;"></strong></span>
                   <span style="font-weight:700; color:#888;">vs</span>
                   <span style="display:flex; align-items:center; gap:5px;"><span style="display:inline-block; width:10px; height:10px; border-radius:2px; background:#d97706;"></span><strong id="pos-monthly-legend-b" style="color:#d97706;"></strong></span>
-              <div id="vs-row-monthly" style="display:none; align-items:center; gap:8px; flex-wrap:wrap; margin-bottom:10px; padding:6px 12px; background:#fffbf0; border-radius:8px; border:1px dashed #f59e0b;">
-                <span style="font-size:11px; font-weight:600; color:#92400e; white-space:nowrap;">Compare with:</span>
-                <select id="rep-year-picker-vs" onchange="loadMonthlyChart(document.getElementById('rep-year-picker').value)"
-                  style="font-size:12px; padding:4px 8px; border-radius:8px; border:1px solid #f59e0b; background:#ffffff; color:#92400e; cursor:pointer;">
-                  <option value="">Select year to compare…</option>
-                </select>
-                <div id="monthly-legend" style="display:none; gap:12px; font-size:11.5px; align-items:center; margin-left:auto;">
-                  <span style="display:flex;align-items:center;gap:4px;"><span style="display:inline-block;width:10px;height:10px;border-radius:2px;background:#7c3aed;"></span><strong id="monthly-legend-a" style="color:#6d28d9;"></strong></span>
-                  <span style="font-weight:700;color:#888;">vs</span>
-                  <span style="display:flex;align-items:center;gap:4px;"><span style="display:inline-block;width:10px;height:10px;border-radius:2px;background:#f59e0b;"></span><strong id="monthly-legend-b" style="color:#b45309;"></strong></span>
                 </div>
               </div>
               <div class="chart-box" style="height:210px;">
@@ -6103,7 +6111,17 @@ $_CSRF_TOKEN = getCsrfToken();
       document.getElementById('page-title').textContent = titles[name] || '';
 
       if (name === 'pos') { renderPOS(); initShortcutScrollSpy(); }
-      if (name === 'orders') renderOrders();
+      if (name === 'orders') {
+        if (!_isUserAdmin) {
+          _orderPickerMode = '';
+          currentOrderFilter = 'today';
+          const card = document.getElementById('order-picker-card');
+          if (card) card.style.display = 'none';
+          renderOrders();
+        } else {
+          if (!_orderPickerMode) { setOrderPickerMode('date'); } else { applyOrderPickerFilter(); }
+        }
+      }
       if (name === 'menu') renderMenuTable();
       if (name === 'dashboard') updateDashboard();
       if (name === 'reports') renderReports();
@@ -7611,8 +7629,9 @@ $_CSRF_TOKEN = getCsrfToken();
     }
 
     /* ========== ORDERS ========== */
+    let _isUserAdmin       = false;
     let currentOrderFilter = 'today';
-    let _orderPickerMode   = '';  // '' | 'date' | 'week' | 'month' | 'year'
+    let _orderPickerMode   = 'date';  // default to Date picker mode
     let _orderPickerVal    = '';
 
     function _formatLocalDate(d) {
@@ -7676,6 +7695,7 @@ $_CSRF_TOKEN = getCsrfToken();
     }
 
     function setOrderPickerMode(mode) {
+      if (!_isUserAdmin) return;
       _orderPickerMode = mode;
       _initOrderPickerControls();
       // Deactivate quick tabs
@@ -7795,7 +7815,9 @@ $_CSRF_TOKEN = getCsrfToken();
       if (listEl)    listEl.style.display = 'none';
 
       let apiUrl;
-      if (_orderPickerMode && _orderPickerVal) {
+      if (!_isUserAdmin) {
+        apiUrl = 'orders.php?date=today';
+      } else if (_orderPickerMode && _orderPickerVal) {
         apiUrl = `orders.php?date_mode=${_orderPickerMode}&date_val=${encodeURIComponent(_orderPickerVal)}`;
       } else {
         apiUrl = `orders.php?date=${currentOrderFilter}`;
@@ -8401,11 +8423,15 @@ $_CSRF_TOKEN = getCsrfToken();
 
     /* ========== PRINT ORDERS REPORT ========== */
     async function printOrders() {
-      const filterLabels = { today: 'Today', week: 'This Week', month: 'This Month', year: 'This Year' };
-      const label = filterLabels[currentOrderFilter] || 'Today';
+      let printUrl = 'orders.php?action=print_summary&date=today';
+      let label = 'Today';
+      if (_isUserAdmin && _orderPickerMode && _orderPickerVal) {
+        printUrl = `orders.php?action=print_summary&date_mode=${_orderPickerMode}&date_val=${encodeURIComponent(_orderPickerVal)}`;
+        label = document.getElementById('order-picker-summary')?.textContent?.replace('Showing: ','') || _orderPickerVal;
+      }
 
       try {
-        const res = await api(`orders.php?action=print_summary&date=${currentOrderFilter}`);
+        const res = await api(printUrl);
         if (!res.success) { showToast('⚠ Could not load print data.'); return; }
 
         const now = new Date().toLocaleString('en-PH', { dateStyle: 'full', timeStyle: 'short' });
@@ -8542,111 +8568,121 @@ $_CSRF_TOKEN = getCsrfToken();
       }
     }
 
-    // Group definitions matching the POS ordering grid
-    const MENU_GROUPS = [
-      // ── Coffee Branch ─────────────────────────────────────
-      { label: 'All',         icon: 'bi-grid',              cats: null },   // null = no filter
-      { label: 'Coffee',      icon: 'bi-cup-hot-fill',      cats: ['Hot Coffee', 'Iced Coffee'] },
-      { label: 'Non-Coffee',  icon: 'bi-cup-straw',         cats: ['Classic Milktea', 'Virgin Mojito', 'Citrus Popping Boba', 'Soda Float', 'Matcha Series', 'Frappé'] },
-      { label: 'Snack',       icon: 'bi-egg-fried',         cats: ['Fork and Fun'] },
-      // ── Pizza Branch ──────────────────────────────────────
-      { label: 'Pizza',       icon: 'bi-circle',            cats: ['Pizza'] },
-      { label: 'Quesadilla',  icon: 'bi-grid-3x3-gap',      cats: ['Quesadilla'] },
-      { label: 'Patatas',     icon: 'bi-potato',         cats: ['Patatas'] },
-      { label: 'Pasta',       icon: 'bi-noodles',             cats: ['Pasta'] },
-      { label: 'Chickenpops', icon: 'bi-drumstick',         cats: ['Chickenpops'] },
-      { label: 'Combo',       icon: 'bi-collection',        cats: ['Combo', 'Gipitmeal'] },
-    ];
+    /* ========== MENU TABLE ========== */
 
-    let currentMenuMgmtGroup = MENU_GROUPS[0]; // default = All
+    const POS_PIZZA_CAT_IDS = new Set([10, 11, 12, 13, 14, 15, 16]);
+    let currentMenuFilter = null; // null=all, string=category name
 
-    function setMenuMgmtFilter(label, btn) {
-      document.querySelectorAll('#menu-mgmt-filter-tabs .cat-pill').forEach(b => b.classList.remove('active'));
-      btn.classList.add('active');
-      currentMenuMgmtGroup = MENU_GROUPS.find(g => g.label === label) || MENU_GROUPS[0];
+    function buildMenuDropdowns() {
+      if (!posMenuCategories || !posMenuCategories.length) return;
+      const cafeCats  = posMenuCategories.filter(c => !POS_PIZZA_CAT_IDS.has(Number(c.id)));
+      const pizzaCats = posMenuCategories.filter(c =>  POS_PIZZA_CAT_IDS.has(Number(c.id)));
+
+      function makeList(elId, cats, side) {
+        const el = document.getElementById(elId);
+        if (!el) return;
+        let h = '<div class="menu-dd-item dd-all" onclick="setMenuFilter(null,null)"><span>All Items</span></div>';
+        cats.forEach(c => {
+          const n = (menuItems || []).filter(m => m.category === c.name).length;
+          const safe = (c.name || '').replace(/'/g, "\\'");
+          h += `<div class="menu-dd-item" onclick="setMenuFilter('${safe}','${side}')"><span>${c.name}</span><span style="opacity:.5;font-size:11px;margin-left:8px;">${n}</span></div>`;
+        });
+        el.innerHTML = h;
+      }
+      makeList('menu-dd-list-cafe',  cafeCats,  'cafe');
+      makeList('menu-dd-list-pizza', pizzaCats, 'pizza');
+    }
+
+    function toggleMenuDropdown(side) {
+      buildMenuDropdowns();
+      const myList    = document.getElementById('menu-dd-list-' + side);
+      const myBtn     = document.getElementById('menu-dd-btn-' + side);
+      const otherSide = side === 'cafe' ? 'pizza' : 'cafe';
+      document.getElementById('menu-dd-list-' + otherSide)?.classList.remove('open');
+      document.getElementById('menu-dd-btn-'  + otherSide)?.classList.remove('open');
+      myList?.classList.toggle('open');
+      myBtn?.classList.toggle('open');
+    }
+
+    function setMenuFilter(categoryName, side) {
+      currentMenuFilter = categoryName;
+      ['cafe','pizza'].forEach(s => {
+        document.getElementById('menu-dd-list-' + s)?.classList.remove('open');
+        document.getElementById('menu-dd-btn-'  + s)?.classList.remove('open');
+        document.getElementById('menu-dd-btn-'  + s)?.classList.toggle('active', s === side && !!categoryName);
+      });
+      document.querySelectorAll('.menu-dd-item').forEach(el => el.classList.remove('selected'));
+      if (categoryName) {
+        document.querySelectorAll('.menu-dd-item').forEach(el => {
+          if (el.textContent.trim().startsWith(categoryName)) el.classList.add('selected');
+        });
+      }
+      const lbl = document.getElementById('menu-filter-label');
+      const clr = document.getElementById('menu-filter-clear');
+      if (lbl) { lbl.textContent = categoryName || ''; lbl.classList.toggle('visible', !!categoryName); }
+      if (clr)  clr.style.display = categoryName ? '' : 'none';
       renderMenuTable();
     }
 
-    /* ========== MENU TABLE ========== */
-    let menuMgmtTabsBuilt = false;
+    function clearMenuFilter() { setMenuFilter(null, null); }
+
+    document.addEventListener('click', function(e) {
+      if (!e.target.closest('.menu-dd-wrap')) {
+        document.querySelectorAll('.menu-dd-list').forEach(el => el.classList.remove('open'));
+        document.querySelectorAll('.menu-dd-btn').forEach(el => el.classList.remove('open'));
+      }
+    });
 
     function renderMenuTable() {
-      // Build tabs once
-      if (!menuMgmtTabsBuilt) {
-        const tabsEl = document.getElementById('menu-mgmt-filter-tabs');
-        if (tabsEl) {
-          tabsEl.innerHTML = MENU_GROUPS
-            .filter(g => g.label === 'All' || (menuItems || []).some(m => g.cats && g.cats.includes(m.category)))
-            .map((g, i) => {
-              const sep = (g.label === 'Pizza') ? '<span style="width:1px;background:var(--cafe-tan);height:22px;display:inline-block;margin:0 4px;vertical-align:middle;"></span>' : '';
-              return `${sep}<button class="cat-pill${i === 0 ? ' active' : ''}" onclick="setMenuMgmtFilter('${g.label}', this)"><i class="bi ${g.icon} me-1"></i>${g.label}</button>`;
-            })
-            .join('');
-          menuMgmtTabsBuilt = true;
-        }
-      }
-
+      buildMenuDropdowns();
       const q = (document.getElementById('menu-mgmt-search')?.value || '').toLowerCase();
-      const filtered = menuItems.filter(m => {
-        const matchQ = !q || m.name.toLowerCase().includes(q);
-        const matchCat = !currentMenuMgmtGroup.cats || currentMenuMgmtGroup.cats.includes(m.category);
+      const filtered = (menuItems || []).filter(m => {
+        const matchQ   = !q || m.name.toLowerCase().includes(q);
+        const matchCat = !currentMenuFilter || m.category === currentMenuFilter;
         return matchQ && matchCat;
       });
-
-      document.getElementById('menu-tbody').innerHTML = filtered.map(item => {
+      const tbody = document.getElementById('menu-tbody');
+      if (!tbody) return;
+      if (!filtered.length) {
+        tbody.innerHTML = '<tr><td colspan="6" class="text-center text-muted py-4">No items found</td></tr>';
+        return;
+      }
+      tbody.innerHTML = filtered.map(item => {
         const isOut = item.stock <= 0;
         const isLow = !isOut && item.stock <= item.minStock;
-        const stockBadgeClass = isOut ? 'stock-out' : (isLow ? 'stock-low' : 'stock-ok');
-        
-        let stockIcon = '';
-        if (isOut) stockIcon = '<i class="bi bi-x-circle-fill me-1"></i>';
-        else if (isLow) stockIcon = '<i class="bi bi-exclamation-triangle-fill me-1"></i>';
-
-        const stockText = isOut ? 'No Stock' : (isLow ? 'Low Stock (' + item.stock + ')' : item.stock + ' / min ' + item.minStock);
-        return `
-    <tr>
-      <td style="white-space:nowrap;">
-        ${item.image ? `<img src="${item.image}" style="width:24px; height:24px; object-fit:cover; border-radius:50%; margin-right:8px; vertical-align:middle;">` : `<span style="font-size:16px; margin-right:8px; vertical-align:middle; color:var(--cafe-brown);"><i class="bi bi-cup-hot-fill"></i></span>`}
-        <span style="font-weight:600; vertical-align:middle;">${item.name}</span>
-      </td>
-      <td style="white-space:nowrap;"><span class="badge-cat">${item.category}</span></td>
-      <td style="font-weight:600; color:var(--cafe-amber); white-space:nowrap;">₱${item.price}</td>
-      <td style="white-space:nowrap;">
-        <span class="stock-badge ${stockBadgeClass}" style="font-size:10.5px; padding:2px 7px;">${stockIcon}${stockText}</span>
-        <div style="margin-top:4px; display:flex; align-items:center; gap:3px;">
-          <button class="qty-btn" onclick="adjustStock(${item.id}, -1)" title="Decrease stock">−</button>
-          <input type="number" min="0" value="${item.stock}" style="width:42px; height:24px; font-size:11.5px; font-weight:700; border:1px solid var(--cafe-tan); border-radius:5px; padding:0 2px; text-align:center;" onchange="setStock(${item.id}, this.value)" title="Direct stock edit">
-          <button class="qty-btn" onclick="adjustStock(${item.id}, 1)" title="Increase stock">+</button>
-        </div>
-      </td>
-      <td style="white-space:nowrap;">
-        <span class="${item.available ? 'badge-success' : 'badge-pending'}" style="font-size:11px; padding:3px 8px;">${item.available ? 'Available' : 'Unavailable'}</span>
-      </td>
-      <td style="white-space:nowrap; text-align:right;">
-        <button class="btn-menu-action me-1" style="background:var(--cafe-tan); color:var(--cafe-brown);" onclick="toggleAvail(${item.id})" title="${item.available ? 'Mark Unavailable' : 'Mark Available'}">
-          ${item.available ? 'Mark Unavail.' : 'Mark Avail.'}
-        </button>
-        <button class="btn-menu-action me-1" style="background:#dbeafe; color:#1d4ed8;" onclick="posOpenPhotoModal(${item.id}, '${item.name.replace(/'/g, "\\'")}')" title="Upload / change photo">
-          <i class="bi bi-camera-fill"></i>Photo
-        </button>
-        ${pendingDeleteIds.has(item.id)
-          ? `<div style="display:inline-flex;align-items:center;gap:3px;">
-               <button class="btn-menu-action" style="background:#fef3c7; color:#92400e; border:1px solid #fde68a !important;" onclick="openCancelRemovalModal(${item.id})" title="Click to view or cancel pending removal">
-                 <i class="bi bi-hourglass-split"></i>Pending
-               </button>
-               <button class="btn-menu-action" style="background:#fee2e2; color:#b91c1c; border:1px solid #fca5a5 !important;" onclick="openCancelRemovalModal(${item.id})" title="Cancel this pending removal request">
-                 <i class="bi bi-x-circle"></i>Cancel
-               </button>
-             </div>`
-          : `<button class="btn-menu-action" style="background:#f8d7da; color:#842029;" onclick="deleteMenuItem(${item.id})" title="Delete item">
-               <i class="bi bi-trash-fill"></i>Delete
-             </button>`
-        }
-      </td>
-    </tr>`;
+        const sc = isOut ? 'stock-out' : (isLow ? 'stock-low' : 'stock-ok');
+        let si = '';
+        if (isOut) si = '<i class="bi bi-x-circle-fill me-1"></i>';
+        else if (isLow) si = '<i class="bi bi-exclamation-triangle-fill me-1"></i>';
+        const st = isOut ? 'No Stock' : (isLow ? 'Low Stock (' + item.stock + ')' : item.stock + ' / min ' + item.minStock);
+        const ico = POS_PIZZA_CAT_IDS.has(Number(item.category_id))
+          ? '<i class="bi bi-circle-fill" style="font-size:12px;color:var(--cafe-amber);"></i>'
+          : '<i class="bi bi-cup-hot-fill" style="font-size:12px;color:var(--cafe-brown);"></i>';
+        const img = item.image
+          ? `<img src="${item.image}" style="width:24px;height:24px;object-fit:cover;border-radius:50%;margin-right:8px;vertical-align:middle;">`
+          : `<span style="font-size:14px;margin-right:8px;vertical-align:middle;">${ico}</span>`;
+        const avBtn = `<button class="btn-menu-action me-1" style="background:var(--cafe-tan);color:var(--cafe-brown);" onclick="toggleAvail(${item.id})" title="${item.available?'Mark Unavailable':'Mark Available'}">${item.available?'Mark Unavail.':'Mark Avail.'}</button>`;
+        const safeName = (item.name || '').replace(/'/g, "\\'");
+        const photoBtn = `<button class="btn-menu-action me-1" style="background:#dbeafe;color:#1d4ed8;" onclick="posOpenPhotoModal(${item.id},'${safeName}')" title="Photo"><i class="bi bi-camera-fill"></i>Photo</button>`;
+        const delBtn = pendingDeleteIds.has(item.id)
+          ? `<div style="display:inline-flex;align-items:center;gap:3px;"><button class="btn-menu-action" style="background:#fef3c7;color:#92400e;border:1px solid #fde68a!important;" onclick="openCancelRemovalModal(${item.id})"><i class="bi bi-hourglass-split"></i>Pending</button><button class="btn-menu-action" style="background:#fee2e2;color:#b91c1c;border:1px solid #fca5a5!important;" onclick="openCancelRemovalModal(${item.id})"><i class="bi bi-x-circle"></i>Cancel</button></div>`
+          : `<button class="btn-menu-action" style="background:#f8d7da;color:#842029;" onclick="deleteMenuItem(${item.id})"><i class="bi bi-trash-fill"></i>Delete</button>`;
+        return `<tr>
+          <td style="white-space:nowrap;">${img}<span style="font-weight:600;vertical-align:middle;">${item.name}</span></td>
+          <td style="white-space:nowrap;"><span class="badge-cat">${item.category}</span></td>
+          <td style="font-weight:600;color:var(--cafe-amber);white-space:nowrap;">₱${item.price}</td>
+          <td style="white-space:nowrap;">
+            <span class="stock-badge ${sc}" style="font-size:10.5px;padding:2px 7px;">${si}${st}</span>
+            <div style="margin-top:4px;display:flex;align-items:center;gap:3px;">
+              <button class="qty-btn" onclick="adjustStock(${item.id},-1)">−</button>
+              <input type="number" min="0" value="${item.stock}" style="width:42px;height:24px;font-size:11.5px;font-weight:700;border:1px solid var(--cafe-tan);border-radius:5px;padding:0 2px;text-align:center;" onchange="setStock(${item.id},this.value)">
+              <button class="qty-btn" onclick="adjustStock(${item.id},1)">+</button>
+            </div></td>
+          <td style="white-space:nowrap;"><span class="${item.available?'badge-success':'badge-pending'}" style="font-size:11px;padding:3px 8px;">${item.available?'Available':'Unavailable'}</span></td>
+          <td style="white-space:nowrap;text-align:right;">${avBtn}${photoBtn}${delBtn}</td>
+        </tr>`;
       }).join('');
     }
-
     async function toggleAvail(id) {
       const res = await api('menu.php?action=toggle', { id });
       if (res.success) {
@@ -8686,7 +8722,6 @@ $_CSRF_TOKEN = getCsrfToken();
     }
 
     /* --- Populate Add-Item category dropdown dynamically --- */
-    const POS_PIZZA_CAT_IDS = new Set([10, 11, 12, 13, 14, 15, 16]);
 
     // Track the approval token for the pending add request
     let _addItemApprovalToken = null;
@@ -9415,221 +9450,13 @@ $_CSRF_TOKEN = getCsrfToken();
         if (!posAvailableWeeks || posAvailableWeeks.length === 0) {
           await posInitChartPickers();
         }
-        // Weekly chart in reports — only set initially if picker not yet loaded
-        if (window.repWeeklyChartIns && stats.weekly_chart && !document.getElementById('rep-week-picker')?.value) {
-          window.repWeeklyChartIns.data.datasets[0].data = stats.weekly_chart;
-          window.repWeeklyChartIns.update();
-        }
-
-        // Monthly chart — only set initially if picker not yet loaded
-        if (window.monthlyChartIns && !document.getElementById('rep-year-picker')?.value) {
-          window.monthlyChartIns.data.labels = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
-          window.monthlyChartIns.data.datasets[0].data = stats.monthly_chart;
-          window.monthlyChartIns.update();
-        }
         const selW = document.getElementById('pos-rep-week-picker')?.value || '';
         posLoadWeeklyChart(selW);
         const selD = document.getElementById('pos-rep-day-picker')?.value || '';
         posLoadHourlyChart(selD);
         const selY = document.getElementById('pos-rep-year-picker')?.value || '';
         posLoadMonthlyChart(selY);
-
-        // Initialize chart filter pickers (async, non-blocking)
-        initChartPickers();
-
       } catch(e) { console.warn('Reports render failed:', e); }
-    }
-
-    /* ── Weekly chart loader ── */
-    async function loadWeeklyChart(weekStart) {
-      try {
-        const param = (weekStart && weekStart.match(/^\d{4}-\d{2}-\d{2}$/)) ? `week_start=${encodeURIComponent(weekStart)}` : `week_offset=0`;
-        const r = await api(`orders.php?action=chart_weekly&${param}`);
-        if (!r.success || !window.repWeeklyChartIns) return;
-        const vsEl = document.getElementById('rep-week-picker-vs');
-        const vsWeek = vsEl && vsEl.value;
-        const ch = window.repWeeklyChartIns;
-
-        if (vsWeek) {
-          const vsParam = vsWeek.match(/^\d{4}-\d{2}-\d{2}$/) ? `week_start=${encodeURIComponent(vsWeek)}` : `week_offset=0`;
-          const rv = await api(`orders.php?action=chart_weekly&${vsParam}`);
-          const labelA = r.formatted_label || r.week_start;
-          const labelB = (rv && rv.formatted_label) || (rv && rv.week_start) || vsWeek;
-
-          ch.data.labels = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
-          ch.data.datasets = [
-            { label: labelA, data: r.data, backgroundColor: 'rgba(37,99,235,0.85)', borderRadius: 6, borderSkipped: false },
-            { label: labelB, data: (rv && rv.data) || [0,0,0,0,0,0,0], backgroundColor: 'rgba(245,158,11,0.75)', borderRadius: 6, borderSkipped: false }
-          ];
-          ch.options.plugins.legend.display = false;
-          ch.update();
-
-          const la = document.getElementById('weekly-legend-a');
-          const lb = document.getElementById('weekly-legend-b');
-          const leg = document.getElementById('weekly-legend');
-          if (la) la.textContent = labelA;
-          if (lb) lb.textContent = labelB;
-          if (leg) leg.style.display = 'flex';
-        } else {
-          ch.data.labels = r.labels;
-          ch.data.datasets = [{
-            label: r.formatted_label || 'Weekly Sales',
-            data: r.data,
-            backgroundColor: ['#2563eb','#7c3aed','#059669','#f59e0b','#dc2626','#0891b2','#db2777'],
-            borderRadius: 8, borderSkipped: false
-          }];
-          ch.options.plugins.legend.display = false;
-          ch.update();
-          const leg = document.getElementById('weekly-legend');
-          if (leg) leg.style.display = 'none';
-        }
-      } catch(e) { console.warn('loadWeeklyChart error', e); }
-    }
-
-    /* ── Hourly chart loader ── */
-    async function loadHourlyChart(date) {
-      try {
-        const r = await api(`orders.php?action=chart_hourly&date=${date}`);
-        if (!r.success || !window.hourlyChartIns) return;
-        const vsEl = document.getElementById('rep-day-picker-vs');
-        const vsDate = vsEl && vsEl.value;
-        const fmtDate = d => new Date(d + 'T00:00:00').toLocaleDateString('en-PH', {month:'short', day:'numeric', year:'numeric'});
-        if (vsDate) {
-          const rv = await api(`orders.php?action=chart_hourly&date=${vsDate}`);
-          const ch = window.hourlyChartIns;
-          ch.data.datasets = [
-            { label: date, data: r.data, borderColor: '#0891b2', backgroundColor: 'rgba(8,145,178,0.12)', fill: true, tension: 0.4, pointRadius: 3, pointBackgroundColor: '#0891b2', pointBorderColor: '#fff', pointBorderWidth: 2 },
-            { label: vsDate, data: rv.data, borderColor: '#f59e0b', backgroundColor: 'rgba(245,158,11,0.10)', fill: true, tension: 0.4, pointRadius: 3, pointBackgroundColor: '#f59e0b', pointBorderColor: '#fff', pointBorderWidth: 2 }
-          ];
-          ch.options.plugins.legend.display = false;
-          ch.update();
-          const la = document.getElementById('hourly-legend-a');
-          const lb = document.getElementById('hourly-legend-b');
-          const leg = document.getElementById('hourly-legend');
-          if (la) la.textContent = fmtDate(date);
-          if (lb) lb.textContent = fmtDate(vsDate);
-          if (leg) leg.style.display = 'flex';
-          const title = document.getElementById('hourly-chart-title');
-          if (title) title.textContent = 'Hourly Sales — ' + fmtDate(date) + ' vs ' + fmtDate(vsDate);
-        } else {
-          const ch = window.hourlyChartIns;
-          ch.data.datasets = [{ data: r.data, borderColor: '#0891b2', backgroundColor: 'rgba(8,145,178,0.10)', fill: true, tension: 0.4, pointRadius: 4, pointBackgroundColor: '#0891b2', pointBorderColor: '#fff', pointBorderWidth: 2 }];
-          ch.update();
-          const leg = document.getElementById('hourly-legend');
-          if (leg) leg.style.display = 'none';
-          const title = document.getElementById('hourly-chart-title');
-          if (title) title.textContent = 'Hourly Sales — ' + fmtDate(date);
-        }
-      } catch(e) { console.warn('loadHourlyChart error', e); }
-    }
-
-    /* ── Monthly chart loader ── */
-    async function loadMonthlyChart(year) {
-      try {
-        const r = await api(`orders.php?action=chart_monthly&year=${year}`);
-        if (!r.success || !window.monthlyChartIns) return;
-        const vsEl = document.getElementById('rep-year-picker-vs');
-        const vsYear = vsEl && vsEl.value;
-        if (vsYear) {
-          const rv = await api(`orders.php?action=chart_monthly&year=${vsYear}`);
-          const ch = window.monthlyChartIns;
-          ch.data.datasets = [
-            { label: year, data: r.data, borderColor: '#7c3aed', backgroundColor: 'rgba(124,58,237,0.10)', fill: true, tension: 0.4, pointRadius: 3, pointBackgroundColor: '#7c3aed', pointBorderColor: '#fff', pointBorderWidth: 2 },
-            { label: vsYear, data: rv.data, borderColor: '#f59e0b', backgroundColor: 'rgba(245,158,11,0.10)', fill: true, tension: 0.4, pointRadius: 3, pointBackgroundColor: '#f59e0b', pointBorderColor: '#fff', pointBorderWidth: 2 }
-          ];
-          ch.options.plugins.legend.display = false;
-          ch.update();
-          const la = document.getElementById('monthly-legend-a');
-          const lb = document.getElementById('monthly-legend-b');
-          const leg = document.getElementById('monthly-legend');
-          if (la) la.textContent = year;
-          if (lb) lb.textContent = vsYear;
-          if (leg) leg.style.display = 'flex';
-        } else {
-          const ch = window.monthlyChartIns;
-          ch.data.datasets = [{ data: r.data, borderColor: '#7c3aed', backgroundColor: 'rgba(124,58,237,0.08)', fill: true, tension: 0.4, pointRadius: 4, pointBackgroundColor: '#7c3aed', pointBorderColor: '#fff', pointBorderWidth: 2 }];
-          ch.update();
-          const leg = document.getElementById('monthly-legend');
-          if (leg) leg.style.display = 'none';
-        }
-      } catch(e) { console.warn('loadMonthlyChart error', e); }
-    }
-
-    /* ── VS toggle ── */
-    const _vsActive = { weekly: false, hourly: false, monthly: false };
-    function toggleVs(chart) {
-      _vsActive[chart] = !_vsActive[chart];
-      const row = document.getElementById(`vs-row-${chart}`);
-      const btn = document.getElementById(`btn-vs-${chart}`);
-      if (row) row.style.display = _vsActive[chart] ? 'flex' : 'none';
-      if (btn) {
-        btn.textContent = _vsActive[chart] ? '✕ VS' : '+ VS';
-        btn.style.background = _vsActive[chart] ? '#fff3cd' : '#fdf8f4';
-        btn.style.borderColor = _vsActive[chart] ? '#f59e0b' : '#d4c5b0';
-        btn.style.color       = _vsActive[chart] ? '#92400e' : 'var(--cafe-brown)';
-      }
-      if (!_vsActive[chart]) {
-        // Clear VS picker and reload single dataset
-        const vsMap = { weekly: 'rep-week-picker-vs', hourly: 'rep-day-picker-vs', monthly: 'rep-year-picker-vs' };
-        const vsEl = document.getElementById(vsMap[chart]);
-        if (vsEl) { if (vsEl.tagName === 'SELECT') vsEl.value = ''; else vsEl.value = ''; }
-        const leg = document.getElementById(`${chart}-legend`);
-        if (leg) leg.style.display = 'none';
-        // Reload primary
-        if (chart === 'weekly') { const p = document.getElementById('rep-week-picker'); if (p && p.value) loadWeeklyChart(p.value); }
-        if (chart === 'hourly') { const p = document.getElementById('rep-day-picker');  if (p && p.value) loadHourlyChart(p.value); }
-        if (chart === 'monthly') { const p = document.getElementById('rep-year-picker'); if (p && p.value) loadMonthlyChart(p.value); }
-      }
-    }
-
-    /* ── Populate chart filter pickers ── */
-    async function initChartPickers() {
-      // Week picker + VS week picker
-      try {
-        const wr = await api('orders.php?action=chart_weekly_weeks');
-        const sel   = document.getElementById('rep-week-picker');
-        const selVs = document.getElementById('rep-week-picker-vs');
-        if (wr.success) {
-          const opts = wr.weeks.map((w, i) =>
-            `<option value="${w.week_start}" ${i===0?'selected':''}>${i===0?'This Week: ':''} ${w.label}</option>`
-          ).join('');
-          const optsVs = wr.weeks.map((w, i) =>
-            `<option value="${w.week_start}">${w.label}</option>`
-          ).join('');
-          if (sel) { sel.innerHTML = opts; }
-          if (selVs) { selVs.innerHTML = '<option value="">Select week…</option>' + optsVs; }
-          if (wr.weeks.length) loadWeeklyChart(wr.weeks[0].week_start);
-        }
-      } catch(e) {}
-
-      // Day picker — default to today; VS day picker set max to today
-      const dayPicker = document.getElementById('rep-day-picker');
-      const dayPickerVs = document.getElementById('rep-day-picker-vs');
-      if (dayPicker && !dayPicker.value) {
-        dayPicker.value = new Date().toISOString().slice(0,10);
-        dayPicker.max   = new Date().toISOString().slice(0,10);
-      }
-      if (dayPickerVs) {
-        dayPickerVs.max = new Date().toISOString().slice(0,10);
-      }
-
-      // Year picker + VS year picker
-      try {
-        const yr = await api('orders.php?action=chart_monthly&year=' + new Date().getFullYear());
-        const ysel   = document.getElementById('rep-year-picker');
-        const yselVs = document.getElementById('rep-year-picker-vs');
-        if (yr.success && yr.available_years) {
-          const curYear = new Date().getFullYear();
-          const yopts = yr.available_years.map(y =>
-            `<option value="${y}" ${y===curYear?'selected':''}>${y}</option>`
-          ).join('');
-          const yoptsVs = yr.available_years.map(y =>
-            `<option value="${y}">${y}</option>`
-          ).join('');
-          if (ysel) ysel.innerHTML = yopts;
-          if (yselVs) yselVs.innerHTML = '<option value="">Select year…</option>' + yoptsVs;
-        }
-      } catch(e) {}
     }
 
     /* ========== CHARTS ========== */
@@ -9993,7 +9820,7 @@ $_CSRF_TOKEN = getCsrfToken();
       try {
         const res = await api('menu.php');
         if (res.success) {
-          menuMgmtTabsBuilt = false;
+          // menuMgmtTabsBuilt removed (accordion layout no longer uses it)
           pendingDeleteIds = new Set((res.pending_deletions || []).map(Number));
           posMenuCategories = res.categories || [];
           menuItems = res.items.map(i => {
@@ -10010,6 +9837,7 @@ $_CSRF_TOKEN = getCsrfToken();
               stock: parseInt(i.stock), minStock: parseInt(i.min_stock)
             };
           });
+          buildMenuDropdowns();
         }
       } catch (e) { console.error('Failed to load menu:', e); }
     }
@@ -10039,11 +9867,23 @@ $_CSRF_TOKEN = getCsrfToken();
         }).catch(e => { console.warn('Could not load orders on init:', e); })
       ]);
 
+      _isUserAdmin = !!isAdmin;
+      window.posIsAdmin = !!isAdmin;
+
+      const orderFilterTabs = document.getElementById('order-filter-tabs');
+      const orderCashierTab = document.getElementById('order-cashier-tab');
+      const orderPickerCard = document.getElementById('order-picker-card');
+
       if (!isAdmin) {
         mgmtLabel.style.display = 'none';
         menuBtn.style.display = 'flex';
         reportsBtn.style.display = 'none';
         if (usersBtn) usersBtn.style.display = 'none';
+        if (orderFilterTabs) orderFilterTabs.style.display = 'none';
+        if (orderCashierTab) orderCashierTab.style.display = 'flex';
+        if (orderPickerCard) orderPickerCard.style.display = 'none';
+        _orderPickerMode = '';
+        currentOrderFilter = 'today';
         safeBuildCharts(); // Build charts so Dashboard view works for cashiers too
         showView('pos', document.getElementById('nav-pos-btn') || document.querySelectorAll('.nav-item-btn')[1]);
       } else {
@@ -10051,6 +9891,10 @@ $_CSRF_TOKEN = getCsrfToken();
         menuBtn.style.display = 'flex';
         reportsBtn.style.display = 'flex';
         if (usersBtn) usersBtn.style.display = 'flex';
+        if (orderFilterTabs) orderFilterTabs.style.display = 'flex';
+        if (orderCashierTab) orderCashierTab.style.display = 'none';
+        if (orderPickerCard) orderPickerCard.style.display = 'block';
+        _orderPickerMode = 'date';
         safeBuildCharts();
         showView('dashboard', document.getElementById('nav-dash-btn') || document.querySelectorAll('.nav-item-btn')[0]);
       }
@@ -10063,6 +9907,8 @@ $_CSRF_TOKEN = getCsrfToken();
       localStorage.removeItem('chipipie_pos_session_id');
       localStorage.removeItem('chipipie_session_id');
       currentUser = null;
+      _isUserAdmin = false;
+      window.posIsAdmin = false;
       document.getElementById('login-user').value = '';
       document.getElementById('login-pass').value = '';
       const step2fa = document.getElementById('pos-step-2fa');
