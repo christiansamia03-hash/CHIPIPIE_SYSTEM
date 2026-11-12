@@ -6,11 +6,11 @@ require_once __DIR__ . '/api/db_config.php';
 startChipipieSession();
 $_CSRF_TOKEN = getCsrfToken();
 ?>
-<script>const CSRF_TOKEN = "<?= htmlspecialchars($_CSRF_TOKEN, ENT_QUOTES, 'UTF-8') ?>";</script>
 <!DOCTYPE html>
 <html lang="en">
 <head>
   <meta charset="UTF-8">
+  <script>window.CSRF_TOKEN = "<?= htmlspecialchars($_CSRF_TOKEN, ENT_QUOTES, 'UTF-8') ?>"; var CSRF_TOKEN = window.CSRF_TOKEN;</script>
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
   <title>ChipiPie — Super Admin Control Center</title>
   <meta name="description" content="ChipiPie Cafe Super Admin Panel — System-wide management and approval center">

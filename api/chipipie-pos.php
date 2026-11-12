@@ -7,12 +7,12 @@ require_once __DIR__ . '/api/db_config.php';
 startChipipieSession();
 $_CSRF_TOKEN = getCsrfToken();
 ?>
-<script>const CSRF_TOKEN = "<?= htmlspecialchars($_CSRF_TOKEN, ENT_QUOTES, 'UTF-8') ?>";</script>
 <!DOCTYPE html>
 <html lang="en">
 
 <head>
   <meta charset="UTF-8">
+  <script>window.CSRF_TOKEN = "<?= htmlspecialchars($_CSRF_TOKEN, ENT_QUOTES, 'UTF-8') ?>"; var CSRF_TOKEN = window.CSRF_TOKEN;</script>
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
   <title>ChipiPie Cafe & Pizza — POS System</title>
 
@@ -4388,6 +4388,15 @@ $_CSRF_TOKEN = getCsrfToken();
                   </select>
                   <button type="button" onclick="posToggleVs('weekly')" id="pos-btn-vs-weekly"
                     style="font-size:11px; padding:3px 10px; border-radius:18px; border:1.5px solid #d4c5b9; background:#fff; color:var(--cafe-dark); cursor:pointer; font-weight:600; white-space:nowrap;">
+              <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:8px; margin-bottom:8px;">
+                <span style="font-weight:600; color:var(--cafe-brown); font-size:14px;">Weekly Sales Overview</span>
+                <div style="display:flex; align-items:center; gap:8px; flex-wrap:wrap;">
+                  <select id="rep-week-picker" onchange="loadWeeklyChart(this.value)"
+                    style="font-size:12px; padding:4px 8px; border-radius:8px; border:1px solid #d4c5b0; background:#fdf8f4; color:var(--cafe-brown); cursor:pointer; max-width:210px;">
+                    <option value="">Loading weeks…</option>
+                  </select>
+                  <button type="button" onclick="toggleVs('weekly')" id="btn-vs-weekly"
+                    style="font-size:11px; padding:3px 10px; border-radius:20px; border:1.5px solid #d4c5b0; background:#fdf8f4; color:var(--cafe-brown); cursor:pointer; font-weight:600; white-space:nowrap;">
                     + VS
                   </button>
                 </div>
@@ -4402,6 +4411,16 @@ $_CSRF_TOKEN = getCsrfToken();
                   <span style="display:flex; align-items:center; gap:5px;"><span style="display:inline-block; width:10px; height:10px; border-radius:2px; background:#5c3d2e;"></span><strong id="pos-weekly-legend-a" style="color:var(--cafe-brown);"></strong></span>
                   <span style="font-weight:700; color:#888;">vs</span>
                   <span style="display:flex; align-items:center; gap:5px;"><span style="display:inline-block; width:10px; height:10px; border-radius:2px; background:#d97706;"></span><strong id="pos-weekly-legend-b" style="color:#d97706;"></strong></span>
+              <div id="vs-row-weekly" style="display:none; align-items:center; gap:8px; flex-wrap:wrap; margin-bottom:10px; padding:6px 12px; background:#fffbf0; border-radius:8px; border:1px dashed #f59e0b;">
+                <span style="font-size:11px; font-weight:600; color:#92400e; white-space:nowrap;">Compare with:</span>
+                <select id="rep-week-picker-vs" onchange="loadWeeklyChart(document.getElementById('rep-week-picker').value)"
+                  style="font-size:12px; padding:4px 8px; border-radius:8px; border:1px solid #f59e0b; background:#ffffff; color:#92400e; cursor:pointer; max-width:210px;">
+                  <option value="">Select week to compare…</option>
+                </select>
+                <div id="weekly-legend" style="display:none; gap:12px; font-size:11.5px; align-items:center; margin-left:auto;">
+                  <span style="display:flex;align-items:center;gap:4px;"><span style="display:inline-block;width:10px;height:10px;border-radius:2px;background:#2563eb;"></span><strong id="weekly-legend-a" style="color:#1d4ed8;"></strong></span>
+                  <span style="font-weight:700;color:#888;">vs</span>
+                  <span style="display:flex;align-items:center;gap:4px;"><span style="display:inline-block;width:10px;height:10px;border-radius:2px;background:#f59e0b;"></span><strong id="weekly-legend-b" style="color:#b45309;"></strong></span>
                 </div>
               </div>
               <div class="chart-box" style="height:210px;">
@@ -4421,6 +4440,13 @@ $_CSRF_TOKEN = getCsrfToken();
                     style="font-size:12px; padding:3px 8px; border-radius:8px; border:1px solid #d4c5b9; background:#fff; color:var(--cafe-dark); cursor:pointer;">
                   <button type="button" onclick="posToggleVs('hourly')" id="pos-btn-vs-hourly"
                     style="font-size:11px; padding:3px 10px; border-radius:18px; border:1.5px solid #d4c5b9; background:#fff; color:var(--cafe-dark); cursor:pointer; font-weight:600; white-space:nowrap;">
+              <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:8px; margin-bottom:8px;">
+                <span style="font-weight:600; color:var(--cafe-brown); font-size:14px;" id="hourly-chart-title">Hourly Sales — Today</span>
+                <div style="display:flex; align-items:center; gap:8px; flex-wrap:wrap;">
+                  <input type="date" id="rep-day-picker" onchange="loadHourlyChart(this.value)"
+                    style="font-size:12px; padding:4px 8px; border-radius:8px; border:1px solid #d4c5b0; background:#fdf8f4; color:var(--cafe-brown); cursor:pointer;">
+                  <button type="button" onclick="toggleVs('hourly')" id="btn-vs-hourly"
+                    style="font-size:11px; padding:3px 10px; border-radius:20px; border:1.5px solid #d4c5b0; background:#fdf8f4; color:var(--cafe-brown); cursor:pointer; font-weight:600; white-space:nowrap;">
                     + VS
                   </button>
                 </div>
@@ -4433,6 +4459,14 @@ $_CSRF_TOKEN = getCsrfToken();
                   <span style="display:flex; align-items:center; gap:5px;"><span style="display:inline-block; width:10px; height:10px; border-radius:2px; background:#2563eb;"></span><strong id="pos-hourly-legend-a" style="color:#2563eb;"></strong></span>
                   <span style="font-weight:700; color:#888;">vs</span>
                   <span style="display:flex; align-items:center; gap:5px;"><span style="display:inline-block; width:10px; height:10px; border-radius:2px; background:#10b981;"></span><strong id="pos-hourly-legend-b" style="color:#10b981;"></strong></span>
+              <div id="vs-row-hourly" style="display:none; align-items:center; gap:8px; flex-wrap:wrap; margin-bottom:10px; padding:6px 12px; background:#fffbf0; border-radius:8px; border:1px dashed #f59e0b;">
+                <span style="font-size:11px; font-weight:600; color:#92400e; white-space:nowrap;">Compare with:</span>
+                <input type="date" id="rep-day-picker-vs" onchange="loadHourlyChart(document.getElementById('rep-day-picker').value)"
+                  style="font-size:12px; padding:4px 8px; border-radius:8px; border:1px solid #f59e0b; background:#ffffff; color:#92400e; cursor:pointer;">
+                <div id="hourly-legend" style="display:none; gap:12px; font-size:11.5px; align-items:center; margin-left:auto;">
+                  <span style="display:flex;align-items:center;gap:4px;"><span style="display:inline-block;width:10px;height:10px;border-radius:2px;background:#0891b2;"></span><strong id="hourly-legend-a" style="color:#0e7490;"></strong></span>
+                  <span style="font-weight:700;color:#888;">vs</span>
+                  <span style="display:flex;align-items:center;gap:4px;"><span style="display:inline-block;width:10px;height:10px;border-radius:2px;background:#f59e0b;"></span><strong id="hourly-legend-b" style="color:#b45309;"></strong></span>
                 </div>
               </div>
               <div class="chart-box" style="height:210px;">
@@ -4451,6 +4485,15 @@ $_CSRF_TOKEN = getCsrfToken();
                   </select>
                   <button type="button" onclick="posToggleVs('monthly')" id="pos-btn-vs-monthly"
                     style="font-size:11px; padding:3px 10px; border-radius:18px; border:1.5px solid #d4c5b9; background:#fff; color:var(--cafe-dark); cursor:pointer; font-weight:600; white-space:nowrap;">
+              <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:8px; margin-bottom:8px;">
+                <span style="font-weight:600; color:var(--cafe-brown); font-size:14px;">Monthly Revenue Trend</span>
+                <div style="display:flex; align-items:center; gap:8px; flex-wrap:wrap;">
+                  <select id="rep-year-picker" onchange="loadMonthlyChart(this.value)"
+                    style="font-size:12px; padding:4px 8px; border-radius:8px; border:1px solid #d4c5b0; background:#fdf8f4; color:var(--cafe-brown); cursor:pointer;">
+                    <option value="">Loading…</option>
+                  </select>
+                  <button type="button" onclick="toggleVs('monthly')" id="btn-vs-monthly"
+                    style="font-size:11px; padding:3px 10px; border-radius:20px; border:1.5px solid #d4c5b0; background:#fdf8f4; color:var(--cafe-brown); cursor:pointer; font-weight:600; white-space:nowrap;">
                     + VS
                   </button>
                 </div>
@@ -4465,6 +4508,16 @@ $_CSRF_TOKEN = getCsrfToken();
                   <span style="display:flex; align-items:center; gap:5px;"><span style="display:inline-block; width:10px; height:10px; border-radius:2px; background:#10b981;"></span><strong id="pos-monthly-legend-a" style="color:#10b981;"></strong></span>
                   <span style="font-weight:700; color:#888;">vs</span>
                   <span style="display:flex; align-items:center; gap:5px;"><span style="display:inline-block; width:10px; height:10px; border-radius:2px; background:#d97706;"></span><strong id="pos-monthly-legend-b" style="color:#d97706;"></strong></span>
+              <div id="vs-row-monthly" style="display:none; align-items:center; gap:8px; flex-wrap:wrap; margin-bottom:10px; padding:6px 12px; background:#fffbf0; border-radius:8px; border:1px dashed #f59e0b;">
+                <span style="font-size:11px; font-weight:600; color:#92400e; white-space:nowrap;">Compare with:</span>
+                <select id="rep-year-picker-vs" onchange="loadMonthlyChart(document.getElementById('rep-year-picker').value)"
+                  style="font-size:12px; padding:4px 8px; border-radius:8px; border:1px solid #f59e0b; background:#ffffff; color:#92400e; cursor:pointer;">
+                  <option value="">Select year to compare…</option>
+                </select>
+                <div id="monthly-legend" style="display:none; gap:12px; font-size:11.5px; align-items:center; margin-left:auto;">
+                  <span style="display:flex;align-items:center;gap:4px;"><span style="display:inline-block;width:10px;height:10px;border-radius:2px;background:#7c3aed;"></span><strong id="monthly-legend-a" style="color:#6d28d9;"></strong></span>
+                  <span style="font-weight:700;color:#888;">vs</span>
+                  <span style="display:flex;align-items:center;gap:4px;"><span style="display:inline-block;width:10px;height:10px;border-radius:2px;background:#f59e0b;"></span><strong id="monthly-legend-b" style="color:#b45309;"></strong></span>
                 </div>
               </div>
               <div class="chart-box" style="height:210px;">
@@ -9361,6 +9414,18 @@ $_CSRF_TOKEN = getCsrfToken();
         // Pickers and VS charts
         if (!posAvailableWeeks || posAvailableWeeks.length === 0) {
           await posInitChartPickers();
+        }
+        // Weekly chart in reports — only set initially if picker not yet loaded
+        if (window.repWeeklyChartIns && stats.weekly_chart && !document.getElementById('rep-week-picker')?.value) {
+          window.repWeeklyChartIns.data.datasets[0].data = stats.weekly_chart;
+          window.repWeeklyChartIns.update();
+        }
+
+        // Monthly chart — only set initially if picker not yet loaded
+        if (window.monthlyChartIns && !document.getElementById('rep-year-picker')?.value) {
+          window.monthlyChartIns.data.labels = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+          window.monthlyChartIns.data.datasets[0].data = stats.monthly_chart;
+          window.monthlyChartIns.update();
         }
         const selW = document.getElementById('pos-rep-week-picker')?.value || '';
         posLoadWeeklyChart(selW);
