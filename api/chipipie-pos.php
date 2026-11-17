@@ -3,7 +3,7 @@ header('Cache-Control: no-store, no-cache, must-revalidate, max-age=0');
 header('Pragma: no-cache');
 header('Expires: 0');
 // Start session and generate CSRF token for this page
-require_once __DIR__ . '/api/db_config.php';
+require_once __DIR__ . '/db_config.php';
 startChipipieSession();
 $_CSRF_TOKEN = getCsrfToken();
 ?>
@@ -846,6 +846,336 @@ $_CSRF_TOKEN = getCsrfToken();
 
     .stock-notif.critical .notif-progress {
       background: #dc3545;
+    }
+
+    /* ====== PIZZA ORDER NOTIFICATION FROM CAFE SIDE ====== */
+    .pizza-orders-notif-container {
+      position: fixed;
+      top: 75px;
+      right: 22px;
+      z-index: 10550;
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+      max-width: 430px;
+      width: calc(100% - 44px);
+      pointer-events: none;
+    }
+    .pizza-order-notif-card {
+      pointer-events: auto;
+      background: linear-gradient(135deg, #2b1307 0%, #4a210d 100%);
+      border: 1.5px solid #e06624;
+      border-radius: 18px;
+      padding: 16px 18px;
+      color: #fff;
+      box-shadow: 0 16px 40px rgba(0, 0, 0, 0.45), 0 0 24px rgba(224, 102, 36, 0.3);
+      animation: pizzaNotifSlideIn 0.35s cubic-bezier(0.22, 1, 0.36, 1);
+      transition: transform 0.2s, opacity 0.25s, box-shadow 0.2s;
+      cursor: pointer;
+      position: relative;
+      overflow: hidden;
+      user-select: none;
+    }
+    .pizza-order-notif-card:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 20px 48px rgba(0, 0, 0, 0.5), 0 0 32px rgba(224, 102, 36, 0.45);
+    }
+    .pizza-order-notif-card.removing {
+      transform: translateX(110%);
+      opacity: 0;
+    }
+    @keyframes pizzaNotifSlideIn {
+      from { transform: translateX(110%); opacity: 0; }
+      to { transform: translateX(0); opacity: 1; }
+    }
+    .pizza-order-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      background: linear-gradient(135deg, #c2410c, #ea580c);
+      color: #fff;
+      font-size: 11px;
+      font-weight: 800;
+      padding: 4px 11px;
+      border-radius: 20px;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      box-shadow: 0 2px 8px rgba(234, 88, 12, 0.45);
+    }
+    .pizza-order-time {
+      font-size: 11.5px;
+      color: #fdba74;
+      font-weight: 600;
+    }
+    .pizza-order-title {
+      font-size: 15px;
+      font-weight: 800;
+      color: #fff;
+      margin-top: 9px;
+      margin-bottom: 5px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+    .pizza-order-items-preview {
+      font-size: 12.5px;
+      color: #fed7aa;
+      line-height: 1.45;
+      margin-bottom: 10px;
+      max-height: 48px;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      display: -webkit-box;
+      -webkit-line-clamp: 2;
+      -webkit-box-orient: vertical;
+    }
+    .pizza-order-footer {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      border-top: 1px solid rgba(232, 168, 124, 0.22);
+      padding-top: 10px;
+      margin-top: 6px;
+    }
+    .pizza-order-view-btn {
+      background: linear-gradient(135deg, #ea580c, #c2410c);
+      color: #fff;
+      border: none;
+      border-radius: 8px;
+      padding: 6px 14px;
+      font-size: 12px;
+      font-weight: 700;
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      cursor: pointer;
+      transition: all 0.15s;
+    }
+    .pizza-order-view-btn:hover {
+      background: linear-gradient(135deg, #f97316, #ea580c);
+      transform: scale(1.03);
+    }
+    .pizza-order-dismiss-btn {
+      background: transparent;
+      border: 1px solid rgba(254, 215, 170, 0.35);
+      color: #fed7aa;
+      border-radius: 8px;
+      padding: 5px 11px;
+      font-size: 11.5px;
+      cursor: pointer;
+      transition: all 0.15s;
+    }
+    .pizza-order-dismiss-btn:hover {
+      background: rgba(255, 255, 255, 0.12);
+      color: #fff;
+    }
+
+    /* CAFE STATION NOTIFICATION CARD OVERRIDES */
+    .pizza-order-notif-card.cafe-station-card {
+      background: linear-gradient(135deg, #1c130d 0%, #362215 100%);
+      border-color: #d97706;
+      box-shadow: 0 16px 40px rgba(0, 0, 0, 0.45), 0 0 24px rgba(217, 119, 6, 0.32);
+    }
+    .pizza-order-notif-card.cafe-station-card:hover {
+      box-shadow: 0 20px 48px rgba(0, 0, 0, 0.5), 0 0 32px rgba(217, 119, 6, 0.48);
+    }
+    .cafe-order-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      background: linear-gradient(135deg, #78350f, #b45309);
+      color: #fff;
+      font-size: 11px;
+      font-weight: 800;
+      padding: 4px 11px;
+      border-radius: 20px;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      box-shadow: 0 2px 8px rgba(180, 83, 9, 0.45);
+    }
+    .pizza-order-notif-card.cafe-station-card .pizza-order-view-btn {
+      background: linear-gradient(135deg, #b45309, #d97706);
+    }
+    .pizza-order-notif-card.cafe-station-card .pizza-order-view-btn:hover {
+      background: linear-gradient(135deg, #d97706, #f59e0b);
+    }
+    .pizza-order-ack-btn {
+      background: linear-gradient(135deg, #2563eb, #3b82f6);
+      color: #fff;
+      border: none;
+      border-radius: 8px;
+      padding: 6px 13px;
+      font-size: 12px;
+      font-weight: 700;
+      display: inline-flex;
+      align-items: center;
+      gap: 5px;
+      cursor: pointer;
+      transition: all 0.15s;
+      box-shadow: 0 2px 8px rgba(37, 99, 235, 0.35);
+    }
+    .pizza-order-ack-btn:hover {
+      background: linear-gradient(135deg, #1d4ed8, #2563eb);
+      transform: scale(1.03);
+      box-shadow: 0 4px 12px rgba(37, 99, 235, 0.45);
+    }
+    .pizza-order-finish-btn {
+      background: linear-gradient(135deg, #059669, #10b981);
+      color: #fff;
+      border: none;
+      border-radius: 8px;
+      padding: 6px 13px;
+      font-size: 12px;
+      font-weight: 800;
+      display: inline-flex;
+      align-items: center;
+      gap: 5px;
+      cursor: pointer;
+      transition: all 0.15s;
+      box-shadow: 0 2px 8px rgba(16, 185, 129, 0.35);
+    }
+    .pizza-order-finish-btn:hover {
+      background: linear-gradient(135deg, #10b981, #34d399);
+      transform: scale(1.03);
+      box-shadow: 0 4px 12px rgba(16, 185, 129, 0.5);
+    }
+
+    /* ====== STATION ORDERS DOCK (Minimized Acknowledged Orders Away From Cart) ====== */
+    .station-orders-dock {
+      position: fixed;
+      bottom: 22px;
+      left: 240px;
+      z-index: 10500;
+      display: flex;
+      flex-direction: column-reverse;
+      gap: 8px;
+      max-width: 440px;
+      width: calc(100% - 280px);
+      pointer-events: none;
+    }
+    @media (max-width: 991px) {
+      .station-orders-dock {
+        left: 16px;
+        bottom: 75px;
+        max-width: calc(100% - 32px);
+        width: calc(100% - 32px);
+      }
+    }
+
+    .station-mini-card {
+      pointer-events: auto;
+      background: linear-gradient(135deg, #1c130d 0%, #301a0e 100%);
+      border: 1.5px solid #d97706;
+      border-radius: 14px;
+      padding: 8px 14px;
+      color: #fff;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 10px;
+      box-shadow: 0 8px 24px rgba(0, 0, 0, 0.4), 0 0 14px rgba(217, 119, 6, 0.25);
+      animation: stationDockSlideUp 0.3s cubic-bezier(0.22, 1, 0.36, 1);
+      transition: all 0.25s ease;
+      cursor: pointer;
+      user-select: none;
+    }
+    .station-mini-card.pizza-mode {
+      background: linear-gradient(135deg, #2b1307 0%, #4a210d 100%);
+      border-color: #ea580c;
+      box-shadow: 0 8px 24px rgba(0, 0, 0, 0.4), 0 0 14px rgba(234, 88, 12, 0.25);
+    }
+    .station-mini-card:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 12px 28px rgba(0, 0, 0, 0.5), 0 0 20px rgba(234, 88, 12, 0.35);
+    }
+    .station-mini-card.finishing {
+      transform: scale(0.92) translateX(30px);
+      opacity: 0;
+      background: #065f46 !important;
+      border-color: #10b981 !important;
+    }
+    @keyframes stationDockSlideUp {
+      from { transform: translateY(30px); opacity: 0; }
+      to { transform: translateY(0); opacity: 1; }
+    }
+
+    .station-mini-info {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      min-width: 0;
+      flex: 1;
+    }
+    .station-mini-title {
+      font-weight: 800;
+      font-size: 13px;
+      color: #fff;
+      white-space: nowrap;
+    }
+    .station-mini-preview {
+      font-size: 11.5px;
+      color: #fed7aa;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      max-width: 170px;
+    }
+    .station-mini-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+      background: rgba(245, 158, 11, 0.2);
+      color: #fbbf24;
+      border: 1px solid rgba(251, 191, 36, 0.4);
+      font-size: 10px;
+      font-weight: 700;
+      padding: 2px 7px;
+      border-radius: 10px;
+      white-space: nowrap;
+    }
+    .station-mini-actions {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      flex-shrink: 0;
+    }
+    .station-mini-btn-view {
+      background: rgba(255, 255, 255, 0.12);
+      border: 1px solid rgba(255, 255, 255, 0.25);
+      color: #fff;
+      border-radius: 8px;
+      padding: 5px 9px;
+      font-size: 11.5px;
+      font-weight: 600;
+      cursor: pointer;
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+      transition: all 0.15s;
+    }
+    .station-mini-btn-view:hover {
+      background: rgba(255, 255, 255, 0.25);
+      transform: scale(1.03);
+    }
+    .station-mini-btn-finish {
+      background: linear-gradient(135deg, #059669, #10b981);
+      border: none;
+      color: #fff;
+      border-radius: 8px;
+      padding: 5px 12px;
+      font-size: 12px;
+      font-weight: 800;
+      cursor: pointer;
+      display: inline-flex;
+      align-items: center;
+      gap: 5px;
+      box-shadow: 0 2px 8px rgba(16, 185, 129, 0.35);
+      transition: all 0.15s;
+    }
+    .station-mini-btn-finish:hover {
+      background: linear-gradient(135deg, #10b981, #34d399);
+      box-shadow: 0 4px 14px rgba(16, 185, 129, 0.55);
+      transform: scale(1.04);
     }
 
     @keyframes fadeIn {
@@ -3883,6 +4213,14 @@ $_CSRF_TOKEN = getCsrfToken();
         <div style="flex: 1;">
           <div class="cashier-name" id="sidebar-name">Admin</div>
           <div class="cashier-role" id="sidebar-role">Cashier</div>
+          <div id="sidebar-station-badge" style="font-size:10px;margin-top:3px;cursor:pointer;display:inline-flex;align-items:center;gap:4px;padding:2px 7px;border-radius:10px;background:rgba(255,255,255,0.15);color:#fff;font-weight:600;" onclick="cycleMyStation()" title="Click to switch active station (Cafe / Pizza / Both)">
+            <span id="sidebar-station-icon">☕</span> <span id="sidebar-station-text">Cafe Station</span>
+          </div>
+          <div style="margin-top:4px;">
+            <a href="chipipie-pos.php?new_session=1" target="_blank" style="color:#e2ded8;font-size:9.5px;text-decoration:none;display:inline-flex;align-items:center;gap:3px;padding:2px 6px;border-radius:5px;background:rgba(255,255,255,0.08);border:1px solid rgba(255,255,255,0.15);" title="Open an independent second staff account or station in a new tab">
+              <i class="bi bi-window-plus" style="font-size:10px;"></i> <span>+ New Station Tab</span>
+            </a>
+          </div>
         </div>
         <button class="btn btn-sm" style="color:#aaa; background:transparent; border:none; padding:4px;"
           onclick="logout()" title="Logout">
@@ -4036,8 +4374,8 @@ $_CSRF_TOKEN = getCsrfToken();
           <!-- Branch switcher (Coffee / Pizza) -->
           <div class="branch-switcher-container">
             <div id="branch-slider"></div>
-            <button id="branch-btn-coffee" onclick="switchBranch('coffee')">Coffee</button>
-            <button id="branch-btn-pizza" onclick="switchBranch('pizza')">Pizza House</button>
+            <button id="branch-btn-coffee" onclick="switchBranch('coffee')">Coffee <span id="cafe-branch-notif-badge" class="badge rounded-pill" style="display:none;background:#ef4444;color:#fff;font-size:10px;padding:2px 6px;margin-left:5px;vertical-align:middle;box-shadow:0 0 8px rgba(239,68,68,0.6);">0</span></button>
+            <button id="branch-btn-pizza" onclick="switchBranch('pizza')">Pizza House <span id="pizza-branch-notif-badge" class="badge rounded-pill" style="display:none;background:#ef4444;color:#fff;font-size:10px;padding:2px 6px;margin-left:5px;vertical-align:middle;box-shadow:0 0 8px rgba(239,68,68,0.6);">0</span></button>
           </div>
 
           <!-- Sticky category shortcut bar -->
@@ -4594,6 +4932,7 @@ $_CSRF_TOKEN = getCsrfToken();
                 <th>Username</th>
                 <th>Email</th>
                 <th>Role</th>
+                <th>Assigned Station</th>
                 <th>Status</th>
                 <th>Actions</th>
               </tr>
@@ -4623,7 +4962,7 @@ $_CSRF_TOKEN = getCsrfToken();
                 <th>Actions</th>
               </tr>
             </thead>
-            <tbody id="pending-tbody"></tbody>
+            <tbody id="pending-tbody">
           </table>
         </div>
 
@@ -4963,6 +5302,15 @@ $_CSRF_TOKEN = getCsrfToken();
             <select class="form-select" id="modal-reg-role" style="padding:7px 10px;font-size:13px;">
               <option value="cashier">Cashier (requires approval)</option>
               <option value="admin">Admin (requires owner approval)</option>
+            </select>
+          </div>
+          <!-- Assigned Station Row -->
+          <div class="mb-2">
+            <label class="form-label mb-1" style="font-size:12px;font-weight:600;">Assigned Station <span class="required-star" title="Required">*</span></label>
+            <select class="form-select" id="modal-reg-station" style="padding:7px 10px;font-size:13px;">
+              <option value="cafe">☕ Cafe Counter (Drinks & Snacks)</option>
+              <option value="pizza">🍕 Pizza House (Pizza, Pasta, Quesadilla)</option>
+              <option value="both">🔄 Both Stations (All-Rounder / Flex)</option>
             </select>
           </div>
           <div id="modal-reg-result" style="display:none;margin-top:8px;"></div>
@@ -5469,7 +5817,94 @@ $_CSRF_TOKEN = getCsrfToken();
     <!-- Kitchen ticket content is populated dynamically by JS -->
   </div>
 
+  <!-- PIZZA ORDERS NOTIFICATION CONTAINER (Visible in Pizza Mode) -->
+  <div id="pizza-orders-notif-container" class="pizza-orders-notif-container" style="display:none;"></div>
+  <!-- STATION ORDERS DOCK (Minimized Acknowledged Orders Away From Cart) -->
+  <div id="station-orders-dock" class="station-orders-dock" style="display:none;"></div>
+
+  <!-- VIEW PIZZA ORDER FROM CAFE MODAL -->
+  <div class="modal fade" id="viewPizzaOrderModal" tabindex="-1" aria-hidden="true" style="z-index: 10600;">
+    <div class="modal-dialog modal-dialog-centered" style="max-width: 530px;">
+      <div class="modal-content" style="border-radius: 20px; overflow: hidden; border: 1.5px solid #e06624; box-shadow: 0 25px 65px rgba(0,0,0,0.5);">
+        <!-- Header -->
+        <div style="background: linear-gradient(135deg, #2b1307 0%, #4a210d 100%); padding: 20px 24px; color: #fff; position: relative;">
+          <div style="display: flex; align-items: center; justify-content: space-between;">
+            <div style="display: flex; align-items: center; gap: 12px;">
+              <div style="width: 44px; height: 44px; border-radius: 12px; background: rgba(224, 102, 36, 0.25); border: 1.5px solid #e06624; display: flex; align-items: center; justify-content: center; font-size: 22px;">
+                🍕
+              </div>
+              <div>
+                <h5 style="margin: 0; font-weight: 800; font-size: 19px; color: #fff; letter-spacing: -0.3px;" id="pom-order-number">Order #---</h5>
+                <span style="font-size: 12px; color: #e8a87c; font-weight: 500;">
+                  <i class="bi bi-shop me-1"></i>Punched at Cafe Counter &bull; <span id="pom-order-time">--:--</span>
+                </span>
+              </div>
+            </div>
+            <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+          </div>
+        </div>
+
+        <!-- Body -->
+        <div class="modal-body" style="padding: 22px 24px; background: #ffffff;">
+          <!-- Cashier & Status Meta Bar -->
+          <div style="display: flex; justify-content: space-between; align-items: center; background: #fff8f3; border: 1px solid #fed7aa; padding: 10px 14px; border-radius: 12px; margin-bottom: 18px; font-size: 12.5px;">
+            <div>
+              <span style="color: #78350f; font-weight: 600;"><i class="bi bi-person-badge me-1"></i>Punched by:</span>
+              <strong id="pom-cashier" style="color: #9a3412;">--</strong>
+            </div>
+            <div>
+              <span class="badge" id="pom-payment-badge" style="background: #2b1307; color: #e8a87c; font-size: 11px; padding: 5px 10px; border-radius: 20px;">Cash</span>
+            </div>
+          </div>
+
+          <!-- Section: Pizza Station Items to Prepare -->
+          <div style="margin-bottom: 18px;">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
+              <span style="font-size: 12px; font-weight: 800; color: #c2410c; text-transform: uppercase; letter-spacing: 0.5px;">
+                <i class="bi bi-fire me-1"></i>Pizza Items to Prepare (<span id="pom-pizza-count">0</span>)
+              </span>
+              <span style="font-size: 11px; color: #ea580c; font-weight: 600; background: #ffedd5; padding: 2px 8px; border-radius: 12px;">Kitchen Action</span>
+            </div>
+            <div id="pom-pizza-items-list" style="display: flex; flex-direction: column; gap: 8px;">
+              <!-- Dynamic pizza items rows -->
+            </div>
+          </div>
+
+          <!-- Section: Other Cafe Items (if any) -->
+          <div id="pom-cafe-section" style="margin-bottom: 18px; display: none;">
+            <div style="font-size: 11.5px; font-weight: 700; color: #78716c; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 8px;">
+              <i class="bi bi-cup-hot me-1"></i>Other Items on Same Order (Prepared at Cafe Counter)
+            </div>
+            <div id="pom-cafe-items-list" style="display: flex; flex-direction: column; gap: 6px;">
+              <!-- Dynamic cafe items rows -->
+            </div>
+          </div>
+
+          <!-- Total Footer -->
+          <div style="display: flex; justify-content: space-between; align-items: center; border-top: 1px solid #f3f4f6; padding-top: 14px; margin-top: 6px;">
+            <span style="font-weight: 600; color: #4b5563; font-size: 14px;">Total Order Amount:</span>
+            <span id="pom-total" style="font-weight: 800; color: #c2410c; font-size: 21px;">₱0.00</span>
+          </div>
+        </div>
+
+        <!-- Footer Buttons -->
+        <div class="modal-footer" style="background: #fafaf9; border-top: 1px solid #f0ece6; padding: 14px 24px; display: flex; justify-content: space-between; align-items: center;">
+          <button type="button" class="btn btn-sm btn-outline-secondary" onclick="printPizzaKitchenTicketFromModal()" style="border-radius: 10px; font-weight: 600; padding: 8px 16px;">
+            <i class="bi bi-printer me-1"></i>Print Kitchen Slip
+          </button>
+          <button type="button" class="btn btn-sm" data-bs-dismiss="modal" style="background: linear-gradient(135deg, #c2410c, #ea580c); color: #fff; border: none; border-radius: 10px; font-weight: 700; padding: 8px 22px; box-shadow: 0 4px 12px rgba(194, 65, 12, 0.35);">
+          <div id="pom-modal-action-btns" style="display: flex; gap: 8px; align-items: center;">
+            <button type="button" class="btn btn-sm btn-primary" data-bs-dismiss="modal" style="border-radius:10px; font-weight:700; padding:8px 20px;"><i class="bi bi-check2-circle me-1"></i>Acknowledge</button>
+          </div>
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+
   <!-- SESSION INACTIVITY TIMEOUT MODAL (ISO/IEC 25010 Security & User Protection) -->
+  <!-- SESSION INACTIVITY MODAL — DISABLED -->
+  <!--
   <div class="modal fade" id="sessionInactivityModal" tabindex="-1" data-bs-backdrop="static" data-bs-keyboard="false" aria-hidden="true" style="z-index: 1090;">
     <div class="modal-dialog modal-dialog-centered" style="max-width: 430px; margin: 16px auto;">
       <div class="modal-content" style="border-radius: 22px; overflow: hidden; border: 1px solid rgba(180, 83, 9, 0.28); box-shadow: 0 25px 65px rgba(0,0,0,0.4); background: #ffffff;">
@@ -5522,6 +5957,7 @@ $_CSRF_TOKEN = getCsrfToken();
       </div>
     </div>
   </div>
+  -->
   <!-- TOAST -->
   <div class="toast-notif" id="toast"></div>
 
@@ -5603,6 +6039,8 @@ $_CSRF_TOKEN = getCsrfToken();
           background-repeat: no-repeat;
           background-position: center bottom;
           filter: drop-shadow(0 -4px 10px rgba(0,0,0,0.35));
+          transform: translateY(14px);
+          transition: transform 0.25s ease;
         }
         /* Dynamic Eye Sockets: clean yellow background with natural clipping */
         .cat-eye-socket {
@@ -5705,6 +6143,7 @@ $_CSRF_TOKEN = getCsrfToken();
           background-size: contain;
           background-repeat: no-repeat;
           z-index: 28;
+          opacity: 1;
           transition: opacity 0.25s ease, transform 0.3s ease;
           pointer-events: none;
         }
@@ -5903,13 +6342,16 @@ $_CSRF_TOKEN = getCsrfToken();
         }, Math.random() * 3500 + 2500);
       }
 
-      // 7. Initial Climbing Entrance: Paw reaches -> forms clinging paw -> Cat pulls up!
+      // 7. Cat Resting on Rim & Smooth Natural Entrance
+      if (headImg) { headImg.style.transform = 'translateY(14px)'; headImg.style.opacity = '1'; }
+      if (rimL) { rimL.style.opacity = '1'; rimL.style.transform = 'none'; rimL.style.visibility = 'visible'; }
+      if (rimR) { rimR.style.opacity = '1'; rimR.style.transform = 'none'; rimR.style.visibility = 'visible'; }
+      if (climbL) climbL.style.display = 'none';
+      if (climbR) climbR.style.display = 'none';
+
       if (typeof gsap !== 'undefined') {
-        gsap.set(headImg, { y: 200, opacity: 1 });
-        gsap.set(rimL, { opacity: 0, scale: 0.7, y: 12 });
-        gsap.set(rimR, { opacity: 0, scale: 0.7, y: 12 });
-        gsap.set(climbL, { opacity: 0, y: 80, rotation: -25, scale: 0.85 });
-        gsap.set(climbR, { opacity: 0, y: 80, rotation: 25, scale: 0.85 });
+        gsap.from(headImg, { y: 45, opacity: 0.5, duration: 0.5, ease: 'back.out(1.4)' });
+        gsap.from([rimL, rimR], { y: 10, scale: 0.8, opacity: 0.5, duration: 0.4, stagger: 0.08, ease: 'back.out(2)' });
 
         const climbTl = gsap.timeline({
           delay: 0.2,
@@ -5974,7 +6416,23 @@ $_CSRF_TOKEN = getCsrfToken();
           duration: 0.45,
           ease: "power2.out"
         }, "+=0.04");
+
+        // Safety guarantee: ensure cat head is pulled up and paws visible even in background tabs
+        setTimeout(() => {
+          if (headImg && (!headImg.style.transform || headImg.style.transform.includes('200px') || headImg.style.transform.includes('150px'))) {
+            headImg.style.transform = 'translateY(14px)';
+          }
+          if (rimL) { rimL.style.opacity = '1'; rimL.style.transform = 'none'; }
+          if (rimR) { rimR.style.opacity = '1'; rimR.style.transform = 'none'; }
+          if (climbL) climbL.style.display = 'none';
+          if (climbR) climbR.style.display = 'none';
+          scheduleBlink();
+          scheduleSaccade();
+        }, 1200);
       } else {
+        if (headImg) headImg.style.transform = 'translateY(14px)';
+        if (rimL) rimL.style.opacity = '1';
+        if (rimR) rimR.style.opacity = '1';
         scheduleBlink();
         scheduleSaccade();
       }
@@ -6105,12 +6563,18 @@ $_CSRF_TOKEN = getCsrfToken();
 
     async function api(endpoint, data = null, method = null) {
       const opts = { credentials: 'include' };
+      const csrf = (typeof CSRF_TOKEN !== 'undefined' && CSRF_TOKEN) 
+                || sessionStorage.getItem('chipipie_csrf_token') 
+                || localStorage.getItem('chipipie_csrf_token') 
+                || '';
       opts.headers = {
         'X-Portal': 'pos',
         'X-Offline': navigator.onLine ? '0' : '1',
-        'X-CSRF-Token': (typeof CSRF_TOKEN !== 'undefined' && CSRF_TOKEN ? CSRF_TOKEN : (localStorage.getItem('chipipie_csrf_token') || ''))
+        'X-CSRF-Token': csrf
       };
-      const sid = localStorage.getItem('chipipie_pos_session_id') || localStorage.getItem('chipipie_session_id');
+      const sid = sessionStorage.getItem('chipipie_pos_session_id') 
+               || localStorage.getItem('chipipie_pos_session_id') 
+               || localStorage.getItem('chipipie_session_id');
       if (sid) {
         opts.headers['X-Session-Id'] = sid;
       }
@@ -6309,8 +6773,10 @@ $_CSRF_TOKEN = getCsrfToken();
       requestAnimationFrame(() => requestAnimationFrame(() => {
         if (branch === 'pizza') {
           document.body.classList.add('pizza-theme');
+          if (typeof onSwitchToPizzaMode === 'function') onSwitchToPizzaMode();
         } else {
           document.body.classList.remove('pizza-theme');
+          if (typeof onSwitchToCoffeeMode === 'function') onSwitchToCoffeeMode();
         }
       }));
     }
@@ -7562,9 +8028,37 @@ $_CSRF_TOKEN = getCsrfToken();
         subtotal: cart[key].price * cart[key].qty
       }));
 
+      const originStation = (_userAssignedStation === 'pizza') ? 'pizza'
+                          : (_userAssignedStation === 'cafe') ? 'cafe'
+                          : (_activeBranch === 'pizza' ? 'pizza' : 'cafe');
+
       try {
-        const res = await api('orders.php?action=checkout', { items, payment_method: _paymentMethod });
+        const res = await api('orders.php?action=checkout', {
+          items,
+          payment_method: _paymentMethod,
+          branch: _activeBranch,
+          origin_branch: originStation,
+          station: _userAssignedStation
+        });
         if (res.success) {
+          if (res.order && res.order.id) {
+            const placedId = parseInt(res.order.id);
+            if (placedId > _lastKnownStationOrderId) {
+              _lastKnownStationOrderId = placedId;
+            }
+          }
+
+          // Broadcast cross-station order to other tabs immediately
+          try {
+            localStorage.setItem('chipipie_station_order_event', JSON.stringify({
+              order_id: (res.order && res.order.id) || 0,
+              origin_branch: (res.order && res.order.origin_branch) || originStation,
+              timestamp: Date.now()
+            }));
+          } catch (e) {}
+          if (typeof checkAndRegisterCrossStationCheckout === 'function') {
+            checkAndRegisterCrossStationCheckout(res.order, items);
+          }
           const methodLabel = _paymentMethod === 'GCash' ? '📱 GCash' : '💵 Cash';
 
           const receiptData = {
@@ -7687,6 +8181,695 @@ $_CSRF_TOKEN = getCsrfToken();
       setTimeout(function () {
         if (notif.parentNode) notif.parentNode.removeChild(notif);
       }, 400);
+    }
+
+    /* ========== CROSS-STATION NOTIFICATIONS & STAFF ALLOCATION (CAFE & PIZZA) ========== */
+    let _userAssignedStation = 'cafe'; // 'cafe' | 'pizza' | 'both'
+    let _lastKnownStationOrderId = 0;
+    let _pendingPizzaOrders = [];
+    let _pendingCafeOrders = [];
+    let _stationOrderPollTimer = null;
+    let _activeStationModalOrder = null;
+    let _acknowledgedStationOrderIds = new Set(JSON.parse(sessionStorage.getItem('chipipie_ack_station_orders') || '[]'));
+    let _finishedStationOrderIds = new Set(JSON.parse(sessionStorage.getItem('chipipie_finished_station_orders') || '[]'));
+
+    // 1. Pizza Station Chime (Warm 4-tone Italian kitchen bell)
+    function playPizzaOrderChime() {
+      try {
+        const AudioCtx = window.AudioContext || window.webkitAudioContext;
+        if (!AudioCtx) return;
+        const ctx = new AudioCtx();
+        if (ctx.state === 'suspended') ctx.resume();
+        const now = ctx.currentTime;
+        const notes = [
+          { freq: 523.25, time: 0, dur: 0.16 },    // C5
+          { freq: 659.25, time: 0.14, dur: 0.16 }, // E5
+          { freq: 783.99, time: 0.28, dur: 0.18 }, // G5
+          { freq: 1046.50, time: 0.42, dur: 0.45 } // C6
+        ];
+        notes.forEach(n => {
+          const osc = ctx.createOscillator();
+          const gain = ctx.createGain();
+          osc.type = 'triangle';
+          osc.frequency.setValueAtTime(n.freq, now + n.time);
+          gain.gain.setValueAtTime(0.26, now + n.time);
+          gain.gain.exponentialRampToValueAtTime(0.001, now + n.time + n.dur);
+          osc.connect(gain);
+          gain.connect(ctx.destination);
+          osc.start(now + n.time);
+          osc.stop(now + n.time + n.dur + 0.05);
+        });
+      } catch (e) {}
+    }
+
+    // 2. Cafe Station Chime (Bright 3-tone Barista bell arpeggio)
+    function playCafeOrderChime() {
+      try {
+        const AudioCtx = window.AudioContext || window.webkitAudioContext;
+        if (!AudioCtx) return;
+        const ctx = new AudioCtx();
+        if (ctx.state === 'suspended') ctx.resume();
+        const now = ctx.currentTime;
+        const notes = [
+          { freq: 698.46, time: 0, dur: 0.14 },    // F5
+          { freq: 880.00, time: 0.13, dur: 0.16 }, // A5
+          { freq: 1046.50, time: 0.27, dur: 0.42 } // C6
+        ];
+        notes.forEach(n => {
+          const osc = ctx.createOscillator();
+          const gain = ctx.createGain();
+          osc.type = 'sine';
+          osc.frequency.setValueAtTime(n.freq, now + n.time);
+          gain.gain.setValueAtTime(0.28, now + n.time);
+          gain.gain.exponentialRampToValueAtTime(0.001, now + n.time + n.dur);
+          osc.connect(gain);
+          gain.connect(ctx.destination);
+          osc.start(now + n.time);
+          osc.stop(now + n.time + n.dur + 0.05);
+        });
+      } catch (e) {}
+    }
+
+    async function initStationOrderMonitoring() {
+      stopStationOrderMonitoring();
+      try {
+        const station = _userAssignedStation || 'both';
+        const res = await api(`orders.php?action=station_orders&station=${encodeURIComponent(station)}&limit=1`);
+        if (res && res.success && res.max_id) {
+          _lastKnownStationOrderId = parseInt(res.max_id) || 0;
+        }
+      } catch (e) {
+        console.warn('Initial station order baseline check:', e);
+      }
+      _stationOrderPollTimer = setInterval(pollStationOrders, 4000);
+    }
+
+    // Backwards compatibility alias
+    function initPizzaOrderMonitoring() {
+      initStationOrderMonitoring();
+    }
+
+    function stopStationOrderMonitoring() {
+      if (_stationOrderPollTimer) {
+        clearInterval(_stationOrderPollTimer);
+        _stationOrderPollTimer = null;
+      }
+    }
+
+    // Instant cross-tab sync when another station tab places an order
+    window.addEventListener('storage', function(e) {
+      if (e.key === 'chipipie_station_order_event' && e.newValue) {
+        try {
+          if (currentUser && typeof pollStationOrders === 'function') {
+            pollStationOrders();
+          }
+        } catch (err) {}
+      } else if (e.key === 'chipipie_station_order_finished' && e.newValue) {
+        try {
+          const data = JSON.parse(e.newValue);
+          if (data && data.order_id) {
+            const finishId = Number(data.order_id);
+            _finishedStationOrderIds.add(finishId);
+            _acknowledgedStationOrderIds.delete(finishId);
+            const card = document.getElementById(`station-notif-order-${finishId}`);
+            if (card && card.parentNode) card.parentNode.removeChild(card);
+            const mini = document.getElementById(`station-dock-mini-${finishId}`);
+            if (mini && mini.parentNode) mini.parentNode.removeChild(mini);
+            _pendingPizzaOrders = _pendingPizzaOrders.filter(o => o.id != finishId);
+            _pendingCafeOrders  = _pendingCafeOrders.filter(o => o.id != finishId);
+            updateStationBranchBadges();
+          }
+        } catch (err) {}
+      }
+    });
+
+    function stopPizzaOrderMonitoring() {
+      stopStationOrderMonitoring();
+    }
+
+    async function pollStationOrders() {
+      const appWrapper = document.getElementById('app-wrapper');
+      if (!currentUser || !appWrapper || appWrapper.style.display === 'none') return;
+
+      const station = _userAssignedStation || 'both';
+      if (!_lastKnownStationOrderId) {
+        try {
+          const initRes = await api(`orders.php?action=station_orders&station=${encodeURIComponent(station)}&limit=1`);
+          if (initRes && initRes.success && initRes.max_id) {
+            _lastKnownStationOrderId = parseInt(initRes.max_id) || 0;
+          }
+        } catch (e) {}
+        return;
+      }
+
+      try {
+        const res = await api(`orders.php?action=station_orders&station=${encodeURIComponent(station)}&since_id=${_lastKnownStationOrderId}`);
+        if (res && res.success) {
+          if (res.orders && res.orders.length > 0) {
+            res.orders.forEach(ord => {
+              handleIncomingStationOrder(ord);
+            });
+          }
+          const newMax = parseInt(res.latest_system_id || res.max_id) || 0;
+          if (newMax > _lastKnownStationOrderId) {
+            _lastKnownStationOrderId = newMax;
+          }
+        }
+      } catch (err) {}
+    }
+
+    function checkAndRegisterCrossStationCheckout(order, items) {
+      if (!items || !items.length) return;
+      const pizzaLineItems = [];
+      const cafeLineItems = [];
+
+      items.forEach(it => {
+        const m = menuItems.find(x => x.id == it.id);
+        if (!m) return;
+        const isPz = typeof POS_PIZZA_CAT_IDS !== 'undefined' && POS_PIZZA_CAT_IDS.has(Number(m.category_id));
+        const itemObj = {
+          name: m.name,
+          category_id: m.category_id,
+          category: m.category || '',
+          size: it.size || '',
+          qty: it.quantity || 1,
+          price: it.unit_price || m.price,
+          subtotal: (it.unit_price || m.price) * (it.quantity || 1),
+          is_pizza: isPz
+        };
+        if (isPz) pizzaLineItems.push(itemObj);
+        else cafeLineItems.push(itemObj);
+      });
+
+      const isFromPizza = (_activeBranch === 'pizza');
+      const originBranch = isFromPizza ? 'pizza' : 'cafe';
+
+      // 1. If checked out from cafe side AND has pizza items -> order for pizza station!
+      if (!isFromPizza && pizzaLineItems.length > 0) {
+        const simOrder = {
+          id: order ? order.id : Date.now(),
+          order_number: (order && order.order_number) ? order.order_number : '#---',
+          total: (order && order.total) ? order.total : _pendingCartTotal,
+          payment_method: _paymentMethod,
+          cashier: (order && order.cashier) || (currentUser && (currentUser.full_name || currentUser.username)) || 'Cafe Staff',
+          time: (order && order.time) || new Date().toLocaleTimeString('en-PH', { hour: '2-digit', minute: '2-digit' }),
+          date: (order && order.date) || new Date().toLocaleDateString('en-PH', { month: 'short', day: 'numeric', year: 'numeric' }),
+          origin_branch: 'cafe',
+          target_station: 'pizza',
+          is_from_cafe: true,
+          is_from_pizza: false,
+          notice_title: '🍕 NEW PIZZA ORDER FROM CAFE SIDE',
+          action_items: pizzaLineItems,
+          action_summary: pizzaLineItems.map(p => `${p.qty > 1 ? p.qty + '× ' : ''}${p.name}${p.size ? ' (' + p.size + ')' : ''}`).join(', '),
+          other_items: cafeLineItems,
+          pizza_items: pizzaLineItems,
+          cafe_items: cafeLineItems,
+          all_items: pizzaLineItems.concat(cafeLineItems),
+          pizza_count: pizzaLineItems.reduce((acc, p) => acc + p.qty, 0)
+        };
+        handleIncomingStationOrder(simOrder);
+      }
+
+      // 2. If checked out from pizza side AND has cafe items -> order for cafe station!
+      if (isFromPizza && cafeLineItems.length > 0) {
+        const simOrder = {
+          id: order ? order.id : Date.now(),
+          order_number: (order && order.order_number) ? order.order_number : '#---',
+          total: (order && order.total) ? order.total : _pendingCartTotal,
+          payment_method: _paymentMethod,
+          cashier: (order && order.cashier) || (currentUser && (currentUser.full_name || currentUser.username)) || 'Pizza Staff',
+          time: (order && order.time) || new Date().toLocaleTimeString('en-PH', { hour: '2-digit', minute: '2-digit' }),
+          date: (order && order.date) || new Date().toLocaleDateString('en-PH', { month: 'short', day: 'numeric', year: 'numeric' }),
+          origin_branch: 'pizza',
+          target_station: 'cafe',
+          is_from_cafe: false,
+          is_from_pizza: true,
+          notice_title: '☕ NEW CAFE/DRINK ORDER FROM PIZZA SIDE',
+          action_items: cafeLineItems,
+          action_summary: cafeLineItems.map(c => `${c.qty > 1 ? c.qty + '× ' : ''}${c.name}${c.size ? ' (' + c.size + ')' : ''}`).join(', '),
+          other_items: pizzaLineItems,
+          pizza_items: pizzaLineItems,
+          cafe_items: cafeLineItems,
+          all_items: pizzaLineItems.concat(cafeLineItems),
+          cafe_count: cafeLineItems.reduce((acc, c) => acc + c.qty, 0)
+        };
+        handleIncomingStationOrder(simOrder);
+      }
+    }
+
+    // Backward-compat checkout hook
+    function checkAndRegisterCafePizzaCheckout(order, items) {
+      checkAndRegisterCrossStationCheckout(order, items);
+    }
+
+    function handleIncomingStationOrder(order) {
+      if (!order || !order.id) return;
+
+      const isForPizza = (order.target_station === 'pizza' || order.target_station === 'both');
+      const isForCafe  = (order.target_station === 'cafe' || order.target_station === 'both');
+
+      if (order.target_station === 'pizza') {
+        if (!_pendingPizzaOrders.some(o => o.id == order.id)) {
+          _pendingPizzaOrders.unshift(order);
+        }
+      } else if (order.target_station === 'cafe') {
+        if (!_pendingCafeOrders.some(o => o.id == order.id)) {
+          _pendingCafeOrders.unshift(order);
+        }
+      } else {
+        if (!_pendingPizzaOrders.some(o => o.id == order.id)) _pendingPizzaOrders.unshift(order);
+        if (!_pendingCafeOrders.some(o => o.id == order.id)) _pendingCafeOrders.unshift(order);
+      }
+
+      updateStationBranchBadges();
+
+      // Check if current user / active view should receive the notice immediately:
+      const isPizzaStaffOrBoth = (_userAssignedStation === 'pizza' || _userAssignedStation === 'both');
+      const isCafeStaffOrBoth  = (_userAssignedStation === 'cafe' || _userAssignedStation === 'both');
+      const isPizzaViewOrStaff = (_activeBranch === 'pizza' || isPizzaStaffOrBoth);
+      const isCafeViewOrStaff  = (_activeBranch === 'coffee' || isCafeStaffOrBoth);
+
+      if (isForPizza && isPizzaViewOrStaff) {
+        showStationOrderNotice(order, 'pizza');
+        playPizzaOrderChime();
+      }
+      if (isForCafe && isCafeViewOrStaff) {
+        showStationOrderNotice(order, 'cafe');
+        playCafeOrderChime();
+      }
+    }
+    function updateStationBranchBadges() {
+      // 1. Pizza branch button badge
+      const pizzaBadge = document.getElementById('pizza-branch-notif-badge');
+      if (pizzaBadge) {
+        const count = _pendingPizzaOrders.length;
+        if (count > 0 && _activeBranch !== 'pizza') {
+          pizzaBadge.textContent = count;
+          pizzaBadge.style.display = 'inline-block';
+        } else {
+          pizzaBadge.style.display = 'none';
+        }
+      }
+
+      // 2. Coffee branch button badge
+      const cafeBadge = document.getElementById('cafe-branch-notif-badge');
+      if (cafeBadge) {
+        const count = _pendingCafeOrders.length;
+        if (count > 0 && _activeBranch !== 'coffee') {
+          cafeBadge.textContent = count;
+          cafeBadge.style.display = 'inline-block';
+        } else {
+          cafeBadge.style.display = 'none';
+        }
+      }
+    }
+
+    function showStationOrderNotice(order, stationType) {
+      if (!order || !order.id) return;
+      if (_finishedStationOrderIds.has(Number(order.id))) return;
+
+      // If this order is already acknowledged, show in the non-intrusive minimized dock away from the cart
+      if (_acknowledgedStationOrderIds.has(Number(order.id))) {
+        renderStationDockMiniCard(order, stationType);
+        return;
+      }
+
+      const container = document.getElementById('pizza-orders-notif-container');
+      if (!container) return;
+      container.style.display = 'flex';
+
+      const existingCard = document.getElementById(`station-notif-order-${order.id}`);
+      if (existingCard) return;
+
+      const card = document.createElement('div');
+      card.id = `station-notif-order-${order.id}`;
+      const isCafeCard = (stationType === 'cafe');
+      card.className = 'pizza-order-notif-card' + (isCafeCard ? ' cafe-station-card' : '');
+
+      const badgeHtml = isCafeCard
+        ? `<span class="cafe-order-badge"><i class="bi bi-cup-hot-fill"></i> NEW CAFE/DRINKS ORDER</span>`
+        : `<span class="pizza-order-badge"><i class="bi bi-fire"></i> NEW PIZZA ORDER</span>`;
+
+      const icon = isCafeCard ? '☕' : '🍕';
+      const ordNum = order.order_number || `#${order.id}`;
+      const ordTotal = parseFloat(order.total || 0).toLocaleString('en-US', { minimumFractionDigits: 2 });
+      const summary = order.action_summary || order.items_summary || (isCafeCard ? 'Drinks / Cafe Items' : 'Pizza Items');
+      const timeStr = order.time || 'Just now';
+      const originLabel = isCafeCard ? 'From Pizza Counter' : 'From Cafe Counter';
+      const cashierName = order.cashier || 'Staff';
+
+      card.innerHTML = `
+        <div style="display:flex; justify-content:space-between; align-items:center;">
+          ${badgeHtml}
+          <span class="pizza-order-time">${escapeHtml(timeStr)}</span>
+        </div>
+        <div class="pizza-order-title">
+          <span>${icon} Order ${escapeHtml(ordNum)}</span>
+          <span style="font-size:13px; font-weight:700; color:#fdba74;">₱${ordTotal}</span>
+        </div>
+        <div class="pizza-order-items-preview">
+          <strong>Prepare:</strong> ${escapeHtml(summary)}
+        </div>
+        <div style="font-size:11px; color:#e2d9d2; margin-bottom:10px;">
+          <i class="bi bi-shop me-1"></i>${originLabel} &bull; ${escapeHtml(cashierName)}
+        </div>
+        <div class="pizza-order-footer">
+          <button type="button" class="pizza-order-ack-btn" onclick="event.stopPropagation(); acknowledgeStationOrder(${order.id}, '${stationType}');" title="Acknowledge and minimize away from cart">
+            <i class="bi bi-check2-circle"></i> Acknowledge
+          </button>
+          <button type="button" class="pizza-order-view-btn" onclick="event.stopPropagation(); openStationOrderModal(${order.id});" title="View full details">
+            <i class="bi bi-eye-fill"></i> View
+          </button>
+          <button type="button" class="pizza-order-finish-btn" onclick="event.stopPropagation(); finishStationOrder(${order.id}, '${stationType}');" title="Finish and clear">
+            <i class="bi bi-check-lg"></i> Finish
+          </button>
+        </div>
+      `;
+
+      card.onclick = function() {
+        openStationOrderModal(order.id);
+      };
+
+      container.appendChild(card);
+    }
+
+    function acknowledgeStationOrder(orderId, stationType) {
+      _acknowledgedStationOrderIds.add(Number(orderId));
+      sessionStorage.setItem('chipipie_ack_station_orders', JSON.stringify([..._acknowledgedStationOrderIds]));
+
+      // 1. Remove full card from top container
+      const card = document.getElementById(`station-notif-order-${orderId}`);
+      if (card) {
+        card.classList.add('removing');
+        setTimeout(() => {
+          if (card && card.parentNode) card.parentNode.removeChild(card);
+          const container = document.getElementById('pizza-orders-notif-container');
+          if (container && container.children.length === 0) container.style.display = 'none';
+        }, 220);
+      }
+
+      // 2. Render into bottom-left minimized dock (completely away from the cart!)
+      const order = _pendingPizzaOrders.find(o => o.id == orderId) || _pendingCafeOrders.find(o => o.id == orderId);
+      if (order) {
+        renderStationDockMiniCard(order, stationType || order.target_station);
+      }
+      showToast(`✓ Order #${(order && order.order_number) || orderId} acknowledged — minimized away from cart.`);
+    }
+
+    function renderStationDockMiniCard(order, stationType) {
+      const dock = document.getElementById('station-orders-dock');
+      if (!dock) return;
+      dock.style.display = 'flex';
+
+      const existingMini = document.getElementById(`station-dock-mini-${order.id}`);
+      if (existingMini) return;
+
+      const isCafe = (stationType === 'cafe' || order.target_station === 'cafe');
+      const icon = isCafe ? '☕' : '🍕';
+      const ordNum = order.order_number || `#${order.id}`;
+      const summary = order.action_summary || order.items_summary || (isCafe ? 'Drinks / Cafe Items' : 'Pizza Items');
+
+      const miniCard = document.createElement('div');
+      miniCard.id = `station-dock-mini-${order.id}`;
+      miniCard.className = 'station-mini-card' + (isCafe ? '' : ' pizza-mode');
+
+      miniCard.innerHTML = `
+        <div class="station-mini-info" onclick="openStationOrderModal(${order.id});" title="Click to view details">
+          <span style="font-size:16px;">${icon}</span>
+          <span class="station-mini-title">${escapeHtml(ordNum)}</span>
+          <span class="station-mini-preview" title="${escapeHtml(summary)}">${escapeHtml(summary)}</span>
+          <span class="station-mini-badge"><i class="bi bi-hourglass-split"></i> In Prep</span>
+        </div>
+        <div class="station-mini-actions">
+          <button type="button" class="station-mini-btn-view" onclick="event.stopPropagation(); openStationOrderModal(${order.id});" title="View order details">
+            <i class="bi bi-eye"></i> View
+          </button>
+          <button type="button" class="station-mini-btn-finish" onclick="event.stopPropagation(); finishStationOrder(${order.id}, '${stationType}');" title="Finish and clear completely">
+            <i class="bi bi-check-circle-fill"></i> Finish
+          </button>
+        </div>
+      `;
+
+      dock.appendChild(miniCard);
+    }
+
+    function finishStationOrder(orderId, stationType) {
+      _finishedStationOrderIds.add(Number(orderId));
+      _acknowledgedStationOrderIds.delete(Number(orderId));
+      sessionStorage.setItem('chipipie_finished_station_orders', JSON.stringify([..._finishedStationOrderIds]));
+      sessionStorage.setItem('chipipie_ack_station_orders', JSON.stringify([..._acknowledgedStationOrderIds]));
+
+      // 1. Remove full card if visible
+      const card = document.getElementById(`station-notif-order-${orderId}`);
+      if (card) {
+        card.classList.add('removing');
+        setTimeout(() => {
+          if (card && card.parentNode) card.parentNode.removeChild(card);
+          const container = document.getElementById('pizza-orders-notif-container');
+          if (container && container.children.length === 0) container.style.display = 'none';
+        }, 220);
+      }
+
+      // 2. Remove dock mini pill with finishing animation
+      const mini = document.getElementById(`station-dock-mini-${orderId}`);
+      if (mini) {
+        mini.classList.add('finishing');
+        setTimeout(() => {
+          if (mini && mini.parentNode) mini.parentNode.removeChild(mini);
+          const dock = document.getElementById('station-orders-dock');
+          if (dock && dock.children.length === 0) dock.style.display = 'none';
+        }, 280);
+      }
+
+      // 3. Close modal if open
+      const modalEl = document.getElementById('viewPizzaOrderModal');
+      if (modalEl) {
+        const bsModal = bootstrap.Modal.getInstance(modalEl);
+        if (bsModal) bsModal.hide();
+      }
+
+      // 4. Remove from active queues
+      _pendingPizzaOrders = _pendingPizzaOrders.filter(o => o.id != orderId);
+      _pendingCafeOrders  = _pendingCafeOrders.filter(o => o.id != orderId);
+      updateStationBranchBadges();
+
+      // Broadcast finish across open tabs
+      try {
+        localStorage.setItem('chipipie_station_order_finished', JSON.stringify({
+          order_id: Number(orderId),
+          timestamp: Date.now()
+        }));
+      } catch (e) {}
+
+      showToast(`✅ Order finished & completed!`);
+    }
+
+    function dismissStationOrderCard(orderId, stationType) {
+      finishStationOrder(orderId, stationType);
+    }
+    function openStationOrderModal(orderId) {
+      const order = _pendingPizzaOrders.find(o => o.id == orderId) || _pendingCafeOrders.find(o => o.id == orderId);
+      if (order) {
+        renderAndShowStationOrderModal(order);
+      } else {
+        api(`orders.php?action=station_orders&station=both&limit=50`).then(res => {
+          if (res && res.success && res.orders) {
+            const found = res.orders.find(o => o.id == orderId);
+            if (found) renderAndShowStationOrderModal(found);
+          }
+        }).catch(() => {});
+      }
+    }
+
+    // Alias for existing calls
+    function openPizzaOrderModal(orderId) {
+      openStationOrderModal(orderId);
+    }
+
+    function renderAndShowStationOrderModal(order) {
+      _activeStationModalOrder = order;
+      const isCafe = (order.target_station === 'cafe');
+
+      const numEl = document.getElementById('pom-order-number');
+      const timeEl = document.getElementById('pom-order-time');
+      const cashEl = document.getElementById('pom-cashier');
+      const payEl = document.getElementById('pom-payment-badge');
+      const totEl = document.getElementById('pom-total');
+      const countEl = document.getElementById('pom-pizza-count');
+
+      if (numEl) numEl.textContent = `Order ${order.order_number || '#---'}`;
+      if (timeEl) {
+        const originDesc = isCafe ? 'Punched at Pizza Counter' : 'Punched at Cafe Counter';
+        timeEl.innerHTML = `<i class="bi bi-shop me-1"></i>${originDesc} &bull; ${escapeHtml(order.time || '')} &bull; ${escapeHtml(order.date || '')}`;
+      }
+      if (cashEl) cashEl.textContent = order.cashier || 'Staff';
+      if (payEl) payEl.textContent = order.payment_method || 'Cash';
+      if (totEl) totEl.textContent = '₱' + parseFloat(order.total || 0).toLocaleString('en-US', { minimumFractionDigits: 2 });
+
+      // Action items to prepare
+      const actionItems = order.action_items || (isCafe ? order.cafe_items : order.pizza_items) || [];
+      const otherItems  = order.other_items  || (isCafe ? order.pizza_items : order.cafe_items) || [];
+
+      if (countEl) countEl.textContent = actionItems.reduce((sum, it) => sum + (it.qty || 1), 0);
+
+      const pizzaList = document.getElementById('pom-pizza-items-list');
+      if (pizzaList) {
+        if (actionItems.length) {
+          const borderColor = isCafe ? '#d97706' : '#ea580c';
+          const badgeBg = isCafe ? '#b45309' : '#ea580c';
+          pizzaList.innerHTML = actionItems.map(item => `
+            <div style="background:#fff7ed; border:1px solid #fed7aa; border-left:4px solid ${borderColor}; border-radius:10px; padding:10px 14px; display:flex; justify-content:space-between; align-items:center;">
+              <div>
+                <div style="font-weight:700; color:#431407; font-size:14px; display:flex; align-items:center;">
+                  <span style="display:inline-block; min-width:26px; height:26px; line-height:26px; text-align:center; background:${badgeBg}; color:#fff; border-radius:6px; font-weight:800; font-size:12px; margin-right:8px; padding:0 4px;">${item.qty}×</span>
+                  <span>${escapeHtml(item.name)}</span>
+                  ${item.size ? `<span style="font-size:12px; font-weight:600; color:${badgeBg}; margin-left:6px;">(${escapeHtml(item.size)})</span>` : ''}
+                </div>
+                <div style="font-size:11.5px; color:#9a3412; margin-top:3px; margin-left:34px;">
+                  ${item.category ? `<span class="badge" style="background:#ffedd5; color:#9a3412; border:1px solid #fed7aa; font-size:10px; font-weight:600; margin-right:6px;">${escapeHtml(item.category)}</span>` : ''}
+                  ₱${parseFloat(item.price || 0).toFixed(2)} each
+                </div>
+              </div>
+              <div style="text-align:right;">
+                <span style="font-weight:800; color:${badgeBg}; font-size:15px;">₱${parseFloat(item.subtotal || 0).toFixed(2)}</span>
+              </div>
+            </div>
+          `).join('');
+        } else {
+          pizzaList.innerHTML = `<div class="text-muted p-2 text-center" style="font-size:12px;">${escapeHtml(order.action_summary || '1× Item')}</div>`;
+        }
+      }
+
+      // Other Items on Ticket (for context)
+      const cafeSec = document.getElementById('pom-cafe-section');
+      const cafeList = document.getElementById('pom-cafe-items-list');
+      if (cafeSec && cafeList) {
+        if (otherItems.length) {
+          cafeSec.style.display = 'block';
+          const otherTitle = isCafe ? 'Pizza Items on Same Ticket (Prepared at Pizza Station)' : 'Cafe Items on Same Ticket (Prepared at Cafe Counter)';
+          const secTitleEl = cafeSec.querySelector('div');
+          if (secTitleEl) secTitleEl.innerHTML = `<i class="bi bi-info-circle me-1"></i>${otherTitle}`;
+          cafeList.innerHTML = otherItems.map(item => `
+            <div style="background:#fafaf9; border:1px solid #e7e5e4; border-radius:8px; padding:7px 12px; display:flex; justify-content:space-between; align-items:center; font-size:12.5px;">
+              <span style="color:#44403c; font-weight:500;">
+                <strong>${item.qty}×</strong> ${escapeHtml(item.name)} ${item.size ? `(${escapeHtml(item.size)})` : ''}
+              </span>
+              <span style="color:#78716c; font-weight:600;">₱${parseFloat(item.subtotal || 0).toFixed(2)}</span>
+            </div>
+          `).join('');
+        } else {
+          cafeSec.style.display = 'none';
+          cafeList.innerHTML = '';
+        }
+      }
+
+      const modalEl = document.getElementById('viewPizzaOrderModal');
+      if (modalEl) {
+      // Dynamic action buttons in modal footer (Acknowledge / Finish)
+      const actionBtnsContainer = document.getElementById('pom-modal-action-btns');
+      if (actionBtnsContainer) {
+        const isAck = _acknowledgedStationOrderIds.has(Number(order.id));
+        const stType = order.target_station || (isCafe ? 'cafe' : 'pizza');
+        if (!isAck) {
+          actionBtnsContainer.innerHTML = `
+            <button type="button" class="btn btn-sm btn-primary" onclick="acknowledgeStationOrder(${order.id}, '${stType}'); bootstrap.Modal.getOrCreateInstance(document.getElementById('viewPizzaOrderModal')).hide();" style="border-radius:10px; font-weight:700; padding:8px 18px; box-shadow:0 3px 10px rgba(37,99,235,0.35);">
+              <i class="bi bi-check2-circle me-1"></i>Acknowledge & Minimize
+            </button>
+            <button type="button" class="btn btn-sm btn-success" onclick="finishStationOrder(${order.id}, '${stType}');" style="border-radius:10px; font-weight:700; padding:8px 18px; box-shadow:0 3px 10px rgba(16,185,129,0.35);">
+              <i class="bi bi-check-circle-fill me-1"></i>Finish Order
+            </button>
+          `;
+        } else {
+          actionBtnsContainer.innerHTML = `
+            <button type="button" class="btn btn-sm btn-outline-secondary" data-bs-dismiss="modal" style="border-radius:10px; font-weight:600; padding:8px 16px;">
+              Close
+            </button>
+            <button type="button" class="btn btn-sm btn-success" onclick="finishStationOrder(${order.id}, '${stType}');" style="border-radius:10px; font-weight:700; padding:8px 20px; box-shadow:0 3px 10px rgba(16,185,129,0.35);">
+              <i class="bi bi-check-circle-fill me-1"></i>Finish Order
+            </button>
+          `;
+        } 
+      }
+
+        const bsModal = bootstrap.Modal.getOrCreateInstance(modalEl);
+        bsModal.show();
+      }
+    }
+
+    function printPizzaKitchenTicketFromModal() {
+      if (!_activeStationModalOrder) return;
+      const ord = _activeStationModalOrder;
+      const printItems = (ord.action_items && ord.action_items.length) ? ord.action_items : (ord.all_items || []);
+      const ticketData = {
+        orderNumber: ord.order_number,
+        date: (ord.date || '') + ' ' + (ord.time || ''),
+        items: printItems
+      };
+      printKitchenTicket(ticketData);
+      showToast('🖨️ Kitchen ticket sent to printer!');
+    }
+
+    function onSwitchToPizzaMode() {
+      if (_pendingPizzaOrders && _pendingPizzaOrders.length > 0) {
+        _pendingPizzaOrders.forEach(ord => {
+          showStationOrderNotice(ord, 'pizza');
+        });
+        playPizzaOrderChime();
+      }
+      updateStationBranchBadges();
+    }
+
+    function onSwitchToCoffeeMode() {
+      if (_pendingCafeOrders && _pendingCafeOrders.length > 0) {
+        _pendingCafeOrders.forEach(ord => {
+          showStationOrderNotice(ord, 'cafe');
+        });
+        playCafeOrderChime();
+      }
+      updateStationBranchBadges();
+    }
+
+    async function cycleMyStation() {
+      if (!currentUser) return;
+      const stations = ['cafe', 'pizza', 'both'];
+      const curIdx = stations.indexOf(_userAssignedStation || 'cafe');
+      const nextStation = stations[(curIdx + 1) % stations.length];
+      try {
+        const res = await api('auth.php?action=set_my_station', { station: nextStation });
+        if (res.success) {
+          currentUser.assigned_station = nextStation;
+          _userAssignedStation = nextStation;
+          updateUserInfoUI(currentUser);
+          showToast('✓ ' + res.message);
+          if (nextStation === 'pizza' && _activeBranch !== 'pizza') {
+            switchBranch('pizza');
+          } else if (nextStation === 'cafe' && _activeBranch !== 'coffee') {
+            switchBranch('coffee');
+          }
+        } else {
+          showToast('⚠ ' + res.message);
+        }
+      } catch (e) {
+        showToast('⚠ Failed to switch active station.');
+      }
+    }
+
+    async function updateStaffStation(userId, station) {
+      try {
+        const res = await api('auth.php?action=update_station', { user_id: userId, station });
+        if (res.success) {
+          showToast('✓ ' + res.message);
+          if (currentUser && currentUser.id == userId) {
+            currentUser.assigned_station = station;
+            _userAssignedStation = station;
+            updateUserInfoUI(currentUser);
+          }
+        } else {
+          showToast('⚠ ' + res.message);
+        }
+      } catch (err) {
+        showToast('⚠ Connection error while updating station.');
+      }
     }
 
     /* ========== ORDERS ========== */
@@ -9720,6 +10903,23 @@ $_CSRF_TOKEN = getCsrfToken();
       if (topName) topName.textContent = user.full_name || 'Admin';
       const topAvatar = document.getElementById('topbar-user-avatar');
       if (topAvatar) topAvatar.textContent = (user.full_name || 'U').charAt(0).toUpperCase();
+
+      const stIcon = document.getElementById('sidebar-station-icon');
+      const stText = document.getElementById('sidebar-station-text');
+      const st = user.assigned_station || 'cafe';
+      _userAssignedStation = st;
+      if (stIcon && stText) {
+        if (st === 'pizza') {
+          stIcon.textContent = '🍕';
+          stText.textContent = 'Pizza House';
+        } else if (st === 'both') {
+          stIcon.textContent = '🔄';
+          stText.textContent = 'Both Stations';
+        } else {
+          stIcon.textContent = '☕';
+          stText.textContent = 'Cafe Station';
+        }
+      }
     }
 
     async function handleLogin(e) {
@@ -9740,6 +10940,15 @@ $_CSRF_TOKEN = getCsrfToken();
         const res = await api('auth.php?action=login', { username: u, password: p });
 
         if (res.requires_2fa) {
+          if (res.session_id) {
+            sessionStorage.setItem('chipipie_pos_session_id', res.session_id);
+            localStorage.setItem('chipipie_pos_session_id', res.session_id);
+          }
+          if (res.csrf_token) {
+            window.CSRF_TOKEN = res.csrf_token;
+            sessionStorage.setItem('chipipie_csrf_token', res.csrf_token);
+            localStorage.setItem('chipipie_csrf_token', res.csrf_token);
+          }
           // Admin 2FA in POS: show POS 2FA screen
           document.getElementById('pos-step-credentials').style.display = 'none';
           document.getElementById('pos-step-2fa').style.display = 'block';
@@ -9767,8 +10976,14 @@ $_CSRF_TOKEN = getCsrfToken();
 
         if (res.success) {
           if (res.session_id) {
+            sessionStorage.setItem('chipipie_pos_session_id', res.session_id);
             localStorage.setItem('chipipie_pos_session_id', res.session_id);
             localStorage.setItem('chipipie_session_id', res.session_id);
+          }
+          if (res.csrf_token) {
+            window.CSRF_TOKEN = res.csrf_token;
+            sessionStorage.setItem('chipipie_csrf_token', res.csrf_token);
+            localStorage.setItem('chipipie_csrf_token', res.csrf_token);
           }
           currentUser = res.user;
           updateUserInfoUI(res.user);
@@ -9812,8 +11027,14 @@ $_CSRF_TOKEN = getCsrfToken();
         const res = await api('auth.php?action=verify_2fa', { code: code });
         if (res.success && res.user) {
           if (res.session_id) {
+            sessionStorage.setItem('chipipie_pos_session_id', res.session_id);
             localStorage.setItem('chipipie_pos_session_id', res.session_id);
             localStorage.setItem('chipipie_session_id', res.session_id);
+          }
+          if (res.csrf_token) {
+            window.CSRF_TOKEN = res.csrf_token;
+            sessionStorage.setItem('chipipie_csrf_token', res.csrf_token);
+            localStorage.setItem('chipipie_csrf_token', res.csrf_token);
           }
           currentUser = res.user;
           updateUserInfoUI(res.user);
@@ -9974,15 +11195,31 @@ $_CSRF_TOKEN = getCsrfToken();
       initGCashKey();
 
       // Start ISO 25010 Cashier Inactivity & Productivity Safeguard
-      startInactivityMonitoring();
+      // DISABLED: Session timeout warning modal removed per user request
+      // startInactivityMonitoring();
       restorePreservedCartIfAny();
+      // Station Allocation: Automatically switch branch based on staff assignment
+      const userStation = (currentUser && currentUser.assigned_station) || _userAssignedStation || 'cafe';
+      _userAssignedStation = userStation;
+      if (userStation === 'pizza') {
+        switchBranch('pizza');
+      } else if (userStation === 'cafe') {
+        switchBranch('coffee');
+      }
+      initStationOrderMonitoring();
     }
 
     async function logout() {
       stopInactivityMonitoring();
+      stopPizzaOrderMonitoring();
+      const currentSid = sessionStorage.getItem('chipipie_pos_session_id') || localStorage.getItem('chipipie_pos_session_id');
       try { await api('auth.php?action=logout', {}); } catch (e) { }
-      localStorage.removeItem('chipipie_pos_session_id');
-      localStorage.removeItem('chipipie_session_id');
+      sessionStorage.removeItem('chipipie_pos_session_id');
+      sessionStorage.removeItem('chipipie_csrf_token');
+      if (localStorage.getItem('chipipie_pos_session_id') === currentSid) {
+        localStorage.removeItem('chipipie_pos_session_id');
+        localStorage.removeItem('chipipie_session_id');
+      }
       currentUser = null;
       _isUserAdmin = false;
       window.posIsAdmin = false;
@@ -10582,6 +11819,13 @@ $_CSRF_TOKEN = getCsrfToken();
             <td><code>${u.username}</code></td>
             <td style="font-size:12px;color:#666;">${u.email || '—'}</td>
             <td><span class="badge-cat" style="display:inline-block;min-width:65px;text-align:center;">${u.role}</span></td>
+            <td>
+              <select class="form-select form-select-sm" style="font-size:11.5px;padding:3px 7px;width:130px;border-radius:6px;border:1px solid var(--cafe-tan);background:#fff;" onchange="updateStaffStation(${u.id}, this.value)">
+                <option value="cafe" ${u.assigned_station === 'cafe' ? 'selected' : ''}>☕ Cafe Counter</option>
+                <option value="pizza" ${u.assigned_station === 'pizza' ? 'selected' : ''}>🍕 Pizza House</option>
+                <option value="both" ${u.assigned_station === 'both' ? 'selected' : ''}>🔄 Both / Flex</option>
+              </select>
+            </td>
             <td><span class="${u.is_active == 1 ? 'badge-success' : 'badge-pending'}" style="display:inline-block;width:70px;text-align:center;box-sizing:border-box;">${u.is_active == 1 ? 'Active' : 'Inactive'}</span></td>
             <td>
               <div style="display:flex;gap:8px;align-items:center;">
@@ -10590,7 +11834,7 @@ $_CSRF_TOKEN = getCsrfToken();
               </div>
             </td>
           </tr>
-        `).join('') || '<tr><td colspan="6" class="text-center text-muted py-3">No users found</td></tr>';
+        `).join('') || '<tr><td colspan="7" class="text-center text-muted py-3">No users found</td></tr>';
 
         const visibleRequests = (res.pending_admin_requests || []).filter(r =>
           r.role !== 'super_admin' &&
@@ -10829,6 +12073,7 @@ $_CSRF_TOKEN = getCsrfToken();
       const password = document.getElementById('modal-reg-pass').value.trim();
       const confirmPass = document.getElementById('modal-reg-pass-confirm').value.trim();
       const role = document.getElementById('modal-reg-role').value;
+      const assigned_station = document.getElementById('modal-reg-station')?.value || 'cafe';
 
       if (!firstName || !lastName || !email || !username || !password) {
         resEl.style.display = 'block'; resEl.style.color = '#842029'; resEl.style.background = '#f8d7da';
@@ -10857,7 +12102,8 @@ $_CSRF_TOKEN = getCsrfToken();
         last_name: lastName,
         suffix: suffix,
         full_name: fullName,
-        email, username, password, role
+        email, username, password, role,
+        assigned_station
       };
 
       try {
@@ -11158,13 +12404,29 @@ $_CSRF_TOKEN = getCsrfToken();
         return;
       }
 
+      // Check for URL flag to open a dedicated fresh/isolated station session in this tab
+      const isNewTabSession = urlParams.has('new_session') || urlParams.has('new_station') || urlParams.has('switch');
+      if (isNewTabSession) {
+        sessionStorage.removeItem('chipipie_pos_session_id');
+        sessionStorage.removeItem('chipipie_csrf_token');
+        window.history.replaceState({}, document.title, window.location.pathname);
+        playWaterDropLoginAnimation('#login-wrapper .login-card');
+        return; // Present fresh login for this tab
+      }
+
       // Check for existing session
       playWaterDropLoginAnimation('#login-wrapper .login-card');
       api('auth.php?action=session').then(res => {
         if (res.success && res.loggedIn) {
           if (res.session_id) {
+            sessionStorage.setItem('chipipie_pos_session_id', res.session_id);
             localStorage.setItem('chipipie_pos_session_id', res.session_id);
             localStorage.setItem('chipipie_session_id', res.session_id);
+          }
+          if (res.csrf_token) {
+            window.CSRF_TOKEN = res.csrf_token;
+            sessionStorage.setItem('chipipie_csrf_token', res.csrf_token);
+            localStorage.setItem('chipipie_csrf_token', res.csrf_token);
           }
           currentUser = res.user;
           updateUserInfoUI(res.user);

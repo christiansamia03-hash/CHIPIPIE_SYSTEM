@@ -28,6 +28,7 @@ elseif ($method === 'GET' && $action === 'chart_weekly_weeks') { handleChartWeek
 elseif ($method === 'GET' && $action === 'chart_weekly')       { handleChartWeekly(); }
 elseif ($method === 'GET' && $action === 'chart_hourly')       { handleChartHourly(); }
 elseif ($method === 'GET' && $action === 'chart_monthly')      { handleChartMonthly(); }
+elseif ($method === 'GET' && ($action === 'pizza_orders' || $action === 'station_orders')) { handleStationOrders(); }
 else { jsonResponse(['success' => false, 'message' => 'Invalid action.'], 400); }
 
 function getVoidRefundRecipients() {
@@ -298,16 +299,43 @@ function handleGetAdjustments() {
 
 function handleCheckout() {
     requireLogin();
+    $userId = (int)($_SESSION['user_id'] ?? 0);
+    $sessionStation = trim($_SESSION['assigned_station'] ?? '');
+    $cashierName = $_SESSION['full_name'] ?? $_SESSION['username'] ?? 'Staff';
     session_write_close();
+
     $input = getJsonInput();
     $cartItems = $input['items'] ?? [];
     $paymentMethod = trim($input['payment_method'] ?? 'Cash');
+    $branchInput = trim($input['branch'] ?? 'coffee');
+    $originInput = trim($input['origin_branch'] ?? $input['origin'] ?? $input['station'] ?? '');
+
+    // Determine originating branch: explicit origin > session station > fallback to branch
+    $originBranch = '';
+    if ($originInput === 'pizza' || $originInput === 'cafe') {
+        $originBranch = $originInput;
+    } elseif ($sessionStation === 'pizza' || $sessionStation === 'cafe') {
+        $originBranch = $sessionStation;
+    }
 
     if (empty($cartItems)) {
         jsonResponse(['success' => false, 'message' => 'Cart is empty.'], 400);
     }
 
     $db = getDB();
+
+    if (!$originBranch && $userId > 0) {
+        $uStmt = $db->prepare("SELECT assigned_station FROM users WHERE id = ?");
+        $uStmt->execute([$userId]);
+        $dbStation = $uStmt->fetchColumn() ?: '';
+        if ($dbStation === 'pizza' || $dbStation === 'cafe') {
+            $originBranch = $dbStation;
+        }
+    }
+    if (!$originBranch) {
+        $originBranch = ($branchInput === 'pizza') ? 'pizza' : 'cafe';
+    }
+
     $db->beginTransaction();
 
     try {
@@ -383,8 +411,16 @@ function handleCheckout() {
         $orderNum = '#' . str_pad(($countStmt->fetch()['cnt'] + 1), 3, '0', STR_PAD_LEFT);
 
         // Create order
-        $stmt = $db->prepare("INSERT INTO orders (order_number, user_id, total, payment_method, status) VALUES (?, ?, ?, ?, 'Completed')");
-        $stmt->execute([$orderNum, $_SESSION['user_id'], $total, $paymentMethod]);
+        // Create order (recording origin branch: cafe or pizza)
+        try {
+            $stmt = $db->prepare("INSERT INTO orders (order_number, user_id, total, payment_method, status, origin_branch) VALUES (?, ?, ?, ?, 'Completed', ?)");
+            $stmt->execute([$orderNum, $userId, $total, $paymentMethod, $originBranch]);
+        } catch (Exception $e) {
+            $stmt = $db->prepare("INSERT INTO orders (order_number, user_id, total, payment_method, status) VALUES (?, ?, ?, ?, 'Completed')");
+            $stmt->execute([$orderNum, $userId, $total, $paymentMethod]);
+        }
+
+
         $orderId = $db->lastInsertId();
 
         // Create order items (now with size)
@@ -413,6 +449,7 @@ function handleCheckout() {
                 'items' => $itemStr,
                 'payment_method' => $paymentMethod,
                 'status' => 'Completed',
+                'origin_branch' => $originBranch,
                 'time' => date('g:i A'),
                 'date' => date('M d, Y'),
                 'created_at' => date('Y-m-d H:i:s'),
@@ -1651,4 +1688,167 @@ function handleChartMonthly() {
         'vs'      => $vsData,
         'years'   => array_values(array_unique(array_map('intval', $years)))
     ]);
+}
+
+
+function handleStationOrders() {
+    requireLogin();
+    $db = getDB();
+
+    $station = trim($_GET['station'] ?? '');
+    if (!$station) {
+        $station = $_SESSION['assigned_station'] ?? 'both';
+    }
+    $sinceId = intval($_GET['since_id'] ?? 0);
+    $limit = min(50, max(1, intval($_GET['limit'] ?? 25)));
+
+    $pizzaCatIds = [10, 11, 12, 13, 14, 15, 16];
+    $placeholders = implode(',', array_fill(0, count($pizzaCatIds), '?'));
+
+    $where = "WHERE o.status != 'Voided'";
+    $params = [];
+
+    if ($sinceId > 0) {
+        $where .= " AND o.id > ?";
+        $params[] = $sinceId;
+    } else {
+        $where .= " AND (DATE(o.created_at) = CURDATE() OR o.created_at >= (NOW() - INTERVAL 12 HOUR))";
+    }
+
+    if ($station === 'pizza') {
+        // Pizza station: wants orders containing pizza items from cafe counter
+        $where .= " AND m.category_id IN ($placeholders) AND (o.origin_branch IS NULL OR o.origin_branch != 'pizza')";
+        $params = array_merge($params, $pizzaCatIds);
+    } elseif ($station === 'cafe') {
+        // Cafe station: wants orders containing drinks/cafe items from pizza counter
+        $where .= " AND m.category_id NOT IN ($placeholders) AND o.origin_branch = 'pizza'";
+        $params = array_merge($params, $pizzaCatIds);
+    } else {
+        // Both: either pizza items from cafe counter, OR cafe items from pizza counter
+        $where .= " AND ((m.category_id IN ($placeholders) AND (o.origin_branch IS NULL OR o.origin_branch != 'pizza')) OR (m.category_id NOT IN ($placeholders) AND o.origin_branch = 'pizza'))";
+        $params = array_merge($params, $pizzaCatIds, $pizzaCatIds);
+    }
+
+    $sql = "
+        SELECT DISTINCT o.id, o.order_number, o.total, o.payment_method, o.status,
+               o.created_at, COALESCE(o.origin_branch, 'cafe') AS origin_branch,
+               COALESCE(u.full_name, u.username, 'Staff') AS cashier
+        FROM orders o
+        JOIN order_items oi ON oi.order_id = o.id
+        JOIN menu_items m ON oi.menu_item_id = m.id
+        LEFT JOIN users u ON o.user_id = u.id
+        $where
+        ORDER BY o.id " . ($sinceId > 0 ? "ASC" : "DESC") . "
+        LIMIT $limit
+    ";
+
+    $stmt = $db->prepare($sql);
+    $stmt->execute($params);
+    $orders = $stmt->fetchAll(PDO::FETCH_ASSOC);
+
+    $result = [];
+    $maxId = $sinceId;
+
+    foreach ($orders as $ord) {
+        $orderId = intval($ord['id']);
+        if ($orderId > $maxId) {
+            $maxId = $orderId;
+        }
+
+        $itemsStmt = $db->prepare("
+            SELECT oi.id, oi.menu_item_id, oi.quantity, oi.unit_price, oi.subtotal, oi.size,
+                   m.name, m.category_id, c.name AS category_name
+            FROM order_items oi
+            JOIN menu_items m ON oi.menu_item_id = m.id
+            LEFT JOIN categories c ON m.category_id = c.id
+            WHERE oi.order_id = ?
+            ORDER BY oi.id ASC
+        ");
+        $itemsStmt->execute([$orderId]);
+        $allItems = $itemsStmt->fetchAll(PDO::FETCH_ASSOC);
+
+        $pizzaItems = [];
+        $cafeItems = [];
+        $pizzaSummaryArr = [];
+        $cafeSummaryArr = [];
+        $allSummaryArr = [];
+
+        foreach ($allItems as $it) {
+            $isPizza = in_array((int)$it['category_id'], $pizzaCatIds, true);
+            $sizeLabel = !empty($it['size']) ? " ({$it['size']})" : '';
+            $summaryText = ($it['quantity'] > 1 ? $it['quantity'] . '× ' : '') . $it['name'] . $sizeLabel;
+
+            $itemData = [
+                'name' => $it['name'],
+                'category_id' => (int)$it['category_id'],
+                'category' => $it['category_name'] ?? '',
+                'size' => $it['size'] ?: '',
+                'qty' => (int)$it['quantity'],
+                'price' => (float)$it['unit_price'],
+                'subtotal' => (float)$it['subtotal'],
+                'is_pizza' => $isPizza
+            ];
+
+            $allSummaryArr[] = $summaryText;
+            if ($isPizza) {
+                $pizzaItems[] = $itemData;
+                $pizzaSummaryArr[] = $summaryText;
+            } else {
+                $cafeItems[] = $itemData;
+                $cafeSummaryArr[] = $summaryText;
+            }
+        }
+
+        $ord['items_summary'] = implode(', ', $allSummaryArr);
+        $ord['pizza_summary'] = implode(', ', $pizzaSummaryArr);
+        $ord['cafe_summary']  = implode(', ', $cafeSummaryArr);
+        $ord['pizza_items'] = $pizzaItems;
+        $ord['cafe_items']  = $cafeItems;
+        $ord['all_items']   = array_merge($pizzaItems, $cafeItems);
+        $ord['pizza_count'] = array_sum(array_column($pizzaItems, 'qty'));
+        $ord['cafe_count']  = array_sum(array_column($cafeItems, 'qty'));
+        $ord['time'] = date('g:i A', strtotime($ord['created_at']));
+        $ord['date'] = date('M d, Y', strtotime($ord['created_at']));
+        $ord['is_from_cafe']  = ($ord['origin_branch'] !== 'pizza');
+        $ord['is_from_pizza'] = ($ord['origin_branch'] === 'pizza');
+
+        // Determine destination station:
+        if ($ord['is_from_cafe'] && !empty($pizzaItems)) {
+            $ord['target_station'] = 'pizza';
+            $ord['notice_title']   = '🍕 NEW PIZZA ORDER FROM CAFE SIDE';
+            $ord['action_items']   = $pizzaItems;
+            $ord['action_summary'] = $ord['pizza_summary'];
+            $ord['other_items']    = $cafeItems;
+        } elseif ($ord['is_from_pizza'] && !empty($cafeItems)) {
+            $ord['target_station'] = 'cafe';
+            $ord['notice_title']   = '☕ NEW CAFE/DRINK ORDER FROM PIZZA SIDE';
+            $ord['action_items']   = $cafeItems;
+            $ord['action_summary'] = $ord['cafe_summary'];
+            $ord['other_items']    = $pizzaItems;
+        } else {
+            $ord['target_station'] = 'both';
+            $ord['notice_title']   = '🔔 NEW CROSS-STATION ORDER';
+            $ord['action_items']   = $ord['all_items'];
+            $ord['action_summary'] = $ord['items_summary'];
+            $ord['other_items']    = [];
+        }
+
+        $result[] = $ord;
+    }
+
+    $maxSysStmt = $db->query("SELECT MAX(id) FROM orders");
+    $latestSystemId = (int)($maxSysStmt->fetchColumn() ?: 0);
+
+    jsonResponse([
+        'success' => true,
+        'station' => $station,
+        'orders' => $result,
+        'count' => count($result),
+        'max_id' => max($maxId, $latestSystemId),
+        'latest_system_id' => $latestSystemId
+    ]);
+}
+
+function handlePizzaOrders() {
+    handleStationOrders();
 }

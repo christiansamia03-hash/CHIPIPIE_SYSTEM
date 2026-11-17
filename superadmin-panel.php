@@ -3126,7 +3126,7 @@ if (typeof gsap === "undefined") { document.write('<script src="https://cdn.jsde
         },
         credentials: 'include'
       };
-      const sid = localStorage.getItem('chipipie_sa_session_id') || localStorage.getItem('chipipie_session_id');
+      const sid = sessionStorage.getItem('chipipie_sa_session_id') || localStorage.getItem('chipipie_sa_session_id') || localStorage.getItem('chipipie_session_id');
       if (sid) {
         opts.headers['X-Session-Id'] = sid;
       }
@@ -3136,7 +3136,23 @@ if (typeof gsap === "undefined") { document.write('<script src="https://cdn.jsde
       // Strip any PHP warnings/notices that may be prepended
       const jsonStart = text.search(/[{[]/);
       const clean     = jsonStart >= 0 ? text.slice(jsonStart) : text;
-      return JSON.parse(clean);
+      let parsed = null;
+      try {
+        parsed = JSON.parse(clean);
+      } catch (err) {
+        console.error('saApi non-JSON response from ' + endpoint + ':', text);
+        return { success: false, message: 'Invalid server response.' };
+      }
+
+      // Automatic session expiration detection (401 or session_expired flag)
+      if (res.status === 401 || (parsed && parsed.success === false && parsed.session_expired)) {
+        if (!endpoint.includes('auth.php?action=login') && !endpoint.includes('auth.php?action=verify_2fa')) {
+          if (typeof handleSASessionExpired === 'function') {
+            handleSASessionExpired(parsed.message || 'Your Super Admin session has expired. Please sign in again.');
+          }
+        }
+      }
+      return parsed;
     }
 
     /* =============================================
@@ -3220,7 +3236,10 @@ if (typeof gsap === "undefined") { document.write('<script src="https://cdn.jsde
           btn.innerHTML = '<i class="bi bi-shield-lock-fill"></i> Sign In as Super Admin';
           return;
         } else if (res.success && res.user.role === 'super_admin') {
-          if (res.session_id) localStorage.setItem('chipipie_sa_session_id', res.session_id);
+          if (res.session_id) {
+            sessionStorage.setItem('chipipie_sa_session_id', res.session_id);
+            localStorage.setItem('chipipie_sa_session_id', res.session_id);
+          }
           saCurrentUser = res.user;
           activateSAApp();
         } else if (res.success && res.user.role !== 'super_admin') {
@@ -3255,7 +3274,10 @@ if (typeof gsap === "undefined") { document.write('<script src="https://cdn.jsde
       try {
         const res = await saApi('auth.php?action=verify_2fa', { code: code });
         if (res.success && res.user && res.user.role === 'super_admin') {
-          if (res.session_id) localStorage.setItem('chipipie_sa_session_id', res.session_id);
+          if (res.session_id) {
+            sessionStorage.setItem('chipipie_sa_session_id', res.session_id);
+            localStorage.setItem('chipipie_sa_session_id', res.session_id);
+          }
           saCurrentUser = res.user;
           activateSAApp();
         } else {
@@ -3486,11 +3508,14 @@ if (typeof gsap === "undefined") { document.write('<script src="https://cdn.jsde
       document.getElementById('sa-sidebar-name').textContent = saCurrentUser.full_name;
       document.getElementById('sa-sidebar-avatar').textContent = saCurrentUser.full_name.charAt(0).toUpperCase();
       loadDashboard();
+      startSAInactivityMonitoring();
     }
 
     async function saLogout() {
+      stopSAInactivityMonitoring();
       // 1. Immediately reset client state and show login UI
       saCurrentUser = null;
+      sessionStorage.removeItem('chipipie_sa_session_id');
       localStorage.removeItem('chipipie_sa_session_id');
       try {
         const appEl = document.getElementById('sa-app');
@@ -3519,6 +3544,112 @@ if (typeof gsap === "undefined") { document.write('<script src="https://cdn.jsde
       // 3. Force clean browser navigation through logout endpoint
       window.location.href = 'api/auth.php?action=logout&redirect=superadmin-panel.php';
     }
+
+
+    /* ==========================================================================
+       SUPER ADMIN INACTIVITY & IMMEDIATE SESSION SIGN-OUT
+       - Standard: High-Privilege Security Auto Sign-Out
+       - Idle Threshold: 5 minutes (300s) of zero interaction
+       - Behavior: Immediately signs out upon reaching timeout or on session expiry (no modal prompt)
+       ========================================================================== */
+
+    let _saInactivityTimer = null;
+    let _saHeartbeatTimer = null;
+    let _lastSAActivityTimestamp = Date.now();
+
+    const SA_INACTIVITY_TIMEOUT_SECONDS = 300; // 5 minutes of idle -> immediate sign out
+
+    function recordSAActivity() {
+      _lastSAActivityTimestamp = Date.now();
+    }
+
+    function startSAInactivityMonitoring() {
+      stopSAInactivityMonitoring();
+      _lastSAActivityTimestamp = Date.now();
+
+      const events = ['mousemove', 'mousedown', 'keydown', 'touchstart', 'scroll', 'click'];
+      let lastThrottle = 0;
+      window._saInactivityHandler = function() {
+        const now = Date.now();
+        if (now - lastThrottle > 1000) {
+          lastThrottle = now;
+          recordSAActivity();
+        }
+      };
+
+      events.forEach(evt => window.addEventListener(evt, window._saInactivityHandler, { passive: true }));
+
+      // Monitor inactivity status every 1 second
+      _saInactivityTimer = setInterval(checkSAInactivityStatus, 1000);
+
+      // Background heartbeat check every 60 seconds to verify session is still valid on server
+      _saHeartbeatTimer = setInterval(async () => {
+        if (!saCurrentUser) return;
+        try {
+          const chk = await saApi('auth.php?action=session');
+          if (!chk || !chk.loggedIn || (chk.user && chk.user.role !== 'super_admin')) {
+            handleSASessionExpired('Your Super Admin session has expired. You have been signed out.');
+          }
+        } catch (e) {}
+      }, 60000);
+    }
+
+    function stopSAInactivityMonitoring() {
+      if (_saInactivityTimer) {
+        clearInterval(_saInactivityTimer);
+        _saInactivityTimer = null;
+      }
+      if (_saHeartbeatTimer) {
+        clearInterval(_saHeartbeatTimer);
+        _saHeartbeatTimer = null;
+      }
+    }
+
+    function checkSAInactivityStatus() {
+      const appEl = document.getElementById('sa-app');
+      if (!saCurrentUser || !appEl || appEl.style.display === 'none') {
+        return;
+      }
+
+      const idleSec = Math.floor((Date.now() - _lastSAActivityTimestamp) / 1000);
+      if (idleSec >= SA_INACTIVITY_TIMEOUT_SECONDS) {
+        stopSAInactivityMonitoring();
+        handleSASessionExpired('Session expired due to inactivity. You have been signed out.');
+      }
+    }
+
+    function handleSASessionExpired(msg = 'Your session has expired. Please sign in again.') {
+      stopSAInactivityMonitoring();
+      saCurrentUser = null;
+      sessionStorage.removeItem('chipipie_sa_session_id');
+      localStorage.removeItem('chipipie_sa_session_id');
+
+      // Reset UI to login screen immediately
+      const appEl = document.getElementById('sa-app');
+      const loginEl = document.getElementById('sa-login-screen');
+      if (appEl) appEl.style.display = 'none';
+      if (loginEl) {
+        loginEl.style.display = 'flex';
+        playWaterDropLoginAnimation('#sa-login-screen .sa-login-card');
+        document.getElementById('sa-step-2fa').style.display = 'none';
+        document.getElementById('sa-step-credentials').style.display = 'block';
+        const passInp = document.getElementById('sa-login-pass');
+        if (passInp) passInp.value = '';
+      }
+
+      // Invalidate on server
+      saApi('auth.php?action=logout', {}).catch(() => {});
+
+      // Prominent toast notification
+      saToast(msg, 'error');
+    }
+
+    // Testing helpers for developer / user (triggers immediate sign-out)
+    window.testInactivitySignOut = function() {
+      handleSASessionExpired('Session expired due to inactivity. You have been signed out.');
+    };
+    window.testSASessionExpiry = window.testInactivitySignOut;
+    window.testInactivityModal = window.testInactivitySignOut;
 
     /* =============================================
        NAVIGATION
@@ -6521,7 +6652,7 @@ if (typeof gsap === "undefined") { document.write('<script src="https://cdn.jsde
 
       try {
         const endpoint = format === 'sql' ? 'superadmin.php?action=backup_export_sql' : 'superadmin.php?action=backup_export_json';
-        const sid = localStorage.getItem('chipipie_sa_session_id') || localStorage.getItem('chipipie_session_id');
+        const sid = sessionStorage.getItem('chipipie_sa_session_id') || localStorage.getItem('chipipie_sa_session_id') || localStorage.getItem('chipipie_session_id');
         const headers = {
           'X-Portal': 'superadmin',
           'X-CSRF-Token': (typeof CSRF_TOKEN !== 'undefined' && CSRF_TOKEN ? CSRF_TOKEN : (localStorage.getItem('chipipie_csrf_token') || ''))
@@ -6560,7 +6691,7 @@ if (typeof gsap === "undefined") { document.write('<script src="https://cdn.jsde
 
     async function downloadArchiveFile(filename) {
       try {
-        const sid = localStorage.getItem('chipipie_sa_session_id') || localStorage.getItem('chipipie_session_id');
+        const sid = sessionStorage.getItem('chipipie_sa_session_id') || localStorage.getItem('chipipie_sa_session_id') || localStorage.getItem('chipipie_session_id');
         const headers = {
           'X-Portal': 'superadmin',
           'X-CSRF-Token': (typeof CSRF_TOKEN !== 'undefined' && CSRF_TOKEN ? CSRF_TOKEN : (localStorage.getItem('chipipie_csrf_token') || ''))
@@ -6692,7 +6823,7 @@ if (typeof gsap === "undefined") { document.write('<script src="https://cdn.jsde
           const formData = new FormData();
           formData.append('backup_file', _activeRestoreSource.file);
 
-          const sid = localStorage.getItem('chipipie_sa_session_id') || localStorage.getItem('chipipie_session_id');
+          const sid = sessionStorage.getItem('chipipie_sa_session_id') || localStorage.getItem('chipipie_sa_session_id') || localStorage.getItem('chipipie_session_id');
           const headers = {
             'X-Portal': 'superadmin',
             'X-CSRF-Token': (typeof CSRF_TOKEN !== 'undefined' && CSRF_TOKEN ? CSRF_TOKEN : (localStorage.getItem('chipipie_csrf_token') || ''))
@@ -6902,7 +7033,6 @@ if (typeof gsap === "undefined") { document.write('<script src="https://cdn.jsde
 
     // Escape key — close only the topmost open modal
     document.addEventListener('keydown', e => {
-      if (e.key === 'Escape') {
         // Priority order: confirm > delete-menu > reject > photo > add-item > edit-user > create-user > review
         const priority = ['sa-confirm-modal','sa-delete-menu-modal','reject-request-modal','sa-photo-modal','sa-add-item-modal','edit-user-modal','create-user-modal','review-modal'];
         for (const id of priority) {
@@ -6966,7 +7096,10 @@ if (typeof gsap === "undefined") { document.write('<script src="https://cdn.jsde
       playWaterDropLoginAnimation('#sa-login-screen .sa-login-card');
       saApi('auth.php?action=session').then(res => {
         if (res.success && res.loggedIn && res.user && res.user.role === 'super_admin') {
-          if (res.session_id) localStorage.setItem('chipipie_sa_session_id', res.session_id);
+          if (res.session_id) {
+            sessionStorage.setItem('chipipie_sa_session_id', res.session_id);
+            localStorage.setItem('chipipie_sa_session_id', res.session_id);
+          }
           saCurrentUser = res.user;
           activateSAApp();
         } else if (res.pending_2fa) {

@@ -30,6 +30,12 @@ switch ($action) {
     case 'toggle_user':
         handleToggleUser();
         break;
+    case 'update_station':
+        handleUpdateStation();
+        break;
+    case 'set_my_station':
+        handleSetMyStation();
+        break;
     case 'session':
         handleCheckSession();
         break;
@@ -111,7 +117,7 @@ function handleLogin() {
     }
 
     $db = getDB();
-    $stmt = $db->prepare("SELECT id, username, password, full_name, email, role, is_active FROM users WHERE username = ?");
+    $stmt = $db->prepare("SELECT id, username, password, full_name, email, role, is_active, assigned_station FROM users WHERE username = ?");
     $stmt->execute([$username]);
     $user = $stmt->fetch();
 
@@ -238,7 +244,7 @@ function handleLogin() {
     if ($user['role'] === 'super_admin') {
         if ($isOffline) {
             // Super Admin direct login in Offline Mode
-            ensureSession();
+            startFreshSession($portal);
             $_SESSION['user_id']   = $user['id'];
             $_SESSION['username']  = $user['username'];
             $_SESSION['full_name'] = $user['full_name'];
@@ -268,9 +274,7 @@ function handleLogin() {
             ]);
         }
 
-        ensureSession();
-        // Clear any previous fully authenticated session
-        unset($_SESSION['user_id'], $_SESSION['username'], $_SESSION['full_name'], $_SESSION['email'], $_SESSION['role']);
+        startFreshSession('superadmin');
 
         // Batch-load all settings needed for SA 2FA in one cached DB query
         $saSettings = getSettings(['superadmin_email', 'owner_email', 'token_expiry_minutes', 'store_name']);
@@ -336,6 +340,8 @@ function handleLogin() {
         $resp = [
             'success'       => true,
             'requires_2fa'  => true,
+            'session_id'    => session_id(),
+            'csrf_token'    => getCsrfToken(),
             'redirect'      => 'superadmin-panel.php',
             'message'       => "Verification code sent to $masked. Please enter the code to continue.",
             'masked_email'  => $masked,
@@ -357,9 +363,7 @@ function handleLogin() {
 
     // Two-Factor Authentication (2FA) for POS Admin (sent directly to the Admin's registered email)
     if ($user['role'] === 'admin') {
-        ensureSession();
-        // Clear any previous fully authenticated session
-        unset($_SESSION['user_id'], $_SESSION['username'], $_SESSION['full_name'], $_SESSION['email'], $_SESSION['role']);
+        startFreshSession('pos');
 
         $adminEmail = trim($user['email'] ?? '');
         // Batch-load all settings needed for Admin 2FA in one cached DB query
@@ -430,6 +434,8 @@ function handleLogin() {
         $resp = [
             'success'       => true,
             'requires_2fa'  => true,
+            'session_id'    => session_id(),
+            'csrf_token'    => getCsrfToken(),
             'role'          => 'admin',
             'message'       => "Verification code sent to your email ($masked). Please enter the code to continue.",
             'masked_email'  => $masked,
@@ -450,12 +456,13 @@ function handleLogin() {
     }
 
     // Standard login for other roles (e.g. cashier)
-    ensureSession();
+    startFreshSession('pos');
     $_SESSION['user_id']  = $user['id'];
     $_SESSION['username'] = $user['username'];
     $_SESSION['full_name']= $user['full_name'];
     $_SESSION['email']    = $user['email'];
     $_SESSION['role']     = $user['role'];
+    $_SESSION['assigned_station'] = $user['assigned_station'] ?? 'cafe';
 
     $response = [
         'success'    => true,
@@ -468,6 +475,7 @@ function handleLogin() {
             'full_name' => $user['full_name'],
             'email'     => $user['email'],
             'role'      => $user['role'],
+            'assigned_station' => $user['assigned_station'] ?? 'cafe',
         ]
     ];
 
@@ -535,6 +543,10 @@ function handleRegister() {
     $suffix        = trim($input['suffix'] ?? '');
     $email         = trim($input['email'] ?? '');
     $role          = trim($input['role'] ?? 'cashier');
+    $assignedStation = trim($input['assigned_station'] ?? 'cafe');
+    if (!in_array($assignedStation, ['cafe', 'pizza', 'both'], true)) {
+        $assignedStation = 'cafe';
+    }
 
     // Build full_name if separate fields provided
     if ($firstName && $lastName) {
@@ -605,8 +617,8 @@ function handleRegister() {
 
     recordRateLimitHit('register_ip', $ip, 10, 600, 600);
     $approvalToken = generateToken(32);
-    $stmt = $db->prepare("INSERT INTO admin_registration_requests (username, password, first_name, last_name, middle_initial, suffix, full_name, email, role, approval_token) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)");
-    $stmt->execute([$username, $hashedPassword, $firstName, $lastName, $middleInitial, $suffix, $full_name, $email, $role, $approvalToken]);
+    $stmt = $db->prepare("INSERT INTO admin_registration_requests (username, password, first_name, last_name, middle_initial, suffix, full_name, email, role, approval_token, assigned_station) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)");
+    $stmt->execute([$username, $hashedPassword, $firstName, $lastName, $middleInitial, $suffix, $full_name, $email, $role, $approvalToken, $assignedStation]);
 
     // Send approval email to owner (batch-load from settings cache)
     $regSettings = getSettings(['owner_email', 'store_name']);
@@ -699,7 +711,9 @@ function handleApproveAdmin() {
     $role = !empty($request['role']) ? $request['role'] : 'admin';
     $roleLabel = ucfirst($role);
 
-    $stmt = $db->prepare("INSERT INTO users (username, password, first_name, last_name, middle_initial, suffix, full_name, email, role, is_active) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 1)");
+    $station = !empty($request['assigned_station']) ? $request['assigned_station'] : 'cafe';
+
+    $stmt = $db->prepare("INSERT INTO users (username, password, first_name, last_name, middle_initial, suffix, full_name, email, role, is_active, assigned_station) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 1, ?)");
     $stmt->execute([
         $request['username'], 
         $request['password'], 
@@ -709,7 +723,8 @@ function handleApproveAdmin() {
         $request['suffix'] ?? null, 
         $request['full_name'], 
         $request['email'],
-        $role
+        $role,
+        $station
     ]);
 
     // Mark request as approved
@@ -799,7 +814,7 @@ function handleListUsers() {
     requireAdmin();
 
     $db = getDB();
-    $stmt = $db->query("SELECT id, username, full_name, email, role, is_active, created_at FROM users WHERE role != 'super_admin' AND username NOT IN ('superadmin', 'super_admin') ORDER BY created_at DESC");
+    $stmt = $db->query("SELECT id, username, full_name, email, role, is_active, assigned_station, created_at FROM users WHERE role != 'super_admin' AND username NOT IN ('superadmin', 'super_admin') ORDER BY created_at DESC");
     $users = $stmt->fetchAll();
 
     // Clean up any approved admin requests where the admin no longer exists in users
@@ -865,7 +880,9 @@ function handleApproveAdminUI() {
     $role = !empty($request['role']) ? $request['role'] : 'cashier';
     $roleLabel = ucfirst($role);
 
-    $stmt = $db->prepare("INSERT INTO users (username, password, first_name, last_name, middle_initial, suffix, full_name, email, role, is_active) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 1)");
+    $station = !empty($request['assigned_station']) ? $request['assigned_station'] : 'cafe';
+
+    $stmt = $db->prepare("INSERT INTO users (username, password, first_name, last_name, middle_initial, suffix, full_name, email, role, is_active, assigned_station) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 1, ?)");
     $stmt->execute([
         $request['username'], 
         $request['password'], 
@@ -875,7 +892,8 @@ function handleApproveAdminUI() {
         $request['suffix'] ?? null, 
         $request['full_name'], 
         $request['email'],
-        $role
+        $role,
+        $station
     ]);
 
     // Mark as approved
@@ -1001,6 +1019,57 @@ function handleToggleUser() {
     ]);
 }
 
+function handleUpdateStation() {
+    requireAdmin();
+    $input = getJsonInput();
+    $userId = intval($input['user_id'] ?? 0);
+    $station = trim($input['station'] ?? 'cafe');
+    if (!in_array($station, ['cafe', 'pizza', 'both'], true)) {
+        jsonResponse(['success' => false, 'message' => 'Invalid station. Choose Cafe, Pizza, or Both.'], 400);
+    }
+    if ($userId <= 0) {
+        jsonResponse(['success' => false, 'message' => 'Valid User ID is required.'], 400);
+    }
+
+    $db = getDB();
+    $stmt = $db->prepare("UPDATE users SET assigned_station = ? WHERE id = ?");
+    $stmt->execute([$station, $userId]);
+
+    if (isset($_SESSION['user_id']) && intval($_SESSION['user_id']) === $userId) {
+        $_SESSION['assigned_station'] = $station;
+    }
+
+    $stationLabels = ['cafe' => 'Cafe Counter', 'pizza' => 'Pizza House', 'both' => 'Both Stations (All-Rounder)'];
+    jsonResponse([
+        'success' => true,
+        'message' => "Station updated to " . ($stationLabels[$station] ?? $station),
+        'station' => $station,
+        'user_id' => $userId
+    ]);
+}
+
+function handleSetMyStation() {
+    requireLogin();
+    $input = getJsonInput();
+    $station = trim($input['station'] ?? 'cafe');
+    if (!in_array($station, ['cafe', 'pizza', 'both'], true)) {
+        jsonResponse(['success' => false, 'message' => 'Invalid station. Choose Cafe, Pizza, or Both.'], 400);
+    }
+
+    $userId = intval($_SESSION['user_id']);
+    $db = getDB();
+    $stmt = $db->prepare("UPDATE users SET assigned_station = ? WHERE id = ?");
+    $stmt->execute([$station, $userId]);
+    $_SESSION['assigned_station'] = $station;
+
+    $stationLabels = ['cafe' => 'Cafe Counter', 'pizza' => 'Pizza House', 'both' => 'Both Stations'];
+    jsonResponse([
+        'success' => true,
+        'message' => "Switched active station to " . ($stationLabels[$station] ?? $station),
+        'station' => $station
+    ]);
+}
+
 // =====================================================
 // CHECK SESSION
 // =====================================================
@@ -1015,16 +1084,24 @@ function handleCheckSession() {
             jsonResponse(['success' => true, 'loggedIn' => false]);
         }
 
+        $db = getDB();
+        $stStmt = $db->prepare("SELECT assigned_station FROM users WHERE id = ?");
+        $stStmt->execute([$_SESSION['user_id']]);
+        $curStation = $stStmt->fetchColumn() ?: ($_SESSION['assigned_station'] ?? 'cafe');
+        $_SESSION['assigned_station'] = $curStation;
+
         jsonResponse([
             'success'    => true,
             'loggedIn'   => true,
             'session_id' => session_id(),
+            'csrf_token' => getCsrfToken(),
             'user' => [
                 'id'        => $_SESSION['user_id'],
                 'username'  => $_SESSION['username'],
                 'full_name' => $_SESSION['full_name'],
                 'email'     => $_SESSION['email'],
                 'role'      => $_SESSION['role'],
+                'assigned_station' => $curStation,
             ]
         ]);
     } else if (isset($_SESSION['pending_2fa']) && time() <= $_SESSION['pending_2fa']['expires_at']) {
@@ -1160,16 +1237,23 @@ function handleVerify2FA() {
            ->execute([$_SESSION['user_id'], $_SESSION['username'], $actionName, 'user', $_SESSION['user_id'], $actionDetail, $ip]);
     } catch (Exception $e) {}
 
+    $stStmt = $db->prepare("SELECT assigned_station FROM users WHERE id = ?");
+    $stStmt->execute([$_SESSION['user_id']]);
+    $curStation = $stStmt->fetchColumn() ?: 'cafe';
+    $_SESSION['assigned_station'] = $curStation;
+
     $resp = [
         'success'    => true,
         'message'    => 'Two-factor verification successful.',
         'session_id' => session_id(),
+        'csrf_token' => getCsrfToken(),
         'user'       => [
             'id'        => $_SESSION['user_id'],
             'username'  => $_SESSION['username'],
             'full_name' => $_SESSION['full_name'],
             'email'     => $_SESSION['email'],
-            'role'      => $_SESSION['role']
+            'role'      => $_SESSION['role'],
+            'assigned_station' => $curStation
         ]
     ];
     if ($pending['role'] === 'super_admin') {

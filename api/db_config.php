@@ -136,33 +136,76 @@ function purgeExpiredAdminTokens($pdo = null) {
 // ============ PDO CONNECTION ============
 function getDB() {
     static $pdo = null;
-    if ($pdo === null) {
-        try {
-            $port = defined('DB_PORT') && DB_PORT ? ';port=' . DB_PORT : '';
-            $dsn = "mysql:host=" . DB_HOST . $port . ";dbname=" . DB_NAME . ";charset=" . DB_CHARSET;
-            $options = [
-                PDO::ATTR_ERRMODE            => PDO::ERRMODE_EXCEPTION,
-                PDO::ATTR_DEFAULT_FETCH_MODE => PDO::FETCH_ASSOC,
-                PDO::ATTR_EMULATE_PREPARES   => false,
-                PDO::MYSQL_ATTR_INIT_COMMAND => 'SET NAMES utf8mb4 COLLATE utf8mb4_unicode_ci',
-            ];
-            if (getenv('DB_SSL') === 'true' || getenv('DB_SSL') === '1' || (defined('DB_PORT') && DB_PORT == 4000)) {
-                $options[PDO::MYSQL_ATTR_SSL_CA] = true;
-                $options[PDO::MYSQL_ATTR_SSL_VERIFY_SERVER_CERT] = false;
-            }
-            $pdo = new PDO($dsn, DB_USER, DB_PASS, $options);
+    if ($pdo !== null) {
+        return $pdo;
+    }
 
-            // Probabilistic auto-purge of expired admin tokens (1 in 5 DB connections)
-            if (mt_rand(1, 5) === 1) {
-                purgeExpiredAdminTokens($pdo);
+    $port = defined('DB_PORT') && DB_PORT ? ';port=' . DB_PORT : '';
+    $options = [
+        PDO::ATTR_ERRMODE            => PDO::ERRMODE_EXCEPTION,
+        PDO::ATTR_DEFAULT_FETCH_MODE => PDO::FETCH_ASSOC,
+        PDO::ATTR_EMULATE_PREPARES   => false,
+        PDO::MYSQL_ATTR_INIT_COMMAND => 'SET NAMES utf8mb4 COLLATE utf8mb4_unicode_ci',
+    ];
+    if (getenv('DB_SSL') === 'true' || getenv('DB_SSL') === '1' || (defined('DB_PORT') && DB_PORT == 4000)) {
+        $options[PDO::MYSQL_ATTR_SSL_CA] = true;
+        $options[PDO::MYSQL_ATTR_SSL_VERIFY_SERVER_CERT] = false;
+    }
+
+    // Build candidate hosts (Primary host + Anycast static IP fallbacks)
+    $hosts = [];
+    if (defined('DB_HOST') && DB_HOST) {
+        $hosts[] = DB_HOST;
+    }
+    $envFallbacks = getenv('DB_FALLBACK_HOSTS');
+    if ($envFallbacks) {
+        foreach (explode(',', $envFallbacks) as $fb) {
+            $fb = trim($fb);
+            if ($fb && !in_array($fb, $hosts)) {
+                $hosts[] = $fb;
             }
-        } catch (PDOException $e) {
-            http_response_code(500);
-            echo json_encode(['success' => false, 'message' => 'Database connection failed: ' . $e->getMessage()]);
-            exit;
         }
     }
-    return $pdo;
+    // TiDB Cloud Anycast static IP fallbacks (bypasses Windows/Tailscale DNS getaddrinfo drops)
+    if (defined('DB_HOST') && strpos(DB_HOST, 'tidbcloud.com') !== false) {
+        $tidbAnycastIps = ['75.2.106.174', '99.83.224.222'];
+        foreach ($tidbAnycastIps as $ip) {
+            if (!in_array($ip, $hosts)) {
+                $hosts[] = $ip;
+            }
+        }
+    }
+
+    $lastException = null;
+    foreach ($hosts as $h) {
+        for ($attempt = 1; $attempt <= 2; $attempt++) {
+            try {
+                $dsn = "mysql:host=" . $h . $port . ";dbname=" . DB_NAME . ";charset=" . DB_CHARSET;
+                $pdo = new PDO($dsn, DB_USER, DB_PASS, $options);
+
+                // Probabilistic auto-purge of expired admin tokens (1 in 5 DB connections)
+                if (mt_rand(1, 5) === 1) {
+                    purgeExpiredAdminTokens($pdo);
+                }
+                return $pdo;
+            } catch (PDOException $e) {
+                $lastException = $e;
+                $msg = $e->getMessage();
+                // If it is a DNS resolution failure (getaddrinfo), move to IP fallback immediately
+                if (strpos($msg, 'php_network_getaddresses') !== false || strpos($msg, 'getaddrinfo') !== false) {
+                    break;
+                }
+                usleep(100000); // 100ms backoff
+            }
+        }
+    }
+
+    http_response_code(500);
+    echo json_encode([
+        'success' => false,
+        'message' => 'Database connection failed: ' . ($lastException ? $lastException->getMessage() : 'Unknown database error.')
+    ]);
+    exit;
 }
 
 // ============ HELPERS ============
@@ -384,6 +427,28 @@ function syncCompanionSession($user, $targetPortal) {
     } catch (Exception $e) {}
     return $newSid;
 }
+
+/**
+ * Start a brand-new isolated session (e.g. for login or station switching)
+ * without reusing or overwriting any existing session from another tab.
+ */
+function startFreshSession($portal = null) {
+    if ($portal === null) {
+        $portal = getPortalContext();
+    }
+    if (session_status() === PHP_SESSION_ACTIVE) {
+        session_write_close();
+    }
+    $cookieName = ($portal === 'superadmin') ? 'CHIPIPIE_SA_SESS' : 'CHIPIPIE_POS_SESS';
+    session_name($cookieName);
+
+    $prefix = ($portal === 'superadmin') ? 'sa' : 'pos';
+    $freshSid = $prefix . bin2hex(random_bytes(16));
+    session_id($freshSid);
+    ensureSession();
+    return $freshSid;
+}
+
 function ensureSession() {
     if (session_status() === PHP_SESSION_ACTIVE) {
         return;
@@ -394,14 +459,14 @@ function ensureSession() {
     $cookieName = ($portal === 'superadmin') ? 'CHIPIPIE_SA_SESS' : 'CHIPIPIE_POS_SESS';
     session_name($cookieName);
 
-    // Check for session ID in header or query param if cookie is missing
-    if (empty($_COOKIE[$cookieName])) {
+    // Prioritize explicit session ID in request header / parameter to allow multi-tab & multi-device isolation
+    if (!session_id()) {
         $altId = $_SERVER['HTTP_X_SESSION_ID'] 
             ?? $_SERVER['HTTP_AUTHORIZATION'] 
             ?? ($_GET['session_id'] ?? '');
         if ($altId) {
             $altId = preg_replace('/^Bearer\s+/i', '', trim($altId));
-            if (preg_match('/^[a-zA-Z0-9,_-]{16,128}$/', $altId)) {
+            if (preg_match('/^[a-zA-Z0-9,-]{16,128}$/', $altId)) {
                 session_id($altId);
             }
         }
@@ -423,6 +488,19 @@ function ensureSession() {
             'samesite' => 'Lax'
         ]);
         @session_start();
+
+    // Inactivity timeout: 30 minutes server-side limit for Super Admin
+    if (isset($_SESSION['user_id']) && isset($_SESSION['role']) && $_SESSION['role'] === 'super_admin') {
+        $saMaxIdle = 1800; // 30 minutes
+        if (isset($_SESSION['sa_last_activity']) && (time() - $_SESSION['sa_last_activity'] > $saMaxIdle)) {
+            $_SESSION = [];
+            if (session_status() === PHP_SESSION_ACTIVE) {
+                session_destroy();
+            }
+            return;
+        }
+        $_SESSION['sa_last_activity'] = time();
+    }
     }
 }
 
@@ -434,7 +512,7 @@ function requireLogin() {
     // Validate CSRF token first on all state-changing requests
     validateCsrf();
     if (!isset($_SESSION['user_id'])) {
-        jsonResponse(['success' => false, 'message' => 'Not authenticated. Please log in.'], 401);
+        jsonResponse(['success' => false, 'message' => 'Not authenticated. Please log in.', 'session_expired' => true], 401);
     }
 }
 
@@ -454,7 +532,7 @@ function requireAdmin() {
 function requireSuperAdmin() {
     requireLogin();
     if ($_SESSION['role'] !== 'super_admin') {
-        jsonResponse(['success' => false, 'message' => 'Super Admin access required.'], 403);
+        jsonResponse(['success' => false, 'message' => 'Super Admin access required.', 'session_expired' => true], 403);
     }
 }
 
