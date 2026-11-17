@@ -59,6 +59,9 @@ switch ($action) {
     case 'backup_delete':         handleSABackupDelete(); break;
     case 'backup_restore_file':   handleSABackupRestoreFile(); break;
     case 'backup_restore_upload': handleSABackupRestoreUpload(); break;
+    case 'backup_auto_get':       handleSABackupAutoGet(); break;
+    case 'backup_auto_save':      handleSABackupAutoSave(); break;
+    case 'backup_auto_trigger':   handleSABackupAutoTrigger(); break;
     default:
         jsonResponse(['success' => false, 'message' => 'Invalid action.'], 400);
 }
@@ -1777,7 +1780,10 @@ function handleSABackupAutoSave() {
     requireSuperAdmin();
     try {
         $input = getJsonInput();
-        $enabled = !empty($input['enabled']);
+        if (empty($input) && !empty($_POST)) {
+            $input = $_POST;
+        }
+        $enabled = isset($input['enabled']) ? filter_var($input['enabled'], FILTER_VALIDATE_BOOLEAN) : false;
         $period = trim($input['period'] ?? 'daily');
         $retention = intval($input['retention'] ?? 30);
         $config = ChipipieBackupManager::saveAutoBackupConfig($enabled, $period, $retention);

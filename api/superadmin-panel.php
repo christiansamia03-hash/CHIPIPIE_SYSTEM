@@ -6820,16 +6820,21 @@ if (typeof gsap === "undefined") { document.write('<script src="https://cdn.jsde
           renderAutoBackupUI(_autoBackupConfig);
           saToast(newEnabled ? 'Auto-backup enabled on schedule!' : 'Auto-backup disabled.', 'success');
         } else {
-          saToast('Failed to save auto-backup status', 'error');
+          _autoBackupConfig.enabled = !newEnabled;
+          renderAutoBackupUI(_autoBackupConfig);
+          saToast((res && res.message) ? res.message : 'Failed to save auto-backup status', 'error');
         }
       } catch (err) {
         console.error(err);
+        _autoBackupConfig.enabled = !newEnabled;
+        renderAutoBackupUI(_autoBackupConfig);
         saToast('Error saving auto-backup status', 'error');
       }
     }
 
     async function changeAutoBackupPeriod(newPeriod) {
       if (!_autoBackupConfig) _autoBackupConfig = { enabled: true, period: newPeriod, retention: 30 };
+      const oldPeriod = _autoBackupConfig.period;
       _autoBackupConfig.period = newPeriod;
 
       try {
@@ -6842,9 +6847,15 @@ if (typeof gsap === "undefined") { document.write('<script src="https://cdn.jsde
           _autoBackupConfig = res.config;
           renderAutoBackupUI(_autoBackupConfig);
           saToast(`Backup schedule updated: ${newPeriod.replace(/_/g, ' ')}`, 'success');
+        } else {
+          _autoBackupConfig.period = oldPeriod;
+          renderAutoBackupUI(_autoBackupConfig);
+          saToast((res && res.message) ? res.message : 'Failed to update backup schedule', 'error');
         }
       } catch (err) {
         console.error(err);
+        _autoBackupConfig.period = oldPeriod;
+        renderAutoBackupUI(_autoBackupConfig);
         saToast('Failed to update backup schedule', 'error');
       }
     }
