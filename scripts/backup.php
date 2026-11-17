@@ -21,8 +21,19 @@ require_once __DIR__ . '/../api/db_config.php';
 require_once __DIR__ . '/../api/backup_helper.php';
 
 // Parse CLI options
-$options = getopt('', ['format::', 'keep-days::', 'output::', 'skip-sessions', 'help']);
+$options = getopt('', ['format::', 'keep-days::', 'output::', 'skip-sessions', 'auto', 'help']);
 
+// Auto backup mode (respects UI schedule & intervals)
+if (isset($options['auto'])) {
+    echo "[" . date('Y-m-d H:i:s') . "] Running automated backup check...\n";
+    $res = ChipipieBackupManager::checkAndRunAutoBackup(false);
+    if (!$res['executed']) {
+        echo "Schedule check: " . $res['reason'] . ". No backup required at this time.\n";
+        exit(0);
+    }
+    echo "SUCCESS: Auto-backup created: {$res['filename']} ({$res['size']}). Purged: {$res['purged']} older files.\n";
+    exit(0);
+}
 if (isset($options['help'])) {
     echo "ChipiPie Cafe POS — Automated Database Backup\n";
     echo "Usage: php scripts/backup.php [options]\n";

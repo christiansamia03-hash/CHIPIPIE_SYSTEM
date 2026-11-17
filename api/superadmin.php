@@ -1762,3 +1762,43 @@ function handleSABackupRestoreUpload() {
     }
     jsonResponse($res);
 }
+
+function handleSABackupAutoGet() {
+    requireSuperAdmin();
+    try {
+        $config = ChipipieBackupManager::getAutoBackupConfig();
+        jsonResponse(['success' => true, 'config' => $config]);
+    } catch (Throwable $e) {
+        jsonResponse(['success' => false, 'message' => $e->getMessage()], 500);
+    }
+}
+
+function handleSABackupAutoSave() {
+    requireSuperAdmin();
+    try {
+        $input = getJsonInput();
+        $enabled = !empty($input['enabled']);
+        $period = trim($input['period'] ?? 'daily');
+        $retention = intval($input['retention'] ?? 30);
+        $config = ChipipieBackupManager::saveAutoBackupConfig($enabled, $period, $retention);
+        jsonResponse(['success' => true, 'message' => 'Auto-backup settings saved successfully.', 'config' => $config]);
+    } catch (Throwable $e) {
+        jsonResponse(['success' => false, 'message' => $e->getMessage()], 500);
+    }
+}
+
+function handleSABackupAutoTrigger() {
+    requireSuperAdmin();
+    try {
+        set_time_limit(300);
+        $res = ChipipieBackupManager::checkAndRunAutoBackup(true); // force run
+        jsonResponse([
+            'success' => true,
+            'message' => 'Automatic backup snapshot triggered: ' . ($res['filename'] ?? 'backup created'),
+            'result'  => $res,
+            'config'  => ChipipieBackupManager::getAutoBackupConfig()
+        ]);
+    } catch (Throwable $e) {
+        jsonResponse(['success' => false, 'message' => $e->getMessage()], 500);
+    }
+}

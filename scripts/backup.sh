@@ -1,9 +1,9 @@
 #!/usr/bin/env bash
 # ==============================================================================
-# ChipiPie Cafe POS System — Automated Daily Backup Script (DigitalOcean Droplet)
+# ChipiPie Cafe POS System — Automated Scheduled Backup Script (DigitalOcean Droplet)
 # ==============================================================================
-# This script can be scheduled via crontab on DigitalOcean:
-# 0 2 * * * /bin/bash /var/www/html/CHIPIPIE_SYSTEM/scripts/backup.sh >> /var/www/html/CHIPIPIE_SYSTEM/logs/backup.log 2>&1
+# Scheduled via crontab:
+# 0 * * * * /bin/bash /var/www/html/CHIPIPIE_SYSTEM/scripts/backup.sh >> /var/www/html/CHIPIPIE_SYSTEM/logs/backup.log 2>&1
 # ==============================================================================
 
 set -e
@@ -16,16 +16,11 @@ LOGS_DIR="$APP_DIR/logs"
 # Ensure logs directory exists
 mkdir -p "$LOGS_DIR"
 
-echo "=========================================================="
-echo " Starting ChipiPie POS Automated Database Backup"
-echo " Date: $(date '+%Y-%m-%d %H:%M:%S')"
-echo " Base Path: $APP_DIR"
-echo "=========================================================="
-
 cd "$APP_DIR"
 
-# Run PHP Backup script (purges backups older than 14 days automatically)
-php "$SCRIPT_DIR/backup.php" --format=sql --keep-days=14
-
-echo "Backup finished successfully at $(date '+%Y-%m-%d %H:%M:%S')"
-echo "=========================================================="
+# Run PHP Backup script (in --auto mode it checks UI settings; or pass custom args)
+if [ $# -eq 0 ]; then
+    php "$SCRIPT_DIR/backup.php" --auto
+else
+    php "$SCRIPT_DIR/backup.php" "$@"
+fi

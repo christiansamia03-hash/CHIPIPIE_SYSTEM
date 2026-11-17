@@ -1087,6 +1087,39 @@ $_CSRF_TOKEN = getCsrfToken();
       font-weight: 700;
       letter-spacing: 0.02em;
     }
+
+    /* AUTO BACKUP SLIDE SWITCH */
+    .bk-switch-slider {
+      position: relative;
+      width: 58px;
+      height: 30px;
+      background: rgba(255, 255, 255, 0.16);
+      border-radius: 9999px;
+      cursor: pointer;
+      transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+      border: 1.5px solid rgba(255, 255, 255, 0.18);
+      display: inline-block;
+      flex-shrink: 0;
+    }
+    .bk-switch-slider.active {
+      background: linear-gradient(135deg, #a855f7 0%, #6366f1 50%, #38bdf8 100%);
+      border-color: rgba(168, 85, 247, 0.5);
+      box-shadow: 0 4px 18px rgba(168, 85, 247, 0.45);
+    }
+    .bk-switch-thumb {
+      position: absolute;
+      top: 2.5px;
+      left: 3px;
+      width: 22px;
+      height: 22px;
+      background: #ffffff;
+      border-radius: 50%;
+      box-shadow: 0 2px 6px rgba(0, 0, 0, 0.4);
+      transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    }
+    .bk-switch-slider.active .bk-switch-thumb {
+      transform: translateX(27px);
+    }
   </style>
 </head>
 <body>
@@ -2130,6 +2163,71 @@ $_CSRF_TOKEN = getCsrfToken();
             </div>
           </div>
 
+          <!-- Automatic Scheduled Backup Card -->
+          <div class="sa-card" style="margin-bottom:20px;border:1.5px solid rgba(168,85,247,0.3);background:linear-gradient(180deg, rgba(168,85,247,0.07), var(--sa-card-bg));border-radius:14px;padding:20px;">
+            <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:16px;">
+              <div style="display:flex;align-items:center;gap:14px;">
+                <div style="width:46px;height:46px;border-radius:14px;background:linear-gradient(135deg,rgba(168,85,247,0.25),rgba(99,102,241,0.25));color:#c084fc;display:flex;align-items:center;justify-content:center;font-size:22px;flex-shrink:0;border:1px solid rgba(168,85,247,0.3);">
+                  <i class="bi bi-clock-history"></i>
+                </div>
+                <div>
+                  <div style="font-weight:700;font-size:15px;color:var(--sa-text);display:flex;align-items:center;gap:8px;">
+                    <span>Automatic Scheduled Backup</span>
+                    <span id="bk-auto-badge" class="badge" style="font-size:10.5px;padding:3px 9px;border-radius:12px;font-weight:700;background:rgba(255,255,255,0.08);color:var(--sa-muted);">Disabled</span>
+                  </div>
+                  <div style="font-size:12.5px;color:var(--sa-muted);margin-top:2px;">
+                    Automatically create database snapshots on your chosen recurring schedule without manual effort.
+                  </div>
+                </div>
+              </div>
+
+              <!-- Slide Button (matches uploaded image) -->
+              <div style="display:flex;align-items:center;gap:12px;">
+                <span id="bk-auto-status-text" style="font-size:13px;font-weight:700;color:var(--sa-muted);">OFF</span>
+                <div class="bk-switch-slider" id="bk-auto-toggle" onclick="toggleAutoBackup()" title="Toggle Auto-Backup">
+                  <div class="bk-switch-thumb"></div>
+                </div>
+              </div>
+            </div>
+
+            <!-- Collapsible Schedule Options (Shown when enabled) -->
+            <div id="bk-auto-options" style="display:none;margin-top:16px;padding-top:16px;border-top:1px solid rgba(255,255,255,0.08);">
+              <div style="display:grid;grid-template-columns:repeat(auto-fit, minmax(280px, 1fr));gap:16px;align-items:center;">
+                <div>
+                  <label style="font-size:12px;font-weight:700;color:var(--sa-text);display:block;margin-bottom:6px;">
+                    <i class="bi bi-calendar-range me-1" style="color:#a855f7;"></i> Backup Frequency:
+                  </label>
+                  <select id="bk-auto-period" class="sa-input" style="font-size:13px;padding:9px 12px;border-radius:8px;background:var(--sa-surface);color:var(--sa-text);" onchange="changeAutoBackupPeriod(this.value)">
+                    <option value="hourly">⏱️ Hourly (Every 1 hour)</option>
+                    <option value="daily" selected>📅 Daily (Every 24 hours at midnight)</option>
+                    <option value="end_of_month">🗓️ End of the Month (Last day of each month)</option>
+                    <option value="every_6_months">📆 Every 6 Months (Twice a year / 180 days)</option>
+                    <option value="yearly">🎂 Yearly (Once a year)</option>
+                  </select>
+                  <div style="font-size:11.5px;color:var(--sa-muted);margin-top:4px;" id="bk-auto-period-desc">
+                    Creates a full database snapshot once every day.
+                  </div>
+                </div>
+
+                <!-- Live Schedule Info Display -->
+                <div style="background:rgba(255,255,255,0.03);border:1px solid rgba(255,255,255,0.08);border-radius:10px;padding:12px 16px;">
+                  <div style="display:flex;justify-content:space-between;margin-bottom:6px;font-size:12px;">
+                    <span style="color:var(--sa-muted);">Next Backup:</span>
+                    <strong id="bk-auto-next-run" style="color:#38bdf8;">Calculating...</strong>
+                  </div>
+                  <div style="display:flex;justify-content:space-between;font-size:12px;">
+                    <span style="color:var(--sa-muted);">Last Auto-Run:</span>
+                    <span id="bk-auto-last-run" style="color:var(--sa-text);">Never</span>
+                  </div>
+                  <div style="margin-top:8px;text-align:right;">
+                    <button type="button" class="sa-btn sa-btn-secondary" style="font-size:11.5px;padding:5px 12px;" onclick="triggerAutoBackupNow()" id="btn-trigger-auto-bk">
+                      <i class="bi bi-play-circle-fill me-1" style="color:#a855f7;"></i> Run Auto-Backup Now
+                    </button>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
           <!-- Main Actions: Quick Backup & Restore Cards -->
           <div style="display:grid;grid-template-columns:repeat(auto-fit, minmax(320px, 1fr));gap:20px;margin-bottom:20px;">
             
@@ -6310,7 +6408,7 @@ if (typeof gsap === "undefined") { document.write('<script src="https://cdn.jsde
     let _activeRestoreSource = null;
 
     async function loadBackupView() {
-      await Promise.all([loadBackupStats(), loadBackupsList()]);
+      await Promise.all([loadBackupStats(), loadBackupsList(), loadAutoBackupConfig()]);
     }
 
     async function loadBackupStats() {
@@ -6640,6 +6738,141 @@ if (typeof gsap === "undefined") { document.write('<script src="https://cdn.jsde
       }
     }
 
+
+
+    /* =============================================
+       AUTO-BACKUP SCHEDULE CONTROLS
+    ============================================= */
+    let _autoBackupConfig = null;
+
+    async function loadAutoBackupConfig() {
+      try {
+        const res = await saApi('superadmin.php?action=backup_auto_get');
+        if (!res || !res.success || !res.config) return;
+        _autoBackupConfig = res.config;
+        renderAutoBackupUI(_autoBackupConfig);
+      } catch (err) {
+        console.error('loadAutoBackupConfig error:', err);
+      }
+    }
+
+    function renderAutoBackupUI(cfg) {
+      if (!cfg) return;
+      const toggle = document.getElementById('bk-auto-toggle');
+      const badge = document.getElementById('bk-auto-badge');
+      const statusText = document.getElementById('bk-auto-status-text');
+      const options = document.getElementById('bk-auto-options');
+      const periodSel = document.getElementById('bk-auto-period');
+      const nextRun = document.getElementById('bk-auto-next-run');
+      const lastRun = document.getElementById('bk-auto-last-run');
+      const periodDesc = document.getElementById('bk-auto-period-desc');
+
+      const isEnabled = !!cfg.enabled;
+      if (toggle) toggle.classList.toggle('active', isEnabled);
+      if (statusText) {
+        statusText.textContent = isEnabled ? 'ON' : 'OFF';
+        statusText.style.color = isEnabled ? '#c084fc' : 'var(--sa-muted)';
+      }
+      if (badge) {
+        badge.textContent = isEnabled ? 'Active' : 'Disabled';
+        badge.style.background = isEnabled ? 'rgba(16,185,129,0.18)' : 'rgba(255,255,255,0.08)';
+        badge.style.color = isEnabled ? '#10b981' : 'var(--sa-muted)';
+      }
+      if (options) {
+        options.style.display = isEnabled ? 'block' : 'none';
+      }
+      if (periodSel) {
+        periodSel.value = cfg.period || 'daily';
+      }
+      if (nextRun) {
+        nextRun.textContent = cfg.next_run || 'Pending';
+      }
+      if (lastRun) {
+        lastRun.textContent = cfg.last_run && cfg.last_run !== 'never' ? cfg.last_run : 'Never';
+      }
+
+      const descs = {
+        hourly: 'Creates a full snapshot every 1 hour automatically.',
+        daily: 'Creates a full snapshot once every day at midnight.',
+        end_of_month: 'Creates a full snapshot on the final day of each month.',
+        every_6_months: 'Creates a snapshot twice a year (every 180 days).',
+        yearly: 'Creates a snapshot once every 365 days.'
+      };
+      if (periodDesc) {
+        periodDesc.textContent = descs[cfg.period] || descs.daily;
+      }
+    }
+
+    async function toggleAutoBackup() {
+      if (!_autoBackupConfig) _autoBackupConfig = { enabled: false, period: 'daily', retention: 30 };
+      const newEnabled = !_autoBackupConfig.enabled;
+      _autoBackupConfig.enabled = newEnabled;
+      renderAutoBackupUI(_autoBackupConfig);
+
+      try {
+        const res = await saApi('superadmin.php?action=backup_auto_save', {
+          enabled: newEnabled,
+          period: _autoBackupConfig.period,
+          retention: _autoBackupConfig.retention || 30
+        });
+        if (res && res.success) {
+          _autoBackupConfig = res.config;
+          renderAutoBackupUI(_autoBackupConfig);
+          saToast(newEnabled ? 'Auto-backup enabled on schedule!' : 'Auto-backup disabled.', 'success');
+        } else {
+          saToast('Failed to save auto-backup status', 'error');
+        }
+      } catch (err) {
+        console.error(err);
+        saToast('Error saving auto-backup status', 'error');
+      }
+    }
+
+    async function changeAutoBackupPeriod(newPeriod) {
+      if (!_autoBackupConfig) _autoBackupConfig = { enabled: true, period: newPeriod, retention: 30 };
+      _autoBackupConfig.period = newPeriod;
+
+      try {
+        const res = await saApi('superadmin.php?action=backup_auto_save', {
+          enabled: _autoBackupConfig.enabled,
+          period: newPeriod,
+          retention: _autoBackupConfig.retention || 30
+        });
+        if (res && res.success) {
+          _autoBackupConfig = res.config;
+          renderAutoBackupUI(_autoBackupConfig);
+          saToast(`Backup schedule updated: ${newPeriod.replace(/_/g, ' ')}`, 'success');
+        }
+      } catch (err) {
+        console.error(err);
+        saToast('Failed to update backup schedule', 'error');
+      }
+    }
+
+    async function triggerAutoBackupNow() {
+      const btn = document.getElementById('btn-trigger-auto-bk');
+      const orig = btn ? btn.innerHTML : '';
+      if (btn) { btn.disabled = true; btn.innerHTML = '<span class="spinner-border spinner-border-sm me-1"></span> Archiving...'; }
+
+      try {
+        const res = await saApi('superadmin.php?action=backup_auto_trigger', {});
+        if (res && res.success) {
+          saToast(res.message || 'Auto-backup completed!', 'success');
+          if (res.config) {
+            _autoBackupConfig = res.config;
+            renderAutoBackupUI(_autoBackupConfig);
+          }
+          await loadBackupView();
+        } else {
+          saToast((res && res.message) ? res.message : 'Backup trigger failed', 'error');
+        }
+      } catch (err) {
+        console.error(err);
+        saToast('Error triggering backup: ' + err.message, 'error');
+      } finally {
+        if (btn) { btn.disabled = false; btn.innerHTML = orig; }
+      }
+    }
 
     function openModal(id) {
       document.getElementById(id).classList.add('open');

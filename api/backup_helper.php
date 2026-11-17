@@ -551,4 +551,207 @@ class ChipipieBackupManager {
         $bytes /= pow(1024, $pow);
         return round($bytes, $precision) . ' ' . $units[$pow];
     }
+
+    /**
+     * Get auto backup configuration from system_settings
+     */
+    public static function getAutoBackupConfig() {
+        $db = getDB();
+        $keys = ['auto_backup_enabled', 'auto_backup_period', 'auto_backup_last_run', 'auto_backup_retention'];
+        $placeholders = implode(',', array_fill(0, count($keys), '?'));
+        
+        $stmt = $db->prepare("SELECT setting_key, setting_value FROM system_settings WHERE setting_key IN ($placeholders)");
+        $stmt->execute($keys);
+        $settings = $stmt->fetchAll(PDO::FETCH_KEY_PAIR);
+
+        $enabled   = ($settings['auto_backup_enabled'] ?? '0') === '1';
+        $period    = $settings['auto_backup_period'] ?? 'daily';
+        $lastRun   = $settings['auto_backup_last_run'] ?? 'never';
+        $retention = intval($settings['auto_backup_retention'] ?? 30);
+        if ($retention < 5) $retention = 30;
+
+        $nextRun = self::calculateNextRun($lastRun, $period, $enabled);
+
+        return [
+            'enabled'   => $enabled,
+            'period'    => $period,
+            'last_run'  => $lastRun,
+            'next_run'  => $nextRun,
+            'retention' => $retention,
+        ];
+    }
+
+    /**
+     * Save auto backup configuration to system_settings
+     */
+    public static function saveAutoBackupConfig($enabled, $period, $retention = 30) {
+        $db = getDB();
+        $allowedPeriods = ['hourly', 'daily', 'end_of_month', 'every_6_months', 'yearly'];
+        if (!in_array($period, $allowedPeriods)) {
+            $period = 'daily';
+        }
+        $retention = max(5, min(365, intval($retention)));
+        $enabledStr = $enabled ? '1' : '0';
+
+        $upsert = function($key, $val) use ($db) {
+            $stmt = $db->prepare("
+                INSERT INTO system_settings (setting_key, setting_value, updated_at) 
+                VALUES (?, ?, NOW()) 
+                ON DUPLICATE KEY UPDATE setting_value = VALUES(setting_value), updated_at = NOW()
+            ");
+            $stmt->execute([$key, $val]);
+        };
+
+        $upsert('auto_backup_enabled', $enabledStr);
+        $upsert('auto_backup_period', $period);
+        $upsert('auto_backup_retention', (string)$retention);
+
+        return self::getAutoBackupConfig();
+    }
+
+    /**
+     * Calculate next scheduled backup timestamp/description
+     */
+    public static function calculateNextRun($lastRunStr, $period, $enabled = true) {
+        if (!$enabled) return 'Disabled';
+
+        $now = time();
+        $lastTs = ($lastRunStr && $lastRunStr !== 'never') ? strtotime($lastRunStr) : 0;
+        if (!$lastTs) {
+            return 'Pending first run';
+        }
+
+        switch ($period) {
+            case 'hourly':
+                $next = $lastTs + 3600;
+                break;
+            case 'daily':
+                $next = $lastTs + 86400;
+                break;
+            case 'end_of_month':
+                $t = strtotime(date('Y-m-t 23:59:59', $lastTs));
+                $next = ($t > $lastTs) ? $t : strtotime(date('Y-m-t 23:59:59', strtotime('+1 month', $lastTs)));
+                break;
+            case 'every_6_months':
+                $next = strtotime('+6 months', $lastTs);
+                break;
+            case 'yearly':
+                $next = strtotime('+1 year', $lastTs);
+                break;
+            default:
+                $next = $lastTs + 86400;
+                break;
+        }
+
+        if ($next <= $now) {
+            return 'Due now (next sync)';
+        }
+        return date('M j, Y g:i A', $next);
+    }
+
+    /**
+     * Check if auto backup is due right now
+     */
+    public static function isAutoBackupDue() {
+        $config = self::getAutoBackupConfig();
+        if (!$config['enabled']) {
+            return false;
+        }
+
+        $lastRunStr = $config['last_run'];
+        if (!$lastRunStr || $lastRunStr === 'never') {
+            return true;
+        }
+
+        $lastRunTs = strtotime($lastRunStr);
+        if (!$lastRunTs) {
+            return true;
+        }
+
+        $now = time();
+        $period = $config['period'];
+
+        switch ($period) {
+            case 'hourly':
+                return ($now - $lastRunTs) >= 3600;
+
+            case 'daily':
+                return ($now - $lastRunTs) >= 86400 || (date('Y-m-d', $now) !== date('Y-m-d', $lastRunTs) && ($now - $lastRunTs) >= 43200);
+
+            case 'end_of_month':
+                $isLastDayOfMonth = (date('t', $now) === date('d', $now));
+                $notRunThisMonth  = (date('Y-m', $now) !== date('Y-m', $lastRunTs));
+                return ($isLastDayOfMonth && $notRunThisMonth) || (($now - $lastRunTs) >= (31 * 86400));
+
+            case 'every_6_months':
+                return ($now - $lastRunTs) >= (180 * 86400);
+
+            case 'yearly':
+                return (date('Y', $now) !== date('Y', $lastRunTs)) || (($now - $lastRunTs) >= (365 * 86400));
+
+            default:
+                return ($now - $lastRunTs) >= 86400;
+        }
+    }
+
+    /**
+     * Purge older backups keeping only the most recent $keepCount files
+     */
+    public static function purgeOldBackups($keepCount = 30) {
+        $backups = self::listBackups();
+        if (count($backups) <= $keepCount) {
+            return 0;
+        }
+
+        $purged = 0;
+        $excess = array_slice($backups, $keepCount);
+        foreach ($excess as $b) {
+            if (self::deleteBackup($b['filename'])) {
+                $purged++;
+            }
+        }
+        return $purged;
+    }
+
+    /**
+     * Execute auto backup if due
+     */
+    public static function checkAndRunAutoBackup($force = false) {
+        if (!$force && !self::isAutoBackupDue()) {
+            return ['executed' => false, 'reason' => 'Not due or disabled'];
+        }
+
+        $db = getDB();
+        $nowStr = date('Y-m-d H:i:s');
+
+        // Update last run time first to prevent concurrency race
+        $stmt = $db->prepare("
+            INSERT INTO system_settings (setting_key, setting_value, updated_at) 
+            VALUES ('auto_backup_last_run', ?, NOW()) 
+            ON DUPLICATE KEY UPDATE setting_value = VALUES(setting_value), updated_at = NOW()
+        ");
+        $stmt->execute([$nowStr]);
+
+        // Create the backup
+        $res = self::createServerBackup('sql');
+
+        // Auto-purge old snapshots beyond retention count
+        $config = self::getAutoBackupConfig();
+        $retention = intval($config['retention'] ?? 30);
+        $purged = self::purgeOldBackups($retention);
+
+        // Record audit log
+        try {
+            $lStmt = $db->prepare("INSERT INTO system_logs (action, details, created_at) VALUES ('auto_backup', ?, NOW())");
+            $lStmt->execute(["Automated database backup created: {$res['filename']} ({$res['size_formatted']}). Older backups purged: {$purged}."]);
+        } catch (Throwable $e) {}
+
+        return [
+            'executed' => true,
+            'filename' => $res['filename'],
+            'size'     => $res['size_formatted'],
+            'purged'   => $purged,
+            'time'     => $nowStr
+        ];
+    }
 }
