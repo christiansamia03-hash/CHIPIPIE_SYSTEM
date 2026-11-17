@@ -5469,6 +5469,59 @@ $_CSRF_TOKEN = getCsrfToken();
     <!-- Kitchen ticket content is populated dynamically by JS -->
   </div>
 
+  <!-- SESSION INACTIVITY TIMEOUT MODAL (ISO/IEC 25010 Security & User Protection) -->
+  <div class="modal fade" id="sessionInactivityModal" tabindex="-1" data-bs-backdrop="static" data-bs-keyboard="false" aria-hidden="true" style="z-index: 1090;">
+    <div class="modal-dialog modal-dialog-centered" style="max-width: 430px; margin: 16px auto;">
+      <div class="modal-content" style="border-radius: 22px; overflow: hidden; border: 1px solid rgba(180, 83, 9, 0.28); box-shadow: 0 25px 65px rgba(0,0,0,0.4); background: #ffffff;">
+        <div style="background: linear-gradient(135deg, #fffbeb 0%, #fef3c7 100%); padding: 26px 24px 20px; text-align: center; border-bottom: 1px solid #fde68a; position: relative;">
+          <!-- Animated Countdown Badge -->
+          <div style="display: inline-flex; flex-direction: column; align-items: center; justify-content: center; width: 84px; height: 84px; border-radius: 50%; background: #ffffff; border: 3px solid #f59e0b; margin-bottom: 12px; box-shadow: 0 8px 24px rgba(245, 158, 11, 0.28); position: relative;">
+            <span id="session-timeout-num" style="font-size: 32px; font-weight: 800; color: #b45309; font-family: monospace; line-height: 1;">60</span>
+            <span style="font-size: 10px; font-weight: 700; color: #d97706; text-transform: uppercase; letter-spacing: 0.5px; margin-top: 2px;">SEC</span>
+          </div>
+          <h4 style="margin: 0; font-weight: 800; color: #78350f; font-size: 21px; letter-spacing: -0.3px;">Are you still there?</h4>
+          <p style="margin: 6px 0 0; font-size: 13px; color: #92400e; font-weight: 500;">
+            Cashier workstation has been idle
+          </p>
+        </div>
+        
+        <div style="padding: 22px 24px; background: #ffffff;">
+          <!-- Smooth Animated Progress Bar -->
+          <div style="height: 6px; background: #fef3c7; border-radius: 999px; overflow: hidden; margin-bottom: 16px;">
+            <div id="session-timeout-progress" style="height: 100%; width: 100%; background: linear-gradient(90deg, #10b981, #f59e0b, #ef4444); border-radius: 999px; transition: width 1s linear;"></div>
+          </div>
+
+          <p style="font-size: 13px; color: #4b5563; line-height: 1.55; margin-bottom: 14px; text-align: center;">
+            No register activity detected for <strong>4 minutes</strong>. To prevent unauthorized register transactions (<strong>ISO/IEC 25010 Security</strong>), this session will automatically lock in <strong id="session-timeout-secs-text" style="color: #b45309;">60 seconds</strong>.
+          </p>
+
+          <div id="session-timeout-cart-banner" style="display:none; background: #ecfdf5; border: 1px solid #a7f3d0; border-radius: 12px; padding: 10px 14px; font-size: 12px; color: #065f46; margin-bottom: 16px;">
+            <div style="display:flex; align-items:center; gap:9px;">
+              <i class="bi bi-shield-check" style="font-size: 18px; color: #10b981; flex-shrink: 0;"></i>
+              <div>
+                <strong style="color: #065f46;">Active Order Protected:</strong>
+                <span id="session-timeout-cart-desc" style="display:block; font-size: 11.5px; color: #047857; margin-top: 2px;">Your current cart items will be preserved safely.</span>
+              </div>
+            </div>
+          </div>
+
+          <!-- Action Buttons -->
+          <button type="button" class="btn w-100" id="btn-session-still-here" onclick="keepSessionAlive()" style="background: linear-gradient(135deg, #2b1810, #422518); color: #ffffff; font-weight: 700; padding: 13px; border-radius: 12px; font-size: 14.5px; border: none; box-shadow: 0 4px 14px rgba(43,24,16,0.3); transition: all 0.15s ease;">
+            <i class="bi bi-check-circle-fill me-2" style="color: #34d399;"></i> I'm Still Here &mdash; Keep Working
+          </button>
+
+          <button type="button" class="btn w-100 mt-2" onclick="lockSessionNow()" style="background: transparent; color: #9ca3af; font-size: 12.5px; border: none; padding: 7px; text-decoration: none;">
+            <i class="bi bi-lock me-1"></i> Lock Register Now (Sign Out)
+          </button>
+
+          <div style="margin-top: 14px; padding-top: 12px; border-top: 1px solid #f3f4f6; text-align: center; font-size: 11px; color: #9ca3af; display: flex; align-items: center; justify-content: center; gap: 4px;">
+            <i class="bi bi-shield-lock" style="color: #6b7280;"></i>
+            <span>ISO 25010 (Security &amp; Fault Tolerance) &bull; PCI-DSS 4.0</span>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
   <!-- TOAST -->
   <div class="toast-notif" id="toast"></div>
 
@@ -9919,9 +9972,14 @@ $_CSRF_TOKEN = getCsrfToken();
       }
       // Preload PayMongo key status (works for both admin and cashier)
       initGCashKey();
+
+      // Start ISO 25010 Cashier Inactivity & Productivity Safeguard
+      startInactivityMonitoring();
+      restorePreservedCartIfAny();
     }
 
     async function logout() {
+      stopInactivityMonitoring();
       try { await api('auth.php?action=logout', {}); } catch (e) { }
       localStorage.removeItem('chipipie_pos_session_id');
       localStorage.removeItem('chipipie_session_id');
@@ -9938,6 +9996,253 @@ $_CSRF_TOKEN = getCsrfToken();
       document.getElementById('login-wrapper').style.display = 'flex';
       playWaterDropLoginAnimation('#login-wrapper .login-card');
     }
+
+    /* ==========================================================================
+       ISO/IEC 25010 CASHIER INACTIVITY & PRODUCTIVITY SAFEGUARD
+       - Standard: ISO/IEC 25010 Quality Model (Security, Usability & Fault Tolerance)
+       - Benchmark: PCI-DSS 4.0 Requirement 8.2.8 & F&B Retail Ergonomics
+       - Default Idle Threshold: 4 minutes (240s) idle + 60s countdown = 5 minutes (300s) total
+       - Features:
+         1. Multi-modal alert: Visually prominent modal + Web Audio API two-tone chime
+         2. Single-click extension ("I'm Still Here — Keep Working") or any keyboard press
+         3. Fault-tolerant Cart Preservation: Saves active order in cart before locking
+         4. Automatic Order Restoration upon cashier re-authentication
+       ========================================================================== */
+
+    let _inactivityTimer = null;
+    let _countdownInterval = null;
+    let _lastActivityTimestamp = Date.now();
+    let _isWarningModalOpen = false;
+    let _remainingCountdownSec = 60;
+
+    const INACTIVITY_IDLE_SECONDS = 240;       // 4 minutes of zero interaction
+    const INACTIVITY_COUNTDOWN_SECONDS = 60;   // 60-second countdown grace period (Total: 5 min)
+
+    function recordUserActivity() {
+      if (!_isWarningModalOpen) {
+        _lastActivityTimestamp = Date.now();
+      }
+    }
+
+    function playInactivityChime() {
+      try {
+        const AudioCtx = window.AudioContext || window.webkitAudioContext;
+        if (!AudioCtx) return;
+        const ctx = new AudioCtx();
+        if (ctx.state === 'suspended') {
+          ctx.resume();
+        }
+        const now = ctx.currentTime;
+        // Two soft musical notification notes (E5 659Hz -> G#5 831Hz)
+        [ { freq: 659.25, time: 0 }, { freq: 830.61, time: 0.18 } ].forEach(n => {
+          const osc = ctx.createOscillator();
+          const gain = ctx.createGain();
+          osc.type = 'sine';
+          osc.frequency.setValueAtTime(n.freq, now + n.time);
+          gain.gain.setValueAtTime(0.18, now + n.time);
+          gain.gain.exponentialRampToValueAtTime(0.001, now + n.time + 0.45);
+          osc.connect(gain);
+          gain.connect(ctx.destination);
+          osc.start(now + n.time);
+          osc.stop(now + n.time + 0.5);
+        });
+      } catch (e) { /* AudioContext policy */ }
+    }
+
+    function startInactivityMonitoring() {
+      stopInactivityMonitoring();
+      _lastActivityTimestamp = Date.now();
+      _isWarningModalOpen = false;
+
+      // Global activity listeners with 1-second throttle
+      const events = ['mousemove', 'mousedown', 'keydown', 'touchstart', 'scroll', 'click'];
+      let lastThrottle = 0;
+      window._inactivityHandler = function(e) {
+        const now = Date.now();
+        if (now - lastThrottle > 1000) {
+          lastThrottle = now;
+          recordUserActivity();
+        }
+        // If warning modal is open, any keypress or touch keeps session alive
+        if (_isWarningModalOpen && (e.type === 'keydown' || e.type === 'touchstart')) {
+          keepSessionAlive();
+        }
+      };
+
+      events.forEach(evt => window.addEventListener(evt, window._inactivityHandler, { passive: true }));
+
+      // Check inactivity every 1 second
+      _inactivityTimer = setInterval(checkInactivityStatus, 1000);
+    }
+
+    function stopInactivityMonitoring() {
+      if (_inactivityTimer) {
+        clearInterval(_inactivityTimer);
+        _inactivityTimer = null;
+      }
+      if (_countdownInterval) {
+        clearInterval(_countdownInterval);
+        _countdownInterval = null;
+      }
+      _isWarningModalOpen = false;
+      const modalEl = document.getElementById('sessionInactivityModal');
+      if (modalEl) {
+        bootstrap.Modal.getInstance(modalEl)?.hide();
+      }
+    }
+
+    function checkInactivityStatus() {
+      const appWrapper = document.getElementById('app-wrapper');
+      if (!currentUser || !appWrapper || appWrapper.style.display === 'none') {
+        return;
+      }
+
+      if (_isWarningModalOpen) return;
+
+      const idleSec = Math.floor((Date.now() - _lastActivityTimestamp) / 1000);
+      if (idleSec >= INACTIVITY_IDLE_SECONDS) {
+        showInactivityWarningModal();
+      }
+    }
+
+    function showInactivityWarningModal() {
+      _isWarningModalOpen = true;
+      _remainingCountdownSec = INACTIVITY_COUNTDOWN_SECONDS;
+
+      const modalEl = document.getElementById('sessionInactivityModal');
+      if (!modalEl) return;
+
+      const numEl = document.getElementById('session-timeout-num');
+      const textEl = document.getElementById('session-timeout-secs-text');
+      const progEl = document.getElementById('session-timeout-progress');
+      const cartBanner = document.getElementById('session-timeout-cart-banner');
+      const cartDesc = document.getElementById('session-timeout-cart-desc');
+
+      if (numEl) numEl.textContent = _remainingCountdownSec;
+      if (textEl) textEl.textContent = _remainingCountdownSec + ' seconds';
+      if (progEl) {
+        progEl.style.transition = 'none';
+        progEl.style.width = '100%';
+        setTimeout(() => { progEl.style.transition = 'width 1s linear'; }, 50);
+      }
+
+      // Check if cart has items to reassure cashier
+      const hasCartItems = cart && Object.keys(cart).length > 0;
+      if (cartBanner) {
+        cartBanner.style.display = hasCartItems ? 'block' : 'none';
+        if (hasCartItems && cartDesc) {
+          const count = Object.values(cart).reduce((sum, item) => sum + (item.qty || 1), 0);
+          cartDesc.textContent = `${count} customer item${count > 1 ? 's' : ''} in cart will be safely saved and restored when you log back in.`;
+        }
+      }
+
+      const bsModal = bootstrap.Modal.getOrCreateInstance(modalEl);
+      bsModal.show();
+      playInactivityChime();
+
+      // Start countdown
+      if (_countdownInterval) clearInterval(_countdownInterval);
+      _countdownInterval = setInterval(() => {
+        _remainingCountdownSec--;
+
+        if (numEl) numEl.textContent = Math.max(0, _remainingCountdownSec);
+        if (textEl) textEl.textContent = Math.max(0, _remainingCountdownSec) + ' seconds';
+        if (progEl) {
+          const pct = Math.max(0, (_remainingCountdownSec / INACTIVITY_COUNTDOWN_SECONDS) * 100);
+          progEl.style.width = pct + '%';
+        }
+
+        if (_remainingCountdownSec <= 0) {
+          clearInterval(_countdownInterval);
+          _countdownInterval = null;
+          handleInactivityExpiration();
+        }
+      }, 1000);
+    }
+
+    function keepSessionAlive() {
+      if (_countdownInterval) {
+        clearInterval(_countdownInterval);
+        _countdownInterval = null;
+      }
+      _isWarningModalOpen = false;
+      _lastActivityTimestamp = Date.now();
+
+      const modalEl = document.getElementById('sessionInactivityModal');
+      if (modalEl) {
+        bootstrap.Modal.getInstance(modalEl)?.hide();
+      }
+      showToast('✓ Session active — welcome back!');
+    }
+
+    async function lockSessionNow() {
+      if (_countdownInterval) {
+        clearInterval(_countdownInterval);
+        _countdownInterval = null;
+      }
+      _isWarningModalOpen = false;
+      const modalEl = document.getElementById('sessionInactivityModal');
+      if (modalEl) {
+        bootstrap.Modal.getInstance(modalEl)?.hide();
+      }
+      await handleInactivityExpiration(true);
+    }
+
+    async function handleInactivityExpiration(isManualLock = false) {
+      stopInactivityMonitoring();
+
+      // Preserve active cart (ISO 25010 Recoverability)
+      if (cart && Object.keys(cart).length > 0) {
+        try {
+          localStorage.setItem('chipipie_preserved_cart', JSON.stringify({
+            cart: cart,
+            savedAt: Date.now(),
+            user: (currentUser && (currentUser.username || currentUser.full_name)) || 'Cashier'
+          }));
+        } catch (e) {}
+      }
+
+      // Logout session
+      await logout();
+
+      // Show security lockout message on login screen
+      const errEl = document.getElementById('login-error');
+      if (errEl) {
+        errEl.innerHTML = `
+          <div style="display:flex;align-items:flex-start;gap:9px;text-align:left;">
+            <i class="bi bi-shield-lock-fill" style="font-size:19px;color:#dc2626;flex-shrink:0;margin-top:2px;"></i>
+            <div>
+              <strong style="color:#991b1b;">Register Locked for Security:</strong>
+              <div style="font-size:12px;color:#4b5563;margin-top:2px;">
+                ${isManualLock ? 'Register was locked manually.' : 'Terminal was inactive for 5 minutes (ISO 25010 Security Safeguard). Please sign in to resume.'}
+              </div>
+            </div>
+          </div>
+        `;
+        errEl.style.display = 'block';
+      }
+    }
+
+    function restorePreservedCartIfAny() {
+      try {
+        const raw = localStorage.getItem('chipipie_preserved_cart');
+        if (!raw) return;
+        const saved = JSON.parse(raw);
+        if (saved && saved.cart && Object.keys(saved.cart).length > 0 && (Date.now() - (saved.savedAt || 0) < 8 * 3600 * 1000)) {
+          cart = saved.cart;
+          renderCart();
+          showToast('✓ Restored your in-progress customer order from before session lock.');
+        }
+        localStorage.removeItem('chipipie_preserved_cart');
+      } catch (e) {
+        console.warn('Error restoring preserved cart:', e);
+      }
+    }
+
+    // Developer / tester trigger: testInactivityModal()
+    window.testInactivityModal = function() {
+      showInactivityWarningModal();
+    };
 
     /* ========== REGISTER (Login page) ========== */
     function showRegisterForm() {
