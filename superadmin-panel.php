@@ -3016,7 +3016,7 @@ if (typeof gsap === "undefined") { document.write('<script src="https://cdn.jsde
     /* =============================================
        API HELPER
     ============================================= */
-    const BASE = 'api/';
+    const BASE = window.location.pathname.includes('/api/') ? '' : 'api/';
     async function saApi(endpoint, data = null, method = null) {
       const m = method || (data !== null ? 'POST' : 'GET');
       const opts = {
@@ -6287,6 +6287,344 @@ if (typeof gsap === "undefined") { document.write('<script src="https://cdn.jsde
     /* =============================================
        MODAL HELPERS
     ============================================= */
+    
+    /* =============================================
+       BACKUP & RESTORE
+    ============================================= */
+    let _activeRestoreSource = null;
+
+    async function loadBackupView() {
+      await Promise.all([loadBackupStats(), loadBackupsList()]);
+    }
+
+    async function loadBackupStats() {
+      try {
+        const res = await saApi('superadmin.php?action=backup_stats');
+        if (!res || !res.success) {
+          saToast(res ? res.message : 'Failed to load backup stats', 'error');
+          return;
+        }
+        renderBackupStats(res.data);
+      } catch (err) {
+        console.error(err);
+      }
+    }
+
+    function renderBackupStats(d) {
+      if (!d) return;
+      const tEl = document.getElementById('bk-stat-tables');
+      if (tEl) tEl.textContent = d.table_count || 0;
+
+      const dbInfoEl = document.getElementById('bk-stat-db-info');
+      if (dbInfoEl) dbInfoEl.textContent = `${d.database_name} (${d.database_host || 'remote'})`;
+
+      const rowsEl = document.getElementById('bk-stat-rows');
+      if (rowsEl) rowsEl.textContent = Number(d.total_rows || 0).toLocaleString();
+
+      const lastBkEl = document.getElementById('bk-stat-last-backup');
+      if (lastBkEl) {
+        if (d.last_backup) {
+          lastBkEl.textContent = `${d.last_backup.created_at} (${d.last_backup.size_formatted})`;
+        } else {
+          lastBkEl.textContent = 'No archive backup yet';
+        }
+      }
+
+      const breakdownEl = document.getElementById('bk-table-breakdown');
+      if (breakdownEl && d.tables) {
+        let html = '';
+        for (const [table, count] of Object.entries(d.tables)) {
+          html += `
+            <div style="background:var(--sa-surface);border:1px solid var(--sa-border);border-radius:8px;padding:10px 14px;display:flex;align-items:center;justify-content:space-between;">
+              <span style="font-family:monospace;font-size:12px;color:var(--sa-text);font-weight:600;">${escapeHtml(table)}</span>
+              <span class="badge" style="background:rgba(59,130,246,0.15);color:#3b82f6;font-size:11px;font-weight:700;">${Number(count).toLocaleString()}</span>
+            </div>`;
+        }
+        breakdownEl.innerHTML = html;
+      }
+    }
+
+    async function loadBackupsList() {
+      const tbody = document.getElementById('bk-archive-tbody');
+      if (!tbody) return;
+      try {
+        const res = await saApi('superadmin.php?action=backup_list');
+        if (!res || !res.success || !res.backups) {
+          tbody.innerHTML = `<tr><td colspan="5" style="text-align:center;padding:18px;color:var(--sa-muted);">Failed to load backups.</td></tr>`;
+          return;
+        }
+        const bkCountEl = document.getElementById('bk-stat-backups-count');
+        if (bkCountEl) bkCountEl.textContent = res.backups.length;
+
+        if (res.backups.length === 0) {
+          tbody.innerHTML = `<tr><td colspan="5" style="text-align:center;padding:22px;color:var(--sa-muted);"><i class="bi bi-inbox" style="font-size:24px;display:block;margin-bottom:6px;"></i>No backup files stored in server archive.</td></tr>`;
+          return;
+        }
+
+        let html = '';
+        res.backups.forEach(b => {
+          const typeBadge = b.type === 'sql' 
+            ? `<span class="badge" style="background:rgba(59,130,246,0.15);color:#3b82f6;font-weight:700;font-size:11px;">SQL</span>`
+            : `<span class="badge" style="background:rgba(16,185,129,0.15);color:#10b981;font-weight:700;font-size:11px;">JSON</span>`;
+
+          html += `
+            <tr>
+              <td>
+                <div style="display:flex;align-items:center;gap:8px;">
+                  <i class="bi ${b.type === 'sql' ? 'bi-filetype-sql' : 'bi-filetype-json'}" style="font-size:20px;color:var(--sa-primary);"></i>
+                  <strong style="font-family:monospace;font-size:13px;">${escapeHtml(b.filename)}</strong>
+                </div>
+              </td>
+              <td>${typeBadge}</td>
+              <td style="font-size:12px;color:var(--sa-muted);">${escapeHtml(b.size_formatted)}</td>
+              <td style="font-size:12px;color:var(--sa-muted);">${escapeHtml(b.created_at)}</td>
+              <td style="text-align:right;">
+                <div style="display:inline-flex;gap:6px;">
+                  <button class="sa-btn sa-btn-ghost" style="padding:5px 10px;font-size:12px;" onclick="downloadArchiveFile('${escapeHtml(b.filename)}')" title="Download File">
+                    <i class="bi bi-download"></i>
+                  </button>
+                  <button class="sa-btn sa-btn-danger" style="padding:5px 10px;font-size:12px;" onclick="confirmArchiveRestore('${escapeHtml(b.filename)}')" title="Restore Database">
+                    <i class="bi bi-arrow-counterclockwise"></i> Restore
+                  </button>
+                  <button class="sa-btn sa-btn-ghost" style="padding:5px 10px;font-size:12px;color:#ef4444;" onclick="deleteArchiveBackup('${escapeHtml(b.filename)}')" title="Delete File">
+                    <i class="bi bi-trash"></i>
+                  </button>
+                </div>
+              </td>
+            </tr>`;
+        });
+        tbody.innerHTML = html;
+      } catch (err) {
+        console.error(err);
+        tbody.innerHTML = `<tr><td colspan="5" style="text-align:center;padding:18px;color:#ef4444;">Error loading archive list.</td></tr>`;
+      }
+    }
+
+    async function downloadBackup(format) {
+      const btn = format === 'sql' ? document.getElementById('btn-dl-sql') : document.getElementById('btn-dl-json');
+      const origHtml = btn ? btn.innerHTML : '';
+      if (btn) { btn.disabled = true; btn.innerHTML = '<span class="spinner-border spinner-border-sm me-2"></span> Generating...'; }
+
+      try {
+        const endpoint = format === 'sql' ? 'superadmin.php?action=backup_export_sql' : 'superadmin.php?action=backup_export_json';
+        const sid = localStorage.getItem('chipipie_sa_session_id') || localStorage.getItem('chipipie_session_id');
+        const headers = {
+          'X-Portal': 'superadmin',
+          'X-CSRF-Token': (typeof CSRF_TOKEN !== 'undefined' && CSRF_TOKEN ? CSRF_TOKEN : (localStorage.getItem('chipipie_csrf_token') || ''))
+        };
+        if (sid) headers['X-Session-Id'] = sid;
+
+        const res = await fetch(BASE + endpoint, { method: 'GET', headers, credentials: 'include' });
+        if (!res.ok) {
+          saToast('Failed to export backup file', 'error');
+          return;
+        }
+
+        const blob = await res.blob();
+        const disposition = res.headers.get('Content-Disposition') || '';
+        let filename = `chipipie_backup_${Date.now()}.${format}`;
+        const match = disposition.match(/filename="?([^";]+)"?/i);
+        if (match && match[1]) filename = match[1];
+
+        const blobUrl = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = blobUrl;
+        a.download = filename;
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        URL.revokeObjectURL(blobUrl);
+
+        saToast(`Downloaded ${filename} successfully!`, 'success');
+      } catch (err) {
+        console.error(err);
+        saToast('Backup export failed: ' + err.message, 'error');
+      } finally {
+        if (btn) { btn.disabled = false; btn.innerHTML = origHtml; }
+      }
+    }
+
+    async function downloadArchiveFile(filename) {
+      try {
+        const sid = localStorage.getItem('chipipie_sa_session_id') || localStorage.getItem('chipipie_session_id');
+        const headers = {
+          'X-Portal': 'superadmin',
+          'X-CSRF-Token': (typeof CSRF_TOKEN !== 'undefined' && CSRF_TOKEN ? CSRF_TOKEN : (localStorage.getItem('chipipie_csrf_token') || ''))
+        };
+        if (sid) headers['X-Session-Id'] = sid;
+
+        const res = await fetch(BASE + `superadmin.php?action=backup_download&file=${encodeURIComponent(filename)}`, {
+          method: 'GET',
+          headers,
+          credentials: 'include'
+        });
+
+        if (!res.ok) {
+          saToast('Failed to download archive backup file', 'error');
+          return;
+        }
+
+        const blob = await res.blob();
+        const blobUrl = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = blobUrl;
+        a.download = filename;
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        URL.revokeObjectURL(blobUrl);
+      } catch (err) {
+        console.error(err);
+        saToast('Error downloading file: ' + err.message, 'error');
+      }
+    }
+
+    async function createServerBackupNow() {
+      const btn = document.getElementById('btn-create-server-bk');
+      const orig = btn ? btn.innerHTML : '';
+      if (btn) { btn.disabled = true; btn.innerHTML = '<span class="spinner-border spinner-border-sm me-2"></span> Archiving...'; }
+
+      try {
+        const res = await saApi('superadmin.php?action=backup_create_server', { format: 'sql' });
+        if (res && res.success) {
+          saToast(res.message || 'Backup snapshot created!', 'success');
+          await loadBackupView();
+        } else {
+          saToast((res && res.message) ? res.message : 'Failed to create backup snapshot', 'error');
+        }
+      } catch (err) {
+        console.error(err);
+        saToast('Failed to create server backup', 'error');
+      } finally {
+        if (btn) { btn.disabled = false; btn.innerHTML = orig; }
+      }
+    }
+
+    async function deleteArchiveBackup(filename) {
+      if (!confirm(`Are you sure you want to permanently delete "${filename}" from the server?`)) return;
+      try {
+        const res = await saApi('superadmin.php?action=backup_delete', { file: filename });
+        if (res && res.success) {
+          saToast(res.message || 'Backup file deleted', 'success');
+          await loadBackupView();
+        } else {
+          saToast((res && res.message) ? res.message : 'Could not delete backup', 'error');
+        }
+      } catch (err) {
+        console.error(err);
+        saToast('Failed to delete backup file', 'error');
+      }
+    }
+
+    function handleBackupFileSelected(input) {
+      const file = input.files && input.files[0];
+      const preview = document.getElementById('bk-selected-file');
+      const btn = document.getElementById('btn-trigger-upload-restore');
+
+      if (file) {
+        const sizeFormatted = (file.size / 1024).toFixed(1) + ' KB';
+        preview.textContent = `Selected: ${file.name} (${sizeFormatted})`;
+        preview.style.display = 'block';
+        btn.disabled = false;
+      } else {
+        preview.style.display = 'none';
+        btn.disabled = true;
+      }
+    }
+
+    function confirmUploadRestore() {
+      const fileInput = document.getElementById('bk-file-input');
+      const file = fileInput.files && fileInput.files[0];
+      if (!file) {
+        saToast('Please select a backup file first.', 'error');
+        return;
+      }
+      _activeRestoreSource = { type: 'upload', filename: file.name, file: file };
+      document.getElementById('bk-modal-filename').textContent = file.name;
+      document.getElementById('bk-confirm-input').value = '';
+      document.getElementById('bk-modal-btn-submit').disabled = true;
+      openModal('bk-confirm-modal');
+    }
+
+    function confirmArchiveRestore(filename) {
+      _activeRestoreSource = { type: 'archive', filename: filename, file: null };
+      document.getElementById('bk-modal-filename').textContent = filename;
+      document.getElementById('bk-confirm-input').value = '';
+      document.getElementById('bk-modal-btn-submit').disabled = true;
+      openModal('bk-confirm-modal');
+    }
+
+    function checkBkConfirmInput(input) {
+      const btn = document.getElementById('bk-modal-btn-submit');
+      btn.disabled = (input.value.trim().toUpperCase() !== 'RESTORE');
+    }
+
+    function closeBkModal() {
+      closeModal('bk-confirm-modal');
+      _activeRestoreSource = null;
+    }
+
+    async function executeConfirmedRestore() {
+      if (!_activeRestoreSource) return;
+      const btn = document.getElementById('bk-modal-btn-submit');
+      const origHtml = btn.innerHTML;
+      btn.disabled = true;
+      btn.innerHTML = '<span class="spinner-border spinner-border-sm me-2"></span> Restoring Database...';
+
+      try {
+        let res = null;
+
+        if (_activeRestoreSource.type === 'upload') {
+          const formData = new FormData();
+          formData.append('backup_file', _activeRestoreSource.file);
+
+          const sid = localStorage.getItem('chipipie_sa_session_id') || localStorage.getItem('chipipie_session_id');
+          const headers = {
+            'X-Portal': 'superadmin',
+            'X-CSRF-Token': (typeof CSRF_TOKEN !== 'undefined' && CSRF_TOKEN ? CSRF_TOKEN : (localStorage.getItem('chipipie_csrf_token') || ''))
+          };
+          if (sid) headers['X-Session-Id'] = sid;
+
+          const response = await fetch(BASE + 'superadmin.php?action=backup_restore_upload', {
+            method: 'POST',
+            headers,
+            credentials: 'include',
+            body: formData
+          });
+          const text = await response.text();
+          const jsonStart = text.search(/[{[]/);
+          res = JSON.parse(jsonStart >= 0 ? text.slice(jsonStart) : text);
+
+        } else if (_activeRestoreSource.type === 'archive') {
+          res = await saApi('superadmin.php?action=backup_restore_file', {
+            file: _activeRestoreSource.filename
+          });
+        }
+
+        if (res && res.success) {
+          closeBkModal();
+          saToast(res.message || 'Database restored successfully!', 'success');
+          const fileInput = document.getElementById('bk-file-input');
+          if (fileInput) fileInput.value = '';
+          const preview = document.getElementById('bk-selected-file');
+          if (preview) preview.style.display = 'none';
+          document.getElementById('btn-trigger-upload-restore').disabled = true;
+
+          await loadBackupView();
+        } else {
+          saToast((res && res.message) ? res.message : 'Database restore failed.', 'error');
+          btn.disabled = false;
+          btn.innerHTML = origHtml;
+        }
+      } catch (err) {
+        console.error(err);
+        saToast('Restore error: ' + err.message, 'error');
+        btn.disabled = false;
+        btn.innerHTML = origHtml;
+      }
+    }
+
+
     function openModal(id) {
       document.getElementById(id).classList.add('open');
     }
