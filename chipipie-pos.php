@@ -2685,7 +2685,10 @@ $_CSRF_TOKEN = getCsrfToken();
         padding: 24px 14px 40px !important;
         align-items: center !important;
         justify-content: center !important;
-        display: flex !important;
+      }
+      .login-wrapper[style*="display:none"],
+      .login-wrapper[style*="display: none"] {
+        display: none !important;
       }
 
       /* POS Container — Flex container taking remaining height */
