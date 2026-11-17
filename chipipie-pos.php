@@ -6079,6 +6079,8 @@ $_CSRF_TOKEN = getCsrfToken();
     }
 
     /* ========== DATA ========== */
+    let _cachedStats = null;
+    let _cachedStatsTime = 0;
     let menuItems = [];
     let posMenuCategories = [];   // [{id, name}] — loaded from API
     let pendingDeleteIds = new Set();
@@ -6145,10 +6147,15 @@ $_CSRF_TOKEN = getCsrfToken();
     }
 
     /* ========== DASHBOARD ========== */
-    async function updateDashboard() {
+    async function updateDashboard(force = false) {
       try {
-        const stats = await api('orders.php?action=stats');
-        if (!stats.success) return;
+        let stats = (!force && _cachedStats && (Date.now() - _cachedStatsTime < 30000)) ? _cachedStats : null;
+        if (!stats) {
+          stats = await api('orders.php?action=stats');
+          if (!stats || !stats.success) return;
+          _cachedStats = stats;
+          _cachedStatsTime = Date.now();
+        }
 
         document.getElementById('kpi-sales').textContent = '₱' + stats.today.revenue.toLocaleString();
         document.getElementById('kpi-orders').textContent = stats.today.orders;
@@ -7526,6 +7533,7 @@ $_CSRF_TOKEN = getCsrfToken();
           showPrintOptionsModal(receiptData);
 
           // Background refreshes (fire-and-forget — non-blocking)
+          _cachedStats = null; _cachedStatsTime = 0;
           loadMenuFromDB().then(() => renderPOS()).catch(() => {});
           api('orders.php?date=today').then(ordRes => {
             if (ordRes.success) {
@@ -9340,10 +9348,15 @@ $_CSRF_TOKEN = getCsrfToken();
       } catch (e) { console.error('Failed to load POS monthly chart:', e); }
     }
 
-    async function renderReports() {
+    async function renderReports(force = false) {
       try {
-        const stats = await api('orders.php?action=stats');
-        if (!stats.success) return;
+        let stats = (!force && _cachedStats && (Date.now() - _cachedStatsTime < 30000)) ? _cachedStats : null;
+        if (!stats) {
+          stats = await api('orders.php?action=stats');
+          if (!stats || !stats.success) return;
+          _cachedStats = stats;
+          _cachedStatsTime = Date.now();
+        }
 
         // KPI cards — all 4 now live
         const el = id => document.getElementById(id);
@@ -9852,7 +9865,7 @@ $_CSRF_TOKEN = getCsrfToken();
       const reportsBtn = document.getElementById('nav-reports-btn');
       const usersBtn = document.getElementById('nav-users-btn');
 
-      // Concurrently load menu & today's orders for instant app activation
+      // Concurrently load menu, today's orders & dashboard stats for instant app activation
       await Promise.all([
         loadMenuFromDB(),
         api('orders.php?date=today').then(ordRes => {
@@ -9864,7 +9877,13 @@ $_CSRF_TOKEN = getCsrfToken();
               payment: o.payment_method, status: o.status
             }));
           }
-        }).catch(e => { console.warn('Could not load orders on init:', e); })
+        }).catch(e => { console.warn('Could not load orders on init:', e); }),
+        api('orders.php?action=stats').then(statsRes => {
+          if (statsRes && statsRes.success) {
+            _cachedStats = statsRes;
+            _cachedStatsTime = Date.now();
+          }
+        }).catch(e => {})
       ]);
 
       _isUserAdmin = !!isAdmin;

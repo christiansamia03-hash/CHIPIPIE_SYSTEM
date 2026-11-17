@@ -607,30 +607,31 @@ function handleStats() {
     requireLogin();
     $db = getDB();
 
-    // Drink category IDs (Hot Coffee=1, Iced Coffee=2, Classic Milktea=3, Virgin Mojito=4, Citrus Popping Boba=5, Soda Float=6, Matcha Series=7, Frappé=8)
-    $allCats = $db->query("SELECT id, name FROM categories")->fetchAll();
-    $drinkIds = [];
-    $foodIds = [];
-    foreach ($allCats as $cat) {
-        $n = strtolower($cat['name']);
-        if (preg_match('/coffee|tea|milktea|drink|beverage|mojito|boba|float|frapp|matcha|juice|shake|smoothie|water/i', $n)) {
-            $drinkIds[] = intval($cat['id']);
-        } else {
-            $foodIds[] = intval($cat['id']);
-        }
-    }
-    $drinkCatIds = !empty($drinkIds) ? implode(',', $drinkIds) : '1,2,3,4,5,6,7,8,18';
-    $foodCatIds  = !empty($foodIds)  ? implode(',', $foodIds)  : '9,10,11,12,13,14,15,16,17,19,20';
+    // 1. Single merged query for counts and revenue (1 round-trip instead of 3)
+    $kpi = $db->query("
+        SELECT
+            COUNT(CASE WHEN DATE(created_at) = CURDATE() THEN 1 END) AS today_cnt,
+            COALESCE(SUM(CASE WHEN DATE(created_at) = CURDATE() THEN total ELSE 0 END), 0) AS today_rev,
+            COUNT(CASE WHEN created_at >= DATE_SUB(NOW(), INTERVAL 7 DAY) THEN 1 END) AS week_cnt,
+            COALESCE(SUM(CASE WHEN created_at >= DATE_SUB(NOW(), INTERVAL 7 DAY) THEN total ELSE 0 END), 0) AS week_rev,
+            COUNT(CASE WHEN created_at >= DATE_SUB(NOW(), INTERVAL 30 DAY) THEN 1 END) AS month_cnt,
+            COALESCE(SUM(CASE WHEN created_at >= DATE_SUB(NOW(), INTERVAL 30 DAY) THEN total ELSE 0 END), 0) AS month_rev
+        FROM orders
+        WHERE status = 'Completed'
+    ")->fetch(PDO::FETCH_ASSOC);
 
+    $todayOrders  = intval($kpi['today_cnt'] ?? 0);
+    $todayRevenue = floatval($kpi['today_rev'] ?? 0);
+    $weekOrders   = intval($kpi['week_cnt'] ?? 0);
+    $weekRevenue  = floatval($kpi['week_rev'] ?? 0);
+    $monthOrders  = intval($kpi['month_cnt'] ?? 0);
+    $monthRevenue = floatval($kpi['month_rev'] ?? 0);
 
-    // Today
-    $today = $db->query("SELECT COUNT(*) as cnt, COALESCE(SUM(total),0) as rev FROM orders WHERE DATE(created_at) = CURDATE() AND status = 'Completed'")->fetch();
-    // This week
-    $week = $db->query("SELECT COUNT(*) as cnt, COALESCE(SUM(total),0) as rev FROM orders WHERE created_at >= DATE_SUB(NOW(), INTERVAL 7 DAY) AND status = 'Completed'")->fetch();
-    // This month
-    $month = $db->query("SELECT COUNT(*) as cnt, COALESCE(SUM(total),0) as rev FROM orders WHERE created_at >= DATE_SUB(NOW(), INTERVAL 30 DAY) AND status = 'Completed'")->fetch();
+    // 2. Drink & Food category IDs (avoids full categories table scan)
+    $drinkCatIds = '1,2,3,4,5,6,7,8,18';
+    $foodCatIds  = '9,10,11,12,13,14,15,16,17,19,20';
 
-    // Volume breakdown for Today, This Week, This Month, and This Year
+    // 3. Volume breakdown for Today, This Week, This Month, and This Year
     $vol = $db->query("
         SELECT 
             COALESCE(SUM(CASE WHEN DATE(o.created_at) = CURDATE() AND m.category_id IN ($drinkCatIds) THEN oi.quantity ELSE 0 END), 0) AS today_cups,
@@ -645,30 +646,33 @@ function handleStats() {
         JOIN orders o ON oi.order_id = o.id
         JOIN menu_items m ON oi.menu_item_id = m.id
         WHERE (YEAR(o.created_at) = YEAR(CURDATE()) OR YEARWEEK(o.created_at, 1) = YEARWEEK(CURDATE(), 1)) AND o.status = 'Completed'
-    ")->fetch();
+    ")->fetch(PDO::FETCH_ASSOC);
 
     $cupsSold = intval($vol['today_cups'] ?? 0);
     $foodSold = intval($vol['today_food'] ?? 0);
-    // Top seller
-    $topStmt = $db->query("
+
+    // 4. Top seller (All time)
+    $topSeller = $db->query("
         SELECT m.name, SUM(oi.quantity) as sold
         FROM order_items oi JOIN menu_items m ON oi.menu_item_id = m.id
         JOIN orders o ON oi.order_id = o.id
         WHERE o.status = 'Completed'
-        GROUP BY m.id ORDER BY sold DESC LIMIT 1
-    ");
-    $topSeller = $topStmt->fetch();
+        GROUP BY m.id, m.name ORDER BY sold DESC LIMIT 1
+    ")->fetch(PDO::FETCH_ASSOC);
 
-    // Top items list (for dashboard top selling items)
-    $topItems = $db->query("
-        SELECT m.name, SUM(oi.quantity) as sold, COALESCE(SUM(oi.subtotal),0) as revenue
-        FROM order_items oi JOIN menu_items m ON oi.menu_item_id = m.id
-        JOIN orders o ON oi.order_id = o.id
-        WHERE DATE(o.created_at) = CURDATE() AND o.status = 'Completed'
-        GROUP BY m.id ORDER BY sold DESC LIMIT 5
-    ")->fetchAll();
+    // 5. Top items today (fast shortcut: skip query if today has 0 orders)
+    $topItems = [];
+    if ($todayOrders > 0) {
+        $topItems = $db->query("
+            SELECT m.name, SUM(oi.quantity) as sold, COALESCE(SUM(oi.subtotal),0) as revenue
+            FROM order_items oi JOIN menu_items m ON oi.menu_item_id = m.id
+            JOIN orders o ON oi.order_id = o.id
+            WHERE DATE(o.created_at) = CURDATE() AND o.status = 'Completed'
+            GROUP BY m.id, m.name ORDER BY sold DESC LIMIT 5
+        ")->fetchAll(PDO::FETCH_ASSOC);
+    }
 
-    // Category breakdown (this month)
+    // 6. Category breakdown (last 30 days)
     $catBreakdown = $db->query("
         SELECT c.name, SUM(oi.quantity) as qty
         FROM order_items oi
@@ -676,115 +680,126 @@ function handleStats() {
         JOIN categories c ON m.category_id = c.id
         JOIN orders o ON oi.order_id = o.id
         WHERE o.created_at >= DATE_SUB(NOW(), INTERVAL 30 DAY) AND o.status = 'Completed'
-        GROUP BY c.id ORDER BY qty DESC
-    ")->fetchAll();
+        GROUP BY c.id, c.name ORDER BY qty DESC
+    ")->fetchAll(PDO::FETCH_ASSOC);
 
-    // Weekly chart data (daily totals for last 7 days)
-    $weeklyChart = $db->query("
-        SELECT DAYOFWEEK(created_at) as dow, COALESCE(SUM(total),0) as rev
-        FROM orders WHERE created_at >= DATE_SUB(NOW(), INTERVAL 7 DAY) AND status = 'Completed'
-        GROUP BY DAYOFWEEK(created_at)
-    ")->fetchAll();
+    // 7. Weekly chart data (skip if week has 0 orders)
     $weeklyData = [0,0,0,0,0,0,0];
-    foreach ($weeklyChart as $r) {
-        $idx = ($r['dow'] + 5) % 7; // Convert to Mon=0
-        $weeklyData[$idx] = floatval($r['rev']);
-    }
-
-    // Hourly chart data (9am to 2am shift)
-    $hourlyChart = $db->query("
-        SELECT HOUR(created_at) as hr, COALESCE(SUM(total),0) as rev
-        FROM orders 
-        WHERE created_at >= CONCAT(DATE(DATE_SUB(NOW(), INTERVAL 3 HOUR)), ' 09:00:00') 
-          AND created_at < CONCAT(DATE_ADD(DATE(DATE_SUB(NOW(), INTERVAL 3 HOUR)), INTERVAL 1 DAY), ' 03:00:00')
-          AND status = 'Completed'
-        GROUP BY HOUR(created_at)
-    ")->fetchAll();
-    $hourlyData = array_fill(0, 18, 0);
-    foreach ($hourlyChart as $r) {
-        $h = intval($r['hr']);
-        if ($h >= 9) {
-            $hourlyData[$h - 9] = floatval($r['rev']);
-        } elseif ($h <= 2) {
-            $hourlyData[$h + 15] = floatval($r['rev']);
+    if ($weekOrders > 0) {
+        $weeklyChart = $db->query("
+            SELECT DAYOFWEEK(created_at) as dow, COALESCE(SUM(total),0) as rev
+            FROM orders WHERE created_at >= DATE_SUB(NOW(), INTERVAL 7 DAY) AND status = 'Completed'
+            GROUP BY DAYOFWEEK(created_at)
+        ")->fetchAll(PDO::FETCH_ASSOC);
+        foreach ($weeklyChart as $r) {
+            $idx = ($r['dow'] + 5) % 7; // Convert to Mon=0
+            $weeklyData[$idx] = floatval($r['rev']);
         }
     }
 
-    // Monthly chart data (this year)
+    // 8. Hourly chart data (9am to 2am shift - skip if today has 0 orders)
+    $hourlyData = array_fill(0, 18, 0);
+    if ($todayOrders > 0) {
+        $hourlyChart = $db->query("
+            SELECT HOUR(created_at) as hr, COALESCE(SUM(total),0) as rev
+            FROM orders 
+            WHERE created_at >= CONCAT(DATE(DATE_SUB(NOW(), INTERVAL 3 HOUR)), ' 09:00:00') 
+              AND created_at < CONCAT(DATE_ADD(DATE(DATE_SUB(NOW(), INTERVAL 3 HOUR)), INTERVAL 1 DAY), ' 03:00:00')
+              AND status = 'Completed'
+            GROUP BY HOUR(created_at)
+        ")->fetchAll(PDO::FETCH_ASSOC);
+        foreach ($hourlyChart as $r) {
+            $h = intval($r['hr']);
+            if ($h >= 9) {
+                $hourlyData[$h - 9] = floatval($r['rev']);
+            } elseif ($h <= 2) {
+                $hourlyData[$h + 15] = floatval($r['rev']);
+            }
+        }
+    }
+
+    // 9. Monthly chart data (this year)
     $monthlyChart = $db->query("
         SELECT MONTH(created_at) as mo, COALESCE(SUM(total),0) as rev
         FROM orders WHERE YEAR(created_at) = YEAR(CURDATE()) AND status = 'Completed'
         GROUP BY MONTH(created_at)
-    ")->fetchAll();
+    ")->fetchAll(PDO::FETCH_ASSOC);
     $monthlyData = [0,0,0,0,0,0,0,0,0,0,0,0];
     foreach ($monthlyChart as $r) {
         $monthlyData[intval($r['mo']) - 1] = floatval($r['rev']);
     }
 
-    // Item sales performance (all time, top 9)
+    // 10. Item sales performance (all time, top 9)
     $itemPerf = $db->query("
         SELECT m.name, SUM(oi.quantity) as sold
         FROM order_items oi
         JOIN menu_items m ON oi.menu_item_id = m.id
         JOIN orders o ON oi.order_id = o.id
         WHERE o.status = 'Completed'
-        GROUP BY m.id ORDER BY sold DESC LIMIT 9
-    ")->fetchAll();
+        GROUP BY m.id, m.name ORDER BY sold DESC LIMIT 9
+    ")->fetchAll(PDO::FETCH_ASSOC);
 
-    // Best revenue day calculation (Hierarchy: This Week -> Last 30 Days -> All-Time Peak)
-    $bestDayWeek = $db->query("
-        SELECT DATE(created_at) as d, DAYNAME(created_at) as day_name, SUM(total) as rev, COUNT(*) as cnt
-        FROM orders 
-        WHERE created_at >= DATE_SUB(NOW(), INTERVAL 7 DAY) AND status = 'Completed'
-        GROUP BY DATE(created_at), DAYNAME(created_at)
-        ORDER BY rev DESC LIMIT 1
-    ")->fetch();
-
-    $bestDayMonth = $db->query("
-        SELECT DATE(created_at) as d, DAYNAME(created_at) as day_name, SUM(total) as rev, COUNT(*) as cnt
-        FROM orders 
-        WHERE created_at >= DATE_SUB(NOW(), INTERVAL 30 DAY) AND status = 'Completed'
-        GROUP BY DATE(created_at), DAYNAME(created_at)
-        ORDER BY rev DESC LIMIT 1
-    ")->fetch();
-
-    $bestDayAllTime = $db->query("
-        SELECT DATE(created_at) as d, DAYNAME(created_at) as day_name, SUM(total) as rev, COUNT(*) as cnt
-        FROM orders 
-        WHERE status = 'Completed'
-        GROUP BY DATE(created_at), DAYNAME(created_at)
-        ORDER BY rev DESC LIMIT 1
-    ")->fetch();
-
+    // 11. Best revenue day calculation (smart single-check hierarchy)
     $bestRevenueDay = null;
-    if ($bestDayWeek && floatval($bestDayWeek['rev']) > 0) {
-        $bestRevenueDay = [
-            'day_name' => $bestDayWeek['day_name'],
-            'date'     => date('M j', strtotime($bestDayWeek['d'])),
-            'revenue'  => floatval($bestDayWeek['rev']),
-            'period'   => 'this week'
-        ];
-    } elseif ($bestDayMonth && floatval($bestDayMonth['rev']) > 0) {
-        $bestRevenueDay = [
-            'day_name' => $bestDayMonth['day_name'],
-            'date'     => date('M j', strtotime($bestDayMonth['d'])),
-            'revenue'  => floatval($bestDayMonth['rev']),
-            'period'   => 'last 30 days'
-        ];
-    } elseif ($bestDayAllTime && floatval($bestDayAllTime['rev']) > 0) {
-        $bestRevenueDay = [
-            'day_name' => $bestDayAllTime['day_name'],
-            'date'     => date('M j, Y', strtotime($bestDayAllTime['d'])),
-            'revenue'  => floatval($bestDayAllTime['rev']),
-            'period'   => 'all-time peak'
-        ];
+    if ($weekOrders > 0) {
+        $bestDayWeek = $db->query("
+            SELECT DATE(created_at) as d, DAYNAME(created_at) as day_name, SUM(total) as rev
+            FROM orders 
+            WHERE created_at >= DATE_SUB(NOW(), INTERVAL 7 DAY) AND status = 'Completed'
+            GROUP BY DATE(created_at), DAYNAME(created_at)
+            ORDER BY rev DESC LIMIT 1
+        ")->fetch(PDO::FETCH_ASSOC);
+        if ($bestDayWeek && floatval($bestDayWeek['rev']) > 0) {
+            $bestRevenueDay = [
+                'day_name' => $bestDayWeek['day_name'],
+                'date'     => date('M j', strtotime($bestDayWeek['d'])),
+                'revenue'  => floatval($bestDayWeek['rev']),
+                'period'   => 'this week'
+            ];
+        }
+    }
+
+    if (!$bestRevenueDay && $monthOrders > 0) {
+        $bestDayMonth = $db->query("
+            SELECT DATE(created_at) as d, DAYNAME(created_at) as day_name, SUM(total) as rev
+            FROM orders 
+            WHERE created_at >= DATE_SUB(NOW(), INTERVAL 30 DAY) AND status = 'Completed'
+            GROUP BY DATE(created_at), DAYNAME(created_at)
+            ORDER BY rev DESC LIMIT 1
+        ")->fetch(PDO::FETCH_ASSOC);
+        if ($bestDayMonth && floatval($bestDayMonth['rev']) > 0) {
+            $bestRevenueDay = [
+                'day_name' => $bestDayMonth['day_name'],
+                'date'     => date('M j', strtotime($bestDayMonth['d'])),
+                'revenue'  => floatval($bestDayMonth['rev']),
+                'period'   => 'last 30 days'
+            ];
+        }
+    }
+
+    if (!$bestRevenueDay) {
+        $bestDayAllTime = $db->query("
+            SELECT DATE(created_at) as d, DAYNAME(created_at) as day_name, SUM(total) as rev
+            FROM orders 
+            WHERE status = 'Completed'
+            GROUP BY DATE(created_at), DAYNAME(created_at)
+            ORDER BY rev DESC LIMIT 1
+        ")->fetch(PDO::FETCH_ASSOC);
+        if ($bestDayAllTime && floatval($bestDayAllTime['rev']) > 0) {
+            $bestRevenueDay = [
+                'day_name' => $bestDayAllTime['day_name'],
+                'date'     => date('M j, Y', strtotime($bestDayAllTime['d'])),
+                'revenue'  => floatval($bestDayAllTime['rev']),
+                'period'   => 'all-time peak'
+            ];
+        }
     }
 
     jsonResponse([
         'success' => true,
-        'today' => ['orders' => intval($today['cnt']), 'revenue' => floatval($today['rev'])],
-        'week'  => ['orders' => intval($week['cnt']),  'revenue' => floatval($week['rev'])],
-        'month' => ['orders' => intval($month['cnt']), 'revenue' => floatval($month['rev'])],
+        'today' => ['orders' => $todayOrders, 'revenue' => $todayRevenue],
+        'week'  => ['orders' => $weekOrders,  'revenue' => $weekRevenue],
+        'month' => ['orders' => $monthOrders, 'revenue' => $monthRevenue],
         'best_revenue_day' => $bestRevenueDay,
         'cups_sold' => $cupsSold,
         'food_sold' => $foodSold,
@@ -795,7 +810,7 @@ function handleStats() {
         'hourly_chart' => $hourlyData,
         'monthly_chart' => $monthlyData,
         'item_performance' => $itemPerf,
-        'avg_order' => $today['cnt'] > 0 ? round($today['rev'] / $today['cnt'], 2) : 0,
+        'avg_order' => $todayOrders > 0 ? round($todayRevenue / $todayOrders, 2) : 0,
         'volume_breakdown' => [
             'today' => ['cups' => intval($vol['today_cups'] ?? 0), 'food' => intval($vol['today_food'] ?? 0)],
             'week'  => ['cups' => intval($vol['week_cups']  ?? 0), 'food' => intval($vol['week_food']  ?? 0)],

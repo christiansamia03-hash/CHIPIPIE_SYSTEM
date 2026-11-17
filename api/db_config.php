@@ -173,6 +173,11 @@ function getDB() {
 function jsonResponse($data, $statusCode = 200) {
     http_response_code($statusCode);
     header('Content-Type: application/json');
+    if (!headers_sent() && extension_loaded('zlib') && !ini_get('zlib.output_compression')) {
+        if (strpos($_SERVER['HTTP_ACCEPT_ENCODING'] ?? '', 'gzip') !== false) {
+            ob_start('ob_gzhandler');
+        }
+    }
     echo json_encode($data);
     exit;
 }
