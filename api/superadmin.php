@@ -1,4 +1,4 @@
-﻿<?php
+<?php
 /**
  * ChipiPie Cafe — Super Admin API
  *
