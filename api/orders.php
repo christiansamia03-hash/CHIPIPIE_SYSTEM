@@ -558,7 +558,7 @@ function handleFetchOrders() {
 
     $sql = "
         SELECT o.id, o.order_number, o.total, o.payment_method, o.status,
-               o.created_at, u.full_name AS cashier,
+               o.created_at, MAX(u.full_name) AS cashier,
                GROUP_CONCAT(
                  CONCAT(
                    oi.quantity, '× ', m.name,
@@ -570,7 +570,7 @@ function handleFetchOrders() {
         LEFT JOIN order_items oi ON oi.order_id = o.id
         LEFT JOIN menu_items m ON oi.menu_item_id = m.id
         $where
-        GROUP BY o.id
+        GROUP BY o.id, o.order_number, o.total, o.payment_method, o.status, o.created_at
         ORDER BY o.created_at DESC
         LIMIT 500
     ";
@@ -907,10 +907,10 @@ function handlePrintSummary() {
     $stmt3->execute($params);
     $topItems = $stmt3->fetchAll();
 
-    // Orders list
+        // Orders list
     $stmt4 = $db->prepare("
         SELECT o.order_number, o.total, o.payment_method, o.status,
-               o.created_at, u.full_name AS cashier,
+               o.created_at, MAX(u.full_name) AS cashier,
                GROUP_CONCAT(
                  CONCAT(
                    oi.quantity, '× ', m.name,
@@ -922,7 +922,7 @@ function handlePrintSummary() {
         LEFT JOIN order_items oi ON oi.order_id = o.id
         LEFT JOIN menu_items m ON oi.menu_item_id = m.id
         $where
-        GROUP BY o.id
+        GROUP BY o.id, o.order_number, o.total, o.payment_method, o.status, o.created_at
         ORDER BY o.created_at DESC
         LIMIT 500
     ");

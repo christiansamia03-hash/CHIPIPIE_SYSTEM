@@ -424,13 +424,13 @@ $_CSRF_TOKEN = getCsrfToken();
     }
 
     .nav-section-label {
-      font-size: 10px;
-      font-weight: 600;
-      letter-spacing: 0.08em;
-      color: rgba(255, 255, 255, 0.3);
+      font-size: 11px;
+      font-weight: 800;
+      letter-spacing: 0.12em;
+      color: rgba(255, 255, 255, 0.75);
       text-transform: uppercase;
-      padding: 6px 10px 4px;
-      margin-top: 4px;
+      padding: 8px 12px 4px;
+      margin-top: 8px;
     }
 
     .nav-link, .nav-item-btn {
