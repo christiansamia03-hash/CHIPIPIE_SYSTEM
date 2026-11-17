@@ -3751,7 +3751,10 @@ if (typeof gsap === "undefined") { document.write('<script src="https://cdn.jsde
           </tr>
         `;
         }).join('');
-      } catch (e) { console.error(e); }
+      } catch (e) {
+        console.error(e);
+        if (tbody) tbody.innerHTML = `<tr><td colspan="7"><div class="sa-empty"><i class="bi bi-exclamation-triangle" style="color:#ef4444;"></i><p>Failed to load orders. Click Refresh or select a different filter.</p></div></td></tr>`;
+      }
     }
 
     function openReviewModal(type, id, data) {
@@ -4038,6 +4041,8 @@ if (typeof gsap === "undefined") { document.write('<script src="https://cdn.jsde
        USERS
     ============================================= */
     async function loadUsers() {
+      const tbody = document.getElementById('users-tbody');
+      if (tbody) tbody.innerHTML = `<tr><td colspan="8" class="text-center" style="padding:36px;color:var(--sa-muted);"><span class="spinner-border spinner-border-sm" style="color:#a855f7;margin-right:8px;vertical-align:middle;"></span>Loading users...</td></tr>`;
       try {
         const res = await saApi('superadmin.php?action=users');
         if (!res.success) return;
@@ -4081,7 +4086,10 @@ if (typeof gsap === "undefined") { document.write('<script src="https://cdn.jsde
             </td>
           </tr>`;
         }).join('');
-      } catch (e) { console.error(e); }
+      } catch (e) {
+        console.error(e);
+        if (tbody) tbody.innerHTML = `<tr><td colspan="7"><div class="sa-empty"><i class="bi bi-exclamation-triangle" style="color:#ef4444;"></i><p>Failed to load orders. Click Refresh or select a different filter.</p></div></td></tr>`;
+      }
     }
 
     function openCreateUserModal() {
@@ -4907,8 +4915,9 @@ if (typeof gsap === "undefined") { document.write('<script src="https://cdn.jsde
         url = `superadmin.php?action=orders&date=${date}&status=${status}&limit=200`;
       }
 
+      const tbody = document.getElementById('sa-orders-tbody');
+      if (tbody) tbody.innerHTML = `<tr><td colspan="7" class="text-center" style="padding:36px;color:var(--sa-muted);"><span class="spinner-border spinner-border-sm" style="color:#a855f7;margin-right:8px;vertical-align:middle;"></span>Loading orders...</td></tr>`;
       try {
-        const tbody = document.getElementById('sa-orders-tbody');
         const res = await saApi(url);
         if (!res || !res.success) {
           if (tbody) tbody.innerHTML = `<tr><td colspan="7"><div class="sa-empty"><i class="bi bi-info-circle"></i><p>${(res && res.message) ? res.message : 'No orders found for this filter.'}</p></div></td></tr>`;
@@ -4937,7 +4946,10 @@ if (typeof gsap === "undefined") { document.write('<script src="https://cdn.jsde
             <td style="font-size:12px;color:var(--sa-muted);">${dt}</td>
           </tr>`;
         }).join('');
-      } catch (e) { console.error(e); }
+      } catch (e) {
+        console.error(e);
+        if (tbody) tbody.innerHTML = `<tr><td colspan="7"><div class="sa-empty"><i class="bi bi-exclamation-triangle" style="color:#ef4444;"></i><p>Failed to load orders. Click Refresh or select a different filter.</p></div></td></tr>`;
+      }
     }
 
     /* =============================================
