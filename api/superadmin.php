@@ -20,6 +20,7 @@
  */
 
 require_once __DIR__ . '/db_config.php';
+require_once __DIR__ . '/backup_helper.php';
 
 $action = $_GET['action'] ?? '';
 
@@ -49,6 +50,15 @@ switch ($action) {
     case 'chart_weekly':        handleSAChartWeekly(); break;
     case 'chart_hourly':        handleSAChartHourly(); break;
     case 'chart_monthly':       handleSAChartMonthly(); break;
+    case 'backup_stats':          handleSABackupStats(); break;
+    case 'backup_list':           handleSABackupList(); break;
+    case 'backup_export_sql':     handleSABackupExportSql(); break;
+    case 'backup_export_json':    handleSABackupExportJson(); break;
+    case 'backup_create_server':  handleSABackupCreateServer(); break;
+    case 'backup_download':       handleSABackupDownload(); break;
+    case 'backup_delete':         handleSABackupDelete(); break;
+    case 'backup_restore_file':   handleSABackupRestoreFile(); break;
+    case 'backup_restore_upload': handleSABackupRestoreUpload(); break;
     default:
         jsonResponse(['success' => false, 'message' => 'Invalid action.'], 400);
 }

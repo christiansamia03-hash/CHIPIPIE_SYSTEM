@@ -13,3 +13,11 @@ Thumbs.db
 # Environment and secrets
 .env
 database/chipipie_*.sql
+
+# Backups folder data (keep directory structure and security files)
+backups/*
+!backups/.htaccess
+!backups/index.php
+
+# Scratch / temp test scripts
+scratch/

@@ -1287,6 +1287,9 @@ $_CSRF_TOKEN = getCsrfToken();
         <button class="sa-nav-btn" id="nav-btn-settings" onclick="saShowView('settings', this)">
           <i class="bi bi-gear-fill"></i> Settings
         </button>
+        <button class="sa-nav-btn" id="nav-btn-backup" onclick="saShowView('backup', this)">
+          <i class="bi bi-cloud-arrow-down-fill"></i> Backup &amp; Restore
+        </button>
       </nav>
 
       <div class="sa-sidebar-footer">
@@ -2045,8 +2048,229 @@ $_CSRF_TOKEN = getCsrfToken();
               </div>
             </div>
           </div>
+          <!-- Backup & Restore Quick Link Card -->
+          <div class="sa-card" style="margin-top:20px;">
+            <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:12px;">
+              <div>
+                <div class="sa-card-title" style="margin-bottom:4px;display:flex;align-items:center;gap:8px;">
+                  <i class="bi bi-cloud-arrow-down-fill" style="color:#3b82f6;"></i> Database Backup &amp; Disaster Recovery
+                </div>
+                <div style="font-size:12px;color:var(--sa-muted);">
+                  Create full database snapshots, download SQL/JSON archives, or restore past backups.
+                </div>
+              </div>
+              <div>
+                <button class="sa-btn sa-btn-primary" onclick="saShowView('backup', document.getElementById('nav-btn-backup'))" style="padding:8px 16px;font-size:13px;display:inline-flex;align-items:center;gap:6px;">
+                  <i class="bi bi-hdd-network-fill"></i> Open Backup &amp; Restore
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+              <!-- ── BACKUP & RESTORE VIEW ── -->
+        <div id="sa-view-backup" class="sa-view">
+          <div class="sa-section-header" style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:12px;margin-bottom:20px;">
+            <div>
+              <div class="sa-section-title">System Backup &amp; Restore</div>
+              <div style="font-size:13px;color:var(--sa-muted);margin-top:2px;">
+                Safeguard all restaurant data, orders, menus, inventory, and system accounts.
+              </div>
+            </div>
+            <div style="display:flex;gap:8px;">
+              <button class="sa-btn sa-btn-secondary" onclick="loadBackupView()">
+                <i class="bi bi-arrow-clockwise"></i> Refresh Status
+              </button>
+            </div>
+          </div>
+
+          <!-- System Status Banner & Live DB Overview -->
+          <div class="sa-grid-kpis" style="margin-bottom:20px;">
+            <div class="sa-kpi-card">
+              <div class="sa-kpi-icon" style="background:rgba(59,130,246,0.15);color:#3b82f6;">
+                <i class="bi bi-database-fill"></i>
+              </div>
+              <div class="sa-kpi-info">
+                <div class="sa-kpi-val" id="bk-stat-tables">0</div>
+                <div class="sa-kpi-label">Database Tables</div>
+                <div class="sa-kpi-sub" id="bk-stat-db-info">Loading...</div>
+              </div>
+            </div>
+
+            <div class="sa-kpi-card">
+              <div class="sa-kpi-icon" style="background:rgba(16,185,129,0.15);color:#10b981;">
+                <i class="bi bi-receipt"></i>
+              </div>
+              <div class="sa-kpi-info">
+                <div class="sa-kpi-val" id="bk-stat-rows">0</div>
+                <div class="sa-kpi-label">Total Records</div>
+                <div class="sa-kpi-sub" id="bk-stat-rows-sub">Orders, Menu &amp; Users</div>
+              </div>
+            </div>
+
+            <div class="sa-kpi-card">
+              <div class="sa-kpi-icon" style="background:rgba(245,158,11,0.15);color:#f59e0b;">
+                <i class="bi bi-archive-fill"></i>
+              </div>
+              <div class="sa-kpi-info">
+                <div class="sa-kpi-val" id="bk-stat-backups-count">0</div>
+                <div class="sa-kpi-label">Stored Backups</div>
+                <div class="sa-kpi-sub" id="bk-stat-last-backup">No recent backup</div>
+              </div>
+            </div>
+
+            <div class="sa-kpi-card">
+              <div class="sa-kpi-icon" style="background:rgba(139,92,246,0.15);color:#8b5cf6;">
+                <i class="bi bi-shield-check"></i>
+              </div>
+              <div class="sa-kpi-info">
+                <div class="sa-kpi-val" style="font-size:20px;color:#10b981;">Protected</div>
+                <div class="sa-kpi-label">Archive Security</div>
+                <div class="sa-kpi-sub">Strict Access &amp; Auto-Purge</div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Main Actions: Quick Backup & Restore Cards -->
+          <div style="display:grid;grid-template-columns:repeat(auto-fit, minmax(320px, 1fr));gap:20px;margin-bottom:20px;">
+            
+            <!-- Card 1: Create Backup -->
+            <div class="sa-card">
+              <div class="sa-card-title" style="display:flex;align-items:center;gap:8px;">
+                <i class="bi bi-download" style="color:#3b82f6;"></i> Create &amp; Download Backup
+              </div>
+              <p style="font-size:13px;color:var(--sa-muted);margin-bottom:16px;">
+                Generate a full snapshot of the database including all menu photos, customer orders, transactions, adjustments, settings, and credentials.
+              </p>
+
+              <div style="display:flex;flex-direction:column;gap:10px;">
+                <button class="sa-btn sa-btn-primary" onclick="downloadBackup('sql')" id="btn-dl-sql" style="display:flex;align-items:center;justify-content:center;gap:8px;padding:12px;">
+                  <i class="bi bi-filetype-sql" style="font-size:18px;"></i>
+                  <span>Download SQL Backup (.sql)</span>
+                </button>
+
+                <button class="sa-btn sa-btn-ghost" onclick="downloadBackup('json')" id="btn-dl-json" style="display:flex;align-items:center;justify-content:center;gap:8px;padding:10px;">
+                  <i class="bi bi-filetype-json" style="font-size:16px;"></i>
+                  <span>Download Portable JSON Backup (.json)</span>
+                </button>
+
+                <button class="sa-btn sa-btn-secondary" onclick="createServerBackupNow()" id="btn-create-server-bk" style="display:flex;align-items:center;justify-content:center;gap:8px;padding:10px;">
+                  <i class="bi bi-hdd-network-fill"></i>
+                  <span>Save Snapshot to Server Archive</span>
+                </button>
+              </div>
+
+              <div style="margin-top:14px;padding:10px 12px;background:rgba(59,130,246,0.06);border-radius:8px;border:1px solid rgba(59,130,246,0.15);font-size:12px;color:var(--sa-muted);">
+                <i class="bi bi-info-circle-fill" style="color:#3b82f6;"></i> <strong>Tip:</strong> The SQL backup includes table definitions and batched inserts. It can be restored through this panel or via terminal / MySQL CLI.
+              </div>
+            </div>
+
+            <!-- Card 2: Restore from Upload -->
+            <div class="sa-card">
+              <div class="sa-card-title" style="display:flex;align-items:center;gap:8px;">
+                <i class="bi bi-cloud-arrow-up-fill" style="color:#10b981;"></i> Restore Database from File
+              </div>
+              <p style="font-size:13px;color:var(--sa-muted);margin-bottom:14px;">
+                Upload a valid <code>.sql</code> or <code>.json</code> backup to restore all tables and data.
+              </p>
+
+              <div id="bk-dropzone" style="border:2px dashed var(--sa-border);border-radius:10px;padding:22px 16px;text-align:center;cursor:pointer;background:rgba(255,255,255,0.02);transition:all 0.2s;" onclick="document.getElementById('bk-file-input').click()">
+                <i class="bi bi-cloud-upload" style="font-size:36px;color:#10b981;display:block;margin-bottom:8px;"></i>
+                <div style="font-weight:600;font-size:14px;">Click to select backup file</div>
+                <div style="font-size:12px;color:var(--sa-muted);margin-top:4px;">Supports .sql and .json backup files</div>
+                <div id="bk-selected-file" style="margin-top:10px;font-size:12px;font-weight:600;color:#10b981;display:none;"></div>
+              </div>
+              <input type="file" id="bk-file-input" accept=".sql,.json" style="display:none;" onchange="handleBackupFileSelected(this)">
+
+              <div style="margin-top:14px;">
+                <button class="sa-btn sa-btn-danger" id="btn-trigger-upload-restore" onclick="confirmUploadRestore()" disabled style="width:100%;padding:11px;display:flex;align-items:center;justify-content:center;gap:8px;">
+                  <i class="bi bi-arrow-counterclockwise"></i>
+                  <span>Restore Selected File</span>
+                </button>
+              </div>
+
+              <div style="margin-top:12px;padding:10px 12px;background:rgba(239,68,68,0.06);border-radius:8px;border:1px solid rgba(239,68,68,0.2);font-size:12px;color:#f87171;">
+                <i class="bi bi-exclamation-triangle-fill"></i> <strong>Warning:</strong> Restoring will overwrite existing records with data from the uploaded backup.
+              </div>
+            </div>
+
+          </div>
+
+          <!-- Server Archive Table -->
+          <div class="sa-card">
+            <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px;flex-wrap:wrap;gap:10px;">
+              <div>
+                <div class="sa-card-title"><i class="bi bi-hdd-stack-fill"></i> Server Backup Archive</div>
+                <div style="font-size:12px;color:var(--sa-muted);">Stored securely on the server in <code>backups/</code> directory (auto-purged after 14 days).</div>
+              </div>
+              <button class="sa-btn sa-btn-ghost" onclick="loadBackupsList()" style="padding:6px 12px;font-size:12px;">
+                <i class="bi bi-arrow-clockwise"></i> Refresh Archive
+              </button>
+            </div>
+
+            <div class="sa-table-responsive" style="overflow-x:auto;">
+              <table class="sa-table" style="width:100%;">
+                <thead>
+                  <tr>
+                    <th>Filename</th>
+                    <th>Format</th>
+                    <th>File Size</th>
+                    <th>Created At</th>
+                    <th style="text-align:right;">Actions</th>
+                  </tr>
+                </thead>
+                <tbody id="bk-archive-tbody">
+                  <tr>
+                    <td colspan="5" style="text-align:center;padding:24px;color:var(--sa-muted);">
+                      Loading archive list...
+                    </td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
+
+          <!-- Table Breakdown Details -->
+          <div class="sa-card" style="margin-top:20px;">
+            <div class="sa-card-title"><i class="bi bi-table"></i> Database Tables Breakdown</div>
+            <div style="font-size:12px;color:var(--sa-muted);margin-bottom:14px;">Real-time row counts across all database entities.</div>
+            <div id="bk-table-breakdown" style="display:grid;grid-template-columns:repeat(auto-fill, minmax(210px, 1fr));gap:12px;">
+              <!-- Populated via JS -->
+            </div>
+          </div>
+
         </div>
       </div> <!-- /sa-views -->
+    </div>
+  </div>
+
+    <!-- ── MODAL: Confirm Restore ── -->
+  <div class="sa-modal-overlay" id="bk-confirm-modal">
+    <div class="sa-modal" style="max-width: 480px;">
+      <div class="sa-modal-header" style="border-bottom:1px solid var(--sa-border);padding-bottom:12px;">
+        <div class="sa-modal-title" style="color:#ef4444;display:flex;align-items:center;gap:8px;font-size:16px;">
+          <i class="bi bi-exclamation-octagon-fill"></i> Confirm System Restoration
+        </div>
+        <button class="sa-modal-close" onclick="closeBkModal()">&#x2715;</button>
+      </div>
+      <div class="sa-modal-body" style="padding:16px 0;">
+        <p style="font-size:14px;color:var(--sa-text);line-height:1.5;">
+          You are about to restore the system database from:
+          <br><strong id="bk-modal-filename" style="color:#38bdf8;font-family:monospace;word-break:break-all;">backup.sql</strong>
+        </p>
+        <div style="padding:12px;background:rgba(239,68,68,0.1);border:1px solid rgba(239,68,68,0.3);border-radius:8px;color:#fca5a5;font-size:12px;line-height:1.5;margin-bottom:14px;">
+          <strong>Warning:</strong> This will replace all current menu items, orders, transactions, users, and settings with the data in this backup file.
+        </div>
+        <div>
+          <label class="sa-label" style="font-size:12px;">Type <strong style="color:#f87171;">RESTORE</strong> to confirm:</label>
+          <input type="text" class="sa-input" id="bk-confirm-input" placeholder="RESTORE" oninput="checkBkConfirmInput(this)">
+        </div>
+      </div>
+      <div class="sa-modal-footer" style="display:flex;justify-content:flex-end;gap:10px;padding-top:12px;border-top:1px solid var(--sa-border);">
+        <button class="sa-btn sa-btn-ghost" onclick="closeBkModal()">Cancel</button>
+        <button class="sa-btn sa-btn-danger" id="bk-modal-btn-submit" disabled onclick="executeConfirmedRestore()">
+          <i class="bi bi-arrow-repeat"></i> Proceed with Restore
+        </button>
+      </div>
     </div>
   </div>
 
@@ -3211,6 +3435,7 @@ if (typeof gsap === "undefined") { document.write('<script src="https://cdn.jsde
       logs: 'Audit Log',
       analytics: 'Analytics',
       settings: 'System Settings',
+      backup: 'System Backup & Restore',
     };
 
     const VIEW_LOADERS = {
@@ -3223,6 +3448,7 @@ if (typeof gsap === "undefined") { document.write('<script src="https://cdn.jsde
       analytics:   loadAnalytics,
       logs:        loadLogs,
       settings:    loadSettings,
+      backup:      loadBackupView,
     };
 
     let _requestsPollInterval = null;

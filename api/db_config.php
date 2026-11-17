@@ -11,6 +11,39 @@ error_reporting(E_ALL & ~E_NOTICE & ~E_WARNING & ~E_DEPRECATED);
 // ============ TIMEZONE (must match MySQL) ============
 date_default_timezone_set('Asia/Manila');
 
+// ============ LOAD .ENV FILE IF AVAILABLE ============
+$possibleEnvPaths = [
+    __DIR__ . '/../.env',
+    __DIR__ . '/.env',
+    dirname(__DIR__) . '/.env'
+];
+foreach ($possibleEnvPaths as $envPath) {
+    if (file_exists($envPath)) {
+        $lines = @file($envPath, FILE_IGNORE_NEW_LINES | FILE_SKIP_EMPTY_LINES);
+        if (is_array($lines)) {
+            foreach ($lines as $line) {
+                $line = trim($line);
+                if ($line === '' || strpos($line, '#') === 0) continue;
+                if (strpos($line, '=') !== false) {
+                    list($key, $val) = explode('=', $line, 2);
+                    $key = trim($key);
+                    $val = trim($val);
+                    if ((strpos($val, '"') === 0 && substr($val, -1) === '"') ||
+                        (strpos($val, "'") === 0 && substr($val, -1) === "'")) {
+                        $val = substr($val, 1, -1);
+                    }
+                    if (getenv($key) === false) {
+                        putenv("{$key}={$val}");
+                        $_ENV[$key] = $val;
+                        $_SERVER[$key] = $val;
+                    }
+                }
+            }
+        }
+        break;
+    }
+}
+
 // ============ DATABASE CONFIG ============
 define('DB_HOST', getenv('DB_HOST') ?: '127.0.0.1'); 
 define('DB_NAME', getenv('DB_NAME') ?: 'chipipie_pos');
