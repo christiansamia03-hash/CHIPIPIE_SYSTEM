@@ -1618,3 +1618,147 @@ function handleSAChartMonthly() {
         'years'   => array_values(array_unique(array_map('intval', $years)))
     ]);
 }
+
+// =====================================================
+// BACKUP & RESTORE
+// =====================================================
+function handleSABackupStats() {
+    requireSuperAdmin();
+    try {
+        $stats = ChipipieBackupManager::getDatabaseStats();
+        jsonResponse(['success' => true, 'data' => $stats]);
+    } catch (Throwable $e) {
+        jsonResponse(['success' => false, 'message' => $e->getMessage()], 500);
+    }
+}
+
+function handleSABackupList() {
+    requireSuperAdmin();
+    try {
+        $backups = ChipipieBackupManager::listBackups();
+        jsonResponse(['success' => true, 'backups' => $backups]);
+    } catch (Throwable $e) {
+        jsonResponse(['success' => false, 'message' => $e->getMessage()], 500);
+    }
+}
+
+function handleSABackupExportSql() {
+    requireSuperAdmin();
+    try {
+        set_time_limit(300);
+        $res = ChipipieBackupManager::exportSql();
+        $filename = 'chipipie_backup_' . date('Ymd_His') . '.sql';
+        header('Content-Type: application/sql; charset=utf-8');
+        header('Content-Disposition: attachment; filename="' . $filename . '"');
+        header('Content-Length: ' . strlen($res['sql']));
+        echo $res['sql'];
+        exit;
+    } catch (Throwable $e) {
+        jsonResponse(['success' => false, 'message' => $e->getMessage()], 500);
+    }
+}
+
+function handleSABackupExportJson() {
+    requireSuperAdmin();
+    try {
+        set_time_limit(300);
+        $res = ChipipieBackupManager::exportJson();
+        $filename = 'chipipie_backup_' . date('Ymd_His') . '.json';
+        header('Content-Type: application/json; charset=utf-8');
+        header('Content-Disposition: attachment; filename="' . $filename . '"');
+        header('Content-Length: ' . strlen($res['json']));
+        echo $res['json'];
+        exit;
+    } catch (Throwable $e) {
+        jsonResponse(['success' => false, 'message' => $e->getMessage()], 500);
+    }
+}
+
+function handleSABackupCreateServer() {
+    requireSuperAdmin();
+    try {
+        set_time_limit(300);
+        $input = getJsonInput();
+        $format = strtolower($input['format'] ?? 'sql');
+        $res = ChipipieBackupManager::createServerBackup($format);
+        jsonResponse([
+            'success' => true,
+            'message' => 'Backup snapshot created: ' . $res['filename'],
+            'backup'  => $res
+        ]);
+    } catch (Throwable $e) {
+        jsonResponse(['success' => false, 'message' => $e->getMessage()], 500);
+    }
+}
+
+function handleSABackupDownload() {
+    requireSuperAdmin();
+    $file = basename($_GET['file'] ?? '');
+    if (!$file || !preg_match('/^chipipie_backup_\d{8}_\d{6}\.(sql|json)$/', $file)) {
+        jsonResponse(['success' => false, 'message' => 'Invalid backup file requested.'], 400);
+    }
+    $path = ChipipieBackupManager::getBackupDirectory() . '/' . $file;
+    if (!file_exists($path)) {
+        jsonResponse(['success' => false, 'message' => 'Backup file not found on server.'], 404);
+    }
+    $mime = str_ends_with($file, '.sql') ? 'application/sql' : 'application/json';
+    header('Content-Type: ' . $mime . '; charset=utf-8');
+    header('Content-Disposition: attachment; filename="' . $file . '"');
+    header('Content-Length: ' . filesize($path));
+    readfile($path);
+    exit;
+}
+
+function handleSABackupDelete() {
+    requireSuperAdmin();
+    $input = getJsonInput();
+    $file = basename($input['file'] ?? $_POST['file'] ?? '');
+    if (!$file || !preg_match('/^chipipie_backup_\d{8}_\d{6}\.(sql|json)$/', $file)) {
+        jsonResponse(['success' => false, 'message' => 'Invalid backup file.'], 400);
+    }
+    $ok = ChipipieBackupManager::deleteBackup($file);
+    if ($ok) {
+        jsonResponse(['success' => true, 'message' => "Backup '$file' deleted successfully."]);
+    } else {
+        jsonResponse(['success' => false, 'message' => "Failed to delete backup '$file'."], 500);
+    }
+}
+
+function handleSABackupRestoreFile() {
+    requireSuperAdmin();
+    set_time_limit(300);
+    $input = getJsonInput();
+    $file = basename($input['file'] ?? '');
+    if (!$file || !preg_match('/^chipipie_backup_\d{8}_\d{6}\.(sql|json)$/', $file)) {
+        jsonResponse(['success' => false, 'message' => 'Invalid backup file.'], 400);
+    }
+    $path = ChipipieBackupManager::getBackupDirectory() . '/' . $file;
+    if (!file_exists($path)) {
+        jsonResponse(['success' => false, 'message' => 'Backup file not found.'], 404);
+    }
+    if (str_ends_with($file, '.sql')) {
+        $res = ChipipieBackupManager::restoreSql($path);
+    } else {
+        $res = ChipipieBackupManager::restoreJson($path);
+    }
+    jsonResponse($res);
+}
+
+function handleSABackupRestoreUpload() {
+    requireSuperAdmin();
+    set_time_limit(300);
+    if (empty($_FILES['backup_file']) || $_FILES['backup_file']['error'] !== UPLOAD_ERR_OK) {
+        jsonResponse(['success' => false, 'message' => 'No backup file uploaded or upload error occurred.'], 400);
+    }
+    $tmpName = $_FILES['backup_file']['tmp_name'];
+    $origName = $_FILES['backup_file']['name'];
+    $ext = strtolower(pathinfo($origName, PATHINFO_EXTENSION));
+    if ($ext === 'sql') {
+        $res = ChipipieBackupManager::restoreSql($tmpName);
+    } elseif ($ext === 'json') {
+        $res = ChipipieBackupManager::restoreJson($tmpName);
+    } else {
+        jsonResponse(['success' => false, 'message' => 'Invalid file format. Only .sql and .json files are supported.'], 400);
+    }
+    jsonResponse($res);
+}
