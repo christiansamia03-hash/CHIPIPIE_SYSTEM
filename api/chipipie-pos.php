@@ -3,7 +3,7 @@ header('Cache-Control: no-store, no-cache, must-revalidate, max-age=0');
 header('Pragma: no-cache');
 header('Expires: 0');
 // Start session and generate CSRF token for this page
-require_once __DIR__ . '/db_config.php';
+require_once __DIR__ . '/api/db_config.php';
 startChipipieSession();
 $_CSRF_TOKEN = getCsrfToken();
 ?>
@@ -2677,7 +2677,15 @@ $_CSRF_TOKEN = getCsrfToken();
         height: 100% !important;
         overflow-y: auto !important;
         -webkit-overflow-scrolling: touch !important;
-        padding: 12px 14px 20px 14px !important;
+        padding: 12px 14px calc(var(--mobile-nav-h) + 24px) 14px !important;
+      }
+
+      /* Login card & wrapper mobile centering */
+      .login-wrapper {
+        padding: 24px 14px 40px !important;
+        align-items: center !important;
+        justify-content: center !important;
+        display: flex !important;
       }
 
       /* POS Container — Flex container taking remaining height */
@@ -2797,13 +2805,46 @@ $_CSRF_TOKEN = getCsrfToken();
       .top-bar {
         height: var(--mobile-top-bar-h) !important;
         min-height: var(--mobile-top-bar-h) !important;
-        padding: 6px 10px !important;
+        padding: 4px 10px !important;
+        display: flex !important;
+        align-items: center !important;
+        justify-content: space-between !important;
+        overflow: hidden !important;
       }
       .top-bar h4 {
-        font-size: 14px !important;
+        font-size: 13.5px !important;
+        font-weight: 700 !important;
+        white-space: nowrap !important;
+        overflow: hidden !important;
+        text-overflow: ellipsis !important;
+        max-width: 120px !important;
+        margin: 0 !important;
       }
       .top-bar-time {
+        display: none !important;
+      }
+      #status-badge {
+        font-size: 10px !important;
+        padding: 2px 6px !important;
+      }
+      .mobile-topbar-actions {
+        display: flex !important;
+        align-items: center !important;
+        gap: 5px !important;
+      }
+      .mobile-topbar-name {
+        max-width: 60px !important;
         font-size: 10.5px !important;
+        white-space: nowrap !important;
+        overflow: hidden !important;
+        text-overflow: ellipsis !important;
+      }
+      .mobile-topbar-logout-btn span {
+        display: none !important;
+      }
+      .mobile-topbar-logout-btn {
+        padding: 3px 6px !important;
+        font-size: 12px !important;
       }
 
       .sidebar {
@@ -2837,12 +2878,12 @@ $_CSRF_TOKEN = getCsrfToken();
         padding-bottom: 0 !important;
       }
 
-      /* POS Container — Takes full remaining height via flex */
+      /* POS Container — Takes full remaining height via flex without bottom cut-off */
       .pos-view-container {
-        flex: 1 !important;
+        flex: 1 1 0% !important;
         min-height: 0 !important;
-        height: 100% !important;
-        max-height: 100% !important;
+        height: auto !important;
+        max-height: none !important;
         flex-direction: column !important;
         overflow: hidden !important;
         position: relative !important;
@@ -2856,7 +2897,7 @@ $_CSRF_TOKEN = getCsrfToken();
         padding: 5px 8px;
         gap: 6px;
         border-bottom: 1.5px solid var(--cafe-tan);
-        flex-shrink: 0;
+        flex-shrink: 0 !important;
         z-index: 10;
       }
       .pos-mtab-btn {
@@ -2894,13 +2935,15 @@ $_CSRF_TOKEN = getCsrfToken();
         font-weight: 800;
       }
 
-      /* Column toggling in portrait */
+      /* Column toggling in portrait — Perfectly flexed and scrollable */
       .pos-menu-col {
         display: none !important;
-        flex: 1;
+        flex: 1 1 0% !important;
+        min-height: 0 !important;
         width: 100% !important;
-        height: 100%;
-        overflow: hidden;
+        height: auto !important;
+        overflow: hidden !important;
+        flex-direction: column !important;
       }
       .pos-menu-col.mobile-active {
         display: flex !important;
@@ -2910,12 +2953,34 @@ $_CSRF_TOKEN = getCsrfToken();
         display: none !important;
         width: 100% !important;
         min-width: 0 !important;
-        flex: 1;
-        height: 100%;
+        flex: 1 1 0% !important;
+        min-height: 0 !important;
+        height: auto !important;
+        overflow: hidden !important;
         border-left: none !important;
+        flex-direction: column !important;
+        background: #fff !important;
       }
       .pos-cart-col.mobile-active {
         display: flex !important;
+      }
+      .cart-header {
+        padding: 8px 12px !important;
+        font-size: 13.5px !important;
+        flex-shrink: 0 !important;
+      }
+      .cart-body {
+        flex: 1 1 0% !important;
+        min-height: 0 !important;
+        overflow-y: auto !important;
+        -webkit-overflow-scrolling: touch !important;
+        padding: 8px 12px !important;
+      }
+      .cart-footer {
+        flex-shrink: 0 !important;
+        padding: 10px 12px calc(12px + env(safe-area-inset-bottom, 0px)) !important;
+        background: #faf8f5 !important;
+        border-top: 1.5px solid var(--cafe-tan) !important;
       }
 
       .pos-cart-back-btn {
@@ -3069,9 +3134,24 @@ $_CSRF_TOKEN = getCsrfToken();
        RESPONSIVE — COMPACT PHONES (max-width: 480px)
        ====================================================== */
     @media (max-width: 480px) {
+      .nav-item-btn {
+        font-size: 8.5px !important;
+        padding: 2px 1px !important;
+        height: 48px !important;
+      }
+      .nav-item-btn i {
+        font-size: 15px !important;
+      }
+      .nav-item-btn.active {
+        background: rgba(255, 255, 255, 0.16) !important;
+        color: #f59e0b !important;
+        border-radius: 8px !important;
+      }
       .product-card {
         padding: 10px 6px;
-        min-height: 100px;
+        min-height: 95px;
+        touch-action: manipulation;
+        -webkit-tap-highlight-color: transparent;
       }
       .product-card .prod-emoji {
         font-size: 22px;
@@ -6629,7 +6709,13 @@ $_CSRF_TOKEN = getCsrfToken();
       const titles = { dashboard: 'Dashboard', pos: 'New Order', orders: 'Orders', menu: 'Menu Items', reports: 'Analytics & Reports', users: 'User Management' };
       document.getElementById('page-title').textContent = titles[name] || '';
 
-      if (name === 'pos') { renderPOS(); initShortcutScrollSpy(); }
+      if (name === 'pos') {
+        renderPOS();
+        initShortcutScrollSpy();
+        if (window.innerWidth <= 768 && typeof switchMobilePosTab === 'function') {
+          switchMobilePosTab('menu');
+        }
+      }
       if (name === 'orders') {
         if (!_isUserAdmin) {
           _orderPickerMode = '';
