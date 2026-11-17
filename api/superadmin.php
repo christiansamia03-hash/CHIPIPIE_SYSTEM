@@ -1089,15 +1089,25 @@ function handleSAOrders() {
     $stmt->execute($params);
     $orders = $stmt->fetchAll();
 
-    foreach ($orders as &$order) {
-        $items = $db->prepare("
-            SELECT oi.quantity, oi.unit_price, oi.subtotal, oi.size, mi.name
+    $orderIds = array_column($orders, 'id');
+    $itemsMap = [];
+    if (!empty($orderIds)) {
+        $placeholders = implode(',', array_fill(0, count($orderIds), '?'));
+        $itemStmt = $db->prepare("
+            SELECT oi.order_id, oi.quantity, oi.unit_price, oi.subtotal, oi.size, mi.name
             FROM order_items oi
             JOIN menu_items mi ON mi.id = oi.menu_item_id
-            WHERE oi.order_id = ?
+            WHERE oi.order_id IN ($placeholders)
         ");
-        $items->execute([$order['id']]);
-        $order['items'] = $items->fetchAll();
+        $itemStmt->execute($orderIds);
+        $allItems = $itemStmt->fetchAll(PDO::FETCH_ASSOC);
+        foreach ($allItems as $it) {
+            $itemsMap[$it['order_id']][] = $it;
+        }
+    }
+
+    foreach ($orders as &$order) {
+        $order['items'] = $itemsMap[$order['id']] ?? [];
     }
     unset($order);
 

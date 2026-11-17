@@ -4908,12 +4908,16 @@ if (typeof gsap === "undefined") { document.write('<script src="https://cdn.jsde
       }
 
       try {
-        const res = await saApi(url);
-        if (!res.success) return;
-
         const tbody = document.getElementById('sa-orders-tbody');
-        if (!res.orders.length) {
-          tbody.innerHTML = `<tr><td colspan="7"><div class="sa-empty"><i class="bi bi-receipt"></i><p>No orders found</p></div></td></tr>`;
+        const res = await saApi(url);
+        if (!res || !res.success) {
+          if (tbody) tbody.innerHTML = `<tr><td colspan="7"><div class="sa-empty"><i class="bi bi-info-circle"></i><p>${(res && res.message) ? res.message : 'No orders found for this filter.'}</p></div></td></tr>`;
+          return;
+        }
+
+        if (!tbody) return;
+        if (!res.orders || !res.orders.length) {
+          tbody.innerHTML = `<tr><td colspan="7"><div class="sa-empty"><i class="bi bi-receipt"></i><p>No orders found for this period. Try clicking "All Time" or "This Month".</p></div></td></tr>`;
           return;
         }
 
