@@ -1779,6 +1779,10 @@ $_CSRF_TOKEN = getCsrfToken();
     }
 
     /* MODAL */
+    #sessionInactivityModal:not(.show) {
+      display: none !important;
+    }
+
     .modal-backdrop {
       background: rgba(0, 0, 0, 0.45);
     }
@@ -5986,13 +5990,10 @@ $_CSRF_TOKEN = getCsrfToken();
   </div>
 
   <!-- SESSION INACTIVITY TIMEOUT MODAL (ISO/IEC 25010 Security & User Protection) -->
-  <!-- SESSION INACTIVITY MODAL — DISABLED -->
-  <!--
   <div class="modal fade" id="sessionInactivityModal" tabindex="-1" data-bs-backdrop="static" data-bs-keyboard="false" aria-hidden="true" style="z-index: 1090;">
     <div class="modal-dialog modal-dialog-centered" style="max-width: 430px; margin: 16px auto;">
       <div class="modal-content" style="border-radius: 22px; overflow: hidden; border: 1px solid rgba(180, 83, 9, 0.28); box-shadow: 0 25px 65px rgba(0,0,0,0.4); background: #ffffff;">
         <div style="background: linear-gradient(135deg, #fffbeb 0%, #fef3c7 100%); padding: 26px 24px 20px; text-align: center; border-bottom: 1px solid #fde68a; position: relative;">
-          <!-- Animated Countdown Badge -->
           <div style="display: inline-flex; flex-direction: column; align-items: center; justify-content: center; width: 84px; height: 84px; border-radius: 50%; background: #ffffff; border: 3px solid #f59e0b; margin-bottom: 12px; box-shadow: 0 8px 24px rgba(245, 158, 11, 0.28); position: relative;">
             <span id="session-timeout-num" style="font-size: 32px; font-weight: 800; color: #b45309; font-family: monospace; line-height: 1;">60</span>
             <span style="font-size: 10px; font-weight: 700; color: #d97706; text-transform: uppercase; letter-spacing: 0.5px; margin-top: 2px;">SEC</span>
@@ -6004,7 +6005,6 @@ $_CSRF_TOKEN = getCsrfToken();
         </div>
         
         <div style="padding: 22px 24px; background: #ffffff;">
-          <!-- Smooth Animated Progress Bar -->
           <div style="height: 6px; background: #fef3c7; border-radius: 999px; overflow: hidden; margin-bottom: 16px;">
             <div id="session-timeout-progress" style="height: 100%; width: 100%; background: linear-gradient(90deg, #10b981, #f59e0b, #ef4444); border-radius: 999px; transition: width 1s linear;"></div>
           </div>
@@ -6023,7 +6023,6 @@ $_CSRF_TOKEN = getCsrfToken();
             </div>
           </div>
 
-          <!-- Action Buttons -->
           <button type="button" class="btn w-100" id="btn-session-still-here" onclick="keepSessionAlive()" style="background: linear-gradient(135deg, #2b1810, #422518); color: #ffffff; font-weight: 700; padding: 13px; border-radius: 12px; font-size: 14.5px; border: none; box-shadow: 0 4px 14px rgba(43,24,16,0.3); transition: all 0.15s ease;">
             <i class="bi bi-check-circle-fill me-2" style="color: #34d399;"></i> I'm Still Here &mdash; Keep Working
           </button>
@@ -6040,7 +6039,6 @@ $_CSRF_TOKEN = getCsrfToken();
       </div>
     </div>
   </div>
-  -->
   <!-- TOAST -->
   <div class="toast-notif" id="toast"></div>
 
