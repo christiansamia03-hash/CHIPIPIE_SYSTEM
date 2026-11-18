@@ -33,6 +33,88 @@ $_CSRF_TOKEN = getCsrfToken();
     html.has-active-session #app-wrapper {
       display: flex !important;
     }
+    html:not(.has-active-session) #pos-loading-screen {
+      display: none !important;
+    }
+
+    /* ── POS LOADING SCREEN ── */
+    .pos-loading-screen {
+      position: fixed;
+      inset: 0;
+      z-index: 999999;
+      background: radial-gradient(ellipse at 50% 35%, rgba(245, 158, 11, 0.18) 0%, transparent 65%),
+                  radial-gradient(ellipse at 80% 80%, rgba(217, 119, 6, 0.08) 0%, transparent 50%),
+                  #0f0f12;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      transition: opacity 0.35s cubic-bezier(0.4, 0, 0.2, 1);
+      opacity: 1;
+      pointer-events: auto;
+    }
+    .pos-loading-screen.fade-out {
+      opacity: 0;
+      pointer-events: none;
+    }
+    .pos-loading-content {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      text-align: center;
+      gap: 16px;
+      padding: 32px;
+      font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    }
+    .pos-loading-logo-wrap {
+      position: relative;
+      width: 76px;
+      height: 76px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+    .pos-loading-logo {
+      width: 72px;
+      height: 72px;
+      object-fit: contain;
+      filter: drop-shadow(0 0 24px rgba(245, 158, 11, 0.5));
+      animation: posLogoPulse 2s infinite ease-in-out;
+    }
+    .pos-loading-spinner-ring {
+      position: relative;
+      width: 36px;
+      height: 36px;
+      margin-top: 4px;
+    }
+    .pos-loading-spinner {
+      width: 36px;
+      height: 36px;
+      border: 3px solid rgba(245, 158, 11, 0.2);
+      border-top-color: #f59e0b;
+      border-right-color: #fbbf24;
+      border-radius: 50%;
+      animation: posSpin 0.8s linear infinite;
+    }
+    .pos-loading-title {
+      font-size: 19px;
+      font-weight: 700;
+      letter-spacing: -0.02em;
+      color: #f8fafc;
+      margin-top: 2px;
+    }
+    .pos-loading-sub {
+      font-size: 13px;
+      color: #a8a29e;
+      font-weight: 500;
+    }
+    @keyframes posSpin {
+      to { transform: rotate(360deg); }
+    }
+    @keyframes posLogoPulse {
+      0%, 100% { transform: scale(1); }
+      50% { transform: scale(1.08); }
+    }
   </style>
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
   <title>ChipiPie Cafe & Pizza — POS System</title>
@@ -4200,6 +4282,20 @@ $_CSRF_TOKEN = getCsrfToken();
 </head>
 
 <body>
+
+  <!-- ── POS LOADING SCREEN ── -->
+  <div id="pos-loading-screen" class="pos-loading-screen">
+    <div class="pos-loading-content">
+      <div class="pos-loading-logo-wrap">
+        <img src="assets/img/logo.png" alt="ChipiPie Logo" class="pos-loading-logo">
+      </div>
+      <div class="pos-loading-spinner-ring">
+        <div class="pos-loading-spinner"></div>
+      </div>
+      <div class="pos-loading-title">ChipiPie Cafe & Pizza</div>
+      <div class="pos-loading-sub" id="pos-loading-sub">Loading POS workstation...</div>
+    </div>
+  </div>
 
   <!-- LOGIN SCREEN -->
   <div id="login-wrapper" class="login-wrapper">
@@ -11385,90 +11481,117 @@ $_CSRF_TOKEN = getCsrfToken();
       } catch (e) { console.error('Failed to load menu:', e); }
     }
 
+    /* ── POS LOADING SCREEN CONTROLLER ── */
+    function showPosLoadingScreen(subText) {
+      const el = document.getElementById('pos-loading-screen');
+      if (!el) return;
+      if (subText && document.getElementById('pos-loading-sub')) {
+        document.getElementById('pos-loading-sub').textContent = subText;
+      }
+      el.classList.remove('fade-out');
+      el.style.display = 'flex';
+    }
+
+    function hidePosLoadingScreen() {
+      const el = document.getElementById('pos-loading-screen');
+      if (!el) return;
+      el.classList.add('fade-out');
+      setTimeout(() => {
+        if (el.classList.contains('fade-out')) {
+          el.style.display = 'none';
+        }
+      }, 400);
+    }
+
     async function activateApp(isAdmin) {
       document.documentElement.classList.add('has-active-session');
       document.getElementById('login-wrapper').style.display = 'none';
       document.getElementById('register-wrapper').style.display = 'none';
       document.getElementById('app-wrapper').style.display = 'flex';
 
-      const mgmtLabel = document.getElementById('nav-mgmt-label');
-      const menuBtn = document.getElementById('nav-menu-btn');
-      const reportsBtn = document.getElementById('nav-reports-btn');
-      const usersBtn = document.getElementById('nav-users-btn');
+      try {
+        const mgmtLabel = document.getElementById('nav-mgmt-label');
+        const menuBtn = document.getElementById('nav-menu-btn');
+        const reportsBtn = document.getElementById('nav-reports-btn');
+        const usersBtn = document.getElementById('nav-users-btn');
 
-      // Concurrently load menu, today's orders & dashboard stats for instant app activation
-      await Promise.all([
-        loadMenuFromDB(),
-        api('orders.php?date=today').then(ordRes => {
-          if (ordRes && ordRes.success && ordRes.orders) {
-            orders = ordRes.orders.map(o => ({
-              id: o.order_number, time: o.time, date: new Date(o.created_at).toDateString(),
-              ts: new Date(o.created_at).getTime(), items: o.items || '',
-              cartData: null, total: parseFloat(o.total),
-              payment: o.payment_method, status: o.status
-            }));
-          }
-        }).catch(e => { console.warn('Could not load orders on init:', e); }),
-        api('orders.php?action=stats').then(statsRes => {
-          if (statsRes && statsRes.success) {
-            _cachedStats = statsRes;
-            _cachedStatsTime = Date.now();
-          }
-        }).catch(e => {})
-      ]);
+        // Concurrently load menu, today's orders & dashboard stats for instant app activation
+        await Promise.all([
+          loadMenuFromDB(),
+          api('orders.php?date=today').then(ordRes => {
+            if (ordRes && ordRes.success && ordRes.orders) {
+              orders = ordRes.orders.map(o => ({
+                id: o.order_number, time: o.time, date: new Date(o.created_at).toDateString(),
+                ts: new Date(o.created_at).getTime(), items: o.items || '',
+                cartData: null, total: parseFloat(o.total),
+                payment: o.payment_method, status: o.status
+              }));
+            }
+          }).catch(e => { console.warn('Could not load orders on init:', e); }),
+          api('orders.php?action=stats').then(statsRes => {
+            if (statsRes && statsRes.success) {
+              _cachedStats = statsRes;
+              _cachedStatsTime = Date.now();
+            }
+          }).catch(e => {})
+        ]);
 
-      _isUserAdmin = !!isAdmin;
-      window.posIsAdmin = !!isAdmin;
+        _isUserAdmin = !!isAdmin;
+        window.posIsAdmin = !!isAdmin;
 
-      const orderFilterTabs = document.getElementById('order-filter-tabs');
-      const orderCashierTab = document.getElementById('order-cashier-tab');
-      const orderPickerCard = document.getElementById('order-picker-card');
+        const orderFilterTabs = document.getElementById('order-filter-tabs');
+        const orderCashierTab = document.getElementById('order-cashier-tab');
+        const orderPickerCard = document.getElementById('order-picker-card');
 
-      if (!isAdmin) {
-        mgmtLabel.style.display = 'none';
-        menuBtn.style.display = 'flex';
-        reportsBtn.style.display = 'none';
-        if (usersBtn) usersBtn.style.display = 'none';
-        if (orderFilterTabs) orderFilterTabs.style.display = 'none';
-        if (orderCashierTab) orderCashierTab.style.display = 'flex';
-        if (orderPickerCard) orderPickerCard.style.display = 'none';
-        _orderPickerMode = '';
-        currentOrderFilter = 'today';
-        safeBuildCharts(); // Build charts so Dashboard view works for cashiers too
-        showView('pos', document.getElementById('nav-pos-btn') || document.querySelectorAll('.nav-item-btn')[1]);
-      } else {
-        mgmtLabel.style.display = 'block';
-        menuBtn.style.display = 'flex';
-        reportsBtn.style.display = 'flex';
-        if (usersBtn) usersBtn.style.display = 'flex';
-        if (orderFilterTabs) orderFilterTabs.style.display = 'flex';
-        if (orderCashierTab) orderCashierTab.style.display = 'none';
-        if (orderPickerCard) orderPickerCard.style.display = 'block';
-        _orderPickerMode = 'date';
-        safeBuildCharts();
-        showView('dashboard', document.getElementById('nav-dash-btn') || document.querySelectorAll('.nav-item-btn')[0]);
+        if (!isAdmin) {
+          mgmtLabel.style.display = 'none';
+          menuBtn.style.display = 'flex';
+          reportsBtn.style.display = 'none';
+          if (usersBtn) usersBtn.style.display = 'none';
+          if (orderFilterTabs) orderFilterTabs.style.display = 'none';
+          if (orderCashierTab) orderCashierTab.style.display = 'flex';
+          if (orderPickerCard) orderPickerCard.style.display = 'none';
+          _orderPickerMode = '';
+          currentOrderFilter = 'today';
+          safeBuildCharts(); // Build charts so Dashboard view works for cashiers too
+          showView('pos', document.getElementById('nav-pos-btn') || document.querySelectorAll('.nav-item-btn')[1]);
+        } else {
+          mgmtLabel.style.display = 'block';
+          menuBtn.style.display = 'flex';
+          reportsBtn.style.display = 'flex';
+          if (usersBtn) usersBtn.style.display = 'flex';
+          if (orderFilterTabs) orderFilterTabs.style.display = 'flex';
+          if (orderCashierTab) orderCashierTab.style.display = 'none';
+          if (orderPickerCard) orderPickerCard.style.display = 'block';
+          _orderPickerMode = 'date';
+          safeBuildCharts();
+          showView('dashboard', document.getElementById('nav-dash-btn') || document.querySelectorAll('.nav-item-btn')[0]);
+        }
+        // Preload PayMongo key status (works for both admin and cashier)
+        initGCashKey();
+
+        // Start ISO 25010 Cashier Inactivity & Productivity Safeguard
+        recordUserActivity();
+        startInactivityMonitoring();
+        restorePreservedCartIfAny();
+        // Station Allocation: Automatically switch branch based on staff assignment
+        const userStation = (currentUser && currentUser.assigned_station) || _userAssignedStation || 'cafe';
+        _userAssignedStation = userStation;
+        if (userStation === 'pizza') {
+          switchBranch('pizza');
+        } else if (userStation === 'cafe') {
+          switchBranch('coffee');
+        }
+        initStationOrderMonitoring();
+      } finally {
+        hidePosLoadingScreen();
       }
-      // Preload PayMongo key status (works for both admin and cashier)
-      initGCashKey();
-
-      // Start ISO 25010 Cashier Inactivity & Productivity Safeguard
-      recordUserActivity();
-      startInactivityMonitoring();
-      restorePreservedCartIfAny();
-      // Station Allocation: Automatically switch branch based on staff assignment
-      const userStation = (currentUser && currentUser.assigned_station) || _userAssignedStation || 'cafe';
-      _userAssignedStation = userStation;
-      if (userStation === 'pizza') {
-        switchBranch('pizza');
-      } else if (userStation === 'cafe') {
-        switchBranch('coffee');
-      }
-      initStationOrderMonitoring();
     }
 
     async function logout() {
       stopInactivityMonitoring();
       stopPizzaOrderMonitoring();
+      hidePosLoadingScreen();
       const currentSid = sessionStorage.getItem('chipipie_pos_session_id');
       if (currentSid) {
         try { await api('auth.php?action=logout', { session_id: currentSid }); } catch (e) { }
@@ -12797,6 +12920,7 @@ $_CSRF_TOKEN = getCsrfToken();
       // Check for URL flag to open a dedicated fresh/isolated station session in this tab
       const isNewTabSession = urlParams.has('new_session') || urlParams.has('new_station') || urlParams.has('switch');
       if (isNewTabSession) {
+        hidePosLoadingScreen();
         sessionStorage.removeItem('chipipie_pos_session_id');
         sessionStorage.removeItem('chipipie_csrf_token');
         window.history.replaceState({}, document.title, window.location.pathname);
@@ -12813,6 +12937,7 @@ $_CSRF_TOKEN = getCsrfToken();
       if (posSid && lastPosAct > 0 && (now - lastPosAct >= POS_TIMEOUT_MS)) {
         // Tab was closed or idle for >= 5 minutes -> immediate auto logout + modal
         document.documentElement.classList.remove('has-active-session');
+        hidePosLoadingScreen();
         sessionStorage.removeItem('chipipie_pos_session_id');
         sessionStorage.removeItem('chipipie_csrf_token');
         sessionStorage.removeItem('chipipie_pos_last_activity');
@@ -12846,6 +12971,7 @@ $_CSRF_TOKEN = getCsrfToken();
             activateApp(isManager);
           } else if (res.session_expired) {
             document.documentElement.classList.remove('has-active-session');
+            hidePosLoadingScreen();
             sessionStorage.removeItem('chipipie_pos_session_id');
             sessionStorage.removeItem('chipipie_csrf_token');
             sessionStorage.removeItem('chipipie_pos_last_activity');
@@ -12858,6 +12984,7 @@ $_CSRF_TOKEN = getCsrfToken();
           } else if (res.pending_2fa && (res.role === 'admin' || res.role === 'super_admin')) {
             // Resume pending 2FA step if page was reloaded
             document.documentElement.classList.remove('has-active-session');
+            hidePosLoadingScreen();
             document.getElementById('pos-step-credentials').style.display = 'none';
             document.getElementById('pos-step-2fa').style.display = 'block';
             document.getElementById('pos-2fa-email').textContent = res.masked_email || 'Your Registered Email';
@@ -12872,16 +12999,19 @@ $_CSRF_TOKEN = getCsrfToken();
             document.documentElement.classList.remove('has-active-session');
             document.getElementById('app-wrapper').style.display = 'none';
             document.getElementById('login-wrapper').style.display = 'flex';
+            hidePosLoadingScreen();
             playWaterDropLoginAnimation('#login-wrapper .login-card');
           }
         }).catch(() => {
           document.documentElement.classList.remove('has-active-session');
           document.getElementById('app-wrapper').style.display = 'none';
           document.getElementById('login-wrapper').style.display = 'flex';
+          hidePosLoadingScreen();
         });
       } else {
         // Brand new tab: Clean login screen! Ready to log in as Cashier 1, Cashier 2, or Admin!
         document.documentElement.classList.remove('has-active-session');
+        hidePosLoadingScreen();
         playWaterDropLoginAnimation('#login-wrapper .login-card');
       }
     });

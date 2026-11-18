@@ -31,6 +31,98 @@ $_CSRF_TOKEN = getCsrfToken();
     html.has-active-session #sa-app {
       display: flex !important;
     }
+    html:not(.has-active-session) #sa-loading-screen {
+      display: none !important;
+    }
+
+    /* ── SUPER ADMIN LOADING SCREEN ── */
+    .sa-loading-screen {
+      position: fixed;
+      inset: 0;
+      z-index: 999999;
+      background: radial-gradient(ellipse at 50% 35%, rgba(109,40,217,0.25) 0%, transparent 65%),
+                  radial-gradient(ellipse at 80% 80%, rgba(245,158,11,0.06) 0%, transparent 50%),
+                  #0a0a0f;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      transition: opacity 0.35s cubic-bezier(0.4, 0, 0.2, 1);
+      opacity: 1;
+      pointer-events: auto;
+    }
+    .sa-loading-screen.fade-out {
+      opacity: 0;
+      pointer-events: none;
+    }
+    .sa-loading-content {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      text-align: center;
+      gap: 16px;
+      padding: 32px;
+      font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    }
+    .sa-loading-shield-wrap {
+      position: relative;
+      width: 76px;
+      height: 76px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+    .sa-loading-shield {
+      font-size: 40px;
+      z-index: 2;
+      filter: drop-shadow(0 0 24px rgba(168, 85, 247, 0.6));
+      animation: saShieldPulse 2s infinite ease-in-out;
+    }
+    .sa-loading-glow {
+      position: absolute;
+      inset: -12px;
+      border-radius: 50%;
+      background: radial-gradient(circle, rgba(168, 85, 247, 0.35) 0%, transparent 70%);
+      animation: saGlowPulse 2s infinite ease-in-out;
+    }
+    .sa-loading-spinner-ring {
+      position: relative;
+      width: 36px;
+      height: 36px;
+      margin-top: 4px;
+    }
+    .sa-loading-spinner {
+      width: 36px;
+      height: 36px;
+      border: 3px solid rgba(168, 85, 247, 0.2);
+      border-top-color: #a855f7;
+      border-right-color: #c084fc;
+      border-radius: 50%;
+      animation: saSpin 0.8s linear infinite;
+    }
+    .sa-loading-title {
+      font-size: 19px;
+      font-weight: 700;
+      letter-spacing: -0.02em;
+      color: #f8fafc;
+      margin-top: 2px;
+    }
+    .sa-loading-sub {
+      font-size: 13px;
+      color: #94a3b8;
+      font-weight: 500;
+    }
+    @keyframes saSpin {
+      to { transform: rotate(360deg); }
+    }
+    @keyframes saShieldPulse {
+      0%, 100% { transform: scale(1); }
+      50% { transform: scale(1.08); }
+    }
+    @keyframes saGlowPulse {
+      0%, 100% { opacity: 0.5; transform: scale(0.95); }
+      50% { opacity: 1; transform: scale(1.15); }
+    }
   </style>
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
   <title>ChipiPie — Super Admin Control Center</title>
@@ -1196,6 +1288,21 @@ $_CSRF_TOKEN = getCsrfToken();
   </style>
 </head>
 <body>
+
+  <!-- ── SUPER ADMIN LOADING SCREEN ── -->
+  <div id="sa-loading-screen" class="sa-loading-screen">
+    <div class="sa-loading-content">
+      <div class="sa-loading-shield-wrap">
+        <div class="sa-loading-shield">🛡️</div>
+        <div class="sa-loading-glow"></div>
+      </div>
+      <div class="sa-loading-spinner-ring">
+        <div class="sa-loading-spinner"></div>
+      </div>
+      <div class="sa-loading-title">ChipiPie Super Admin</div>
+      <div class="sa-loading-sub" id="sa-loading-sub">Loading control center...</div>
+    </div>
+  </div>
 
   <!-- ── LOGIN SCREEN ── -->
   <div class="sa-login-screen" id="sa-login-screen">
@@ -3583,7 +3690,29 @@ if (typeof gsap === "undefined") { document.write('<script src="https://cdn.jsde
       }
     }
 
-    function activateSAApp() {
+    /* ── SUPER ADMIN LOADING SCREEN CONTROLLER ── */
+    function showSALoadingScreen(subText) {
+      const el = document.getElementById('sa-loading-screen');
+      if (!el) return;
+      if (subText && document.getElementById('sa-loading-sub')) {
+        document.getElementById('sa-loading-sub').textContent = subText;
+      }
+      el.classList.remove('fade-out');
+      el.style.display = 'flex';
+    }
+
+    function hideSALoadingScreen() {
+      const el = document.getElementById('sa-loading-screen');
+      if (!el) return;
+      el.classList.add('fade-out');
+      setTimeout(() => {
+        if (el.classList.contains('fade-out')) {
+          el.style.display = 'none';
+        }
+      }, 400);
+    }
+
+    async function activateSAApp() {
       document.documentElement.classList.add('has-active-session');
       try {
         localStorage.setItem('chipipie_sa_last_activity', String(Date.now()));
@@ -3592,14 +3721,23 @@ if (typeof gsap === "undefined") { document.write('<script src="https://cdn.jsde
       document.getElementById('sa-step-2fa').style.display = 'none';
       document.getElementById('sa-step-credentials').style.display = 'block';
       document.getElementById('sa-app').style.display = 'flex';
-      document.getElementById('sa-sidebar-name').textContent = saCurrentUser.full_name;
-      document.getElementById('sa-sidebar-avatar').textContent = saCurrentUser.full_name.charAt(0).toUpperCase();
-      loadDashboard();
+      if (saCurrentUser) {
+        document.getElementById('sa-sidebar-name').textContent = saCurrentUser.full_name || 'Super Admin';
+        document.getElementById('sa-sidebar-avatar').textContent = (saCurrentUser.full_name || 'S').charAt(0).toUpperCase();
+      }
       startSAInactivityMonitoring();
+      try {
+        await loadDashboard();
+      } catch (e) {
+        console.warn('Dashboard load error:', e);
+      } finally {
+        hideSALoadingScreen();
+      }
     }
 
     async function saLogout() {
       stopSAInactivityMonitoring();
+      hideSALoadingScreen();
       // 1. Immediately reset client state and show login UI
       document.documentElement.classList.remove('has-active-session');
       saCurrentUser = null;
@@ -3744,6 +3882,7 @@ if (typeof gsap === "undefined") { document.write('<script src="https://cdn.jsde
 
     function handleSASessionExpired(msg = 'Your session has expired. Please sign in again.') {
       stopSAInactivityMonitoring();
+      hideSALoadingScreen();
       document.documentElement.classList.remove('has-active-session');
       saCurrentUser = null;
       sessionStorage.removeItem('chipipie_sa_session_id');
@@ -7220,6 +7359,7 @@ if (typeof gsap === "undefined") { document.write('<script src="https://cdn.jsde
       const urlParams = new URLSearchParams(window.location.search);
       const resetToken = urlParams.get('reset_token');
       if (resetToken) {
+        hideSALoadingScreen();
         // Show reset overlay, hide normal login steps
         document.getElementById('sa-step-credentials').style.display = 'none';
         document.getElementById('sa-reset-overlay').style.display = 'block';
@@ -7235,6 +7375,7 @@ if (typeof gsap === "undefined") { document.write('<script src="https://cdn.jsde
 
       if (saSid && lastSaAct > 0 && (now - lastSaAct >= SA_TIMEOUT_MS)) {
         document.documentElement.classList.remove('has-active-session');
+        hideSALoadingScreen();
         handleSASessionExpired('Session expired due to 5 minutes of inactivity while tab was closed. Please sign in again.');
         return;
       }
@@ -7252,9 +7393,11 @@ if (typeof gsap === "undefined") { document.write('<script src="https://cdn.jsde
             activateSAApp();
           } else if (res.session_expired) {
             document.documentElement.classList.remove('has-active-session');
+            hideSALoadingScreen();
             handleSASessionExpired(res.message || 'Your Super Admin session has expired due to 5 minutes of inactivity. Please sign in again.');
           } else if (res.pending_2fa) {
             document.documentElement.classList.remove('has-active-session');
+            hideSALoadingScreen();
             // Resume pending 2FA step if page reloaded
             document.getElementById('sa-step-credentials').style.display = 'none';
             document.getElementById('sa-step-2fa').style.display = 'block';
@@ -7270,16 +7413,19 @@ if (typeof gsap === "undefined") { document.write('<script src="https://cdn.jsde
             document.documentElement.classList.remove('has-active-session');
             document.getElementById('sa-app').style.display = 'none';
             document.getElementById('sa-login-screen').style.display = 'flex';
+            hideSALoadingScreen();
             playWaterDropLoginAnimation('#sa-login-screen .sa-login-card');
           }
         }).catch(() => {
           document.documentElement.classList.remove('has-active-session');
           document.getElementById('sa-app').style.display = 'none';
           document.getElementById('sa-login-screen').style.display = 'flex';
+          hideSALoadingScreen();
           playWaterDropLoginAnimation('#sa-login-screen .sa-login-card');
         });
       } else {
         document.documentElement.classList.remove('has-active-session');
+        hideSALoadingScreen();
         playWaterDropLoginAnimation('#sa-login-screen .sa-login-card');
       }
     });
