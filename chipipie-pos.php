@@ -11460,6 +11460,8 @@ $_CSRF_TOKEN = getCsrfToken();
         localStorage.removeItem('chipipie_session_id');
       }
       localStorage.removeItem('chipipie_pos_last_activity');
+      localStorage.removeItem('chipipie_csrf_token');
+      window.CSRF_TOKEN = '';
       currentUser = null;
       _isUserAdmin = false;
       window.posIsAdmin = false;
@@ -12752,6 +12754,7 @@ $_CSRF_TOKEN = getCsrfToken();
           localStorage.removeItem('chipipie_pos_session_id');
           localStorage.removeItem('chipipie_session_id');
           localStorage.removeItem('chipipie_pos_last_activity');
+          localStorage.removeItem('chipipie_csrf_token');
           currentUser = null;
           const errEl = document.getElementById('login-error');
           if (errEl) {

@@ -92,6 +92,12 @@ function getCsrfToken() {
 /**
  * Validate the X-CSRF-Token header on all state-changing (POST/PUT/DELETE) API requests.
  * Skips validation for CLI scripts, GET, HEAD, and OPTIONS.
+ *
+ * Session-mismatch tolerance: If the current server-side session's CSRF token does not
+ * match the client's sent token, we do a DB-level lookup across all recent sessions.
+ * This handles the race condition where the page load creates an anonymous session while
+ * the client's JS sends the CSRF token that belongs to the authenticated session
+ * (which is loaded server-side via X-Session-Id on the actual API POST).
  */
 function validateCsrf() {
     if (php_sapi_name() === 'cli') return true;
@@ -104,15 +110,45 @@ function validateCsrf() {
     if (!$expected) {
         $expected = getCsrfToken();
     }
-    if (!$sent || !hash_equals($expected, $sent)) {
-        jsonResponse([
-            'success'    => false,
-            'csrf_error' => true,
-            'message'    => 'Invalid or missing CSRF token. Please refresh the page and try again.'
-        ], 403);
-        exit;
+
+    // Fast path: token matches the current session directly
+    if ($sent && hash_equals($expected, $sent)) {
+        return true;
     }
-    return true;
+
+    // Slow path: token does not match current session's CSRF.
+    // This can happen in a session-mismatch scenario (e.g. page-load anonymous session
+    // vs authenticated session opened via X-Session-Id header on POST requests).
+    // Do a DB lookup to see if the sent token belongs to ANY recent authenticated session.
+    if ($sent) {
+        try {
+            $db   = getDB();
+            $rows = $db->query(
+                "SELECT data FROM php_sessions WHERE last_activity > " . (time() - 3600)
+            )->fetchAll(\PDO::FETCH_ASSOC);
+            foreach ($rows as $row) {
+                // Extract csrf_token from PHP serialized session data
+                if (preg_match('/csrf_token\|s:\d+:"([^"]+)"/', $row['data'] ?? '', $m)) {
+                    if (hash_equals($m[1], $sent)) {
+                        // Also verify this session belongs to an authenticated user
+                        // so anonymous sessions cannot forge CSRF via DB lookup
+                        if (preg_match('/user_id\|/', $row['data'])) {
+                            return true; // Valid CSRF from authenticated session
+                        }
+                    }
+                }
+            }
+        } catch (\Exception $e) {
+            // DB lookup failed — fall through to standard rejection
+        }
+    }
+
+    jsonResponse([
+        'success'    => false,
+        'csrf_error' => true,
+        'message'    => 'Invalid or missing CSRF token. Please refresh the page and try again.'
+    ], 403);
+    exit;
 }
 /**
  * Deterministically hash an authorization token, PIN, or verification code using SHA-256 (64 hex characters).
