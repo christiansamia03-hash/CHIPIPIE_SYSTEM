@@ -12,7 +12,28 @@ $_CSRF_TOKEN = getCsrfToken();
 
 <head>
   <meta charset="UTF-8">
-  <script>window.CSRF_TOKEN = "<?= htmlspecialchars($_CSRF_TOKEN, ENT_QUOTES, 'UTF-8') ?>"; var CSRF_TOKEN = window.CSRF_TOKEN;</script>
+  <script>
+    window.CSRF_TOKEN = "<?= htmlspecialchars($_CSRF_TOKEN, ENT_QUOTES, 'UTF-8') ?>";
+    var CSRF_TOKEN = window.CSRF_TOKEN;
+    // Anti-FOUC (Flash of Unauthenticated Content): hide login screen immediately if this tab has an active session
+    (function() {
+      try {
+        var sid = sessionStorage.getItem('chipipie_pos_session_id');
+        if (sid) {
+          document.documentElement.classList.add('has-active-session');
+        }
+      } catch(e) {}
+    })();
+  </script>
+  <style>
+    /* Prevent login screen from briefly flashing on page refresh when user is already signed in */
+    html.has-active-session #login-wrapper {
+      display: none !important;
+    }
+    html.has-active-session #app-wrapper {
+      display: flex !important;
+    }
+  </style>
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
   <title>ChipiPie Cafe & Pizza — POS System</title>
 
@@ -11365,6 +11386,7 @@ $_CSRF_TOKEN = getCsrfToken();
     }
 
     async function activateApp(isAdmin) {
+      document.documentElement.classList.add('has-active-session');
       document.getElementById('login-wrapper').style.display = 'none';
       document.getElementById('register-wrapper').style.display = 'none';
       document.getElementById('app-wrapper').style.display = 'flex';
@@ -11464,6 +11486,7 @@ $_CSRF_TOKEN = getCsrfToken();
       currentUser = null;
       _isUserAdmin = false;
       window.posIsAdmin = false;
+      document.documentElement.classList.remove('has-active-session');
       document.getElementById('login-user').value = '';
       document.getElementById('login-pass').value = '';
       const step2fa = document.getElementById('pos-step-2fa');
@@ -12789,6 +12812,7 @@ $_CSRF_TOKEN = getCsrfToken();
 
       if (posSid && lastPosAct > 0 && (now - lastPosAct >= POS_TIMEOUT_MS)) {
         // Tab was closed or idle for >= 5 minutes -> immediate auto logout + modal
+        document.documentElement.classList.remove('has-active-session');
         sessionStorage.removeItem('chipipie_pos_session_id');
         sessionStorage.removeItem('chipipie_csrf_token');
         sessionStorage.removeItem('chipipie_pos_last_activity');
@@ -12803,10 +12827,10 @@ $_CSRF_TOKEN = getCsrfToken();
       }
 
       // Check for existing session in THIS tab
-      playWaterDropLoginAnimation('#login-wrapper .login-card');
       if (posSid) {
         api('auth.php?action=session').then(res => {
           if (res.success && res.loggedIn) {
+            document.documentElement.classList.add('has-active-session');
             if (res.session_id) {
               sessionStorage.setItem('chipipie_pos_session_id', res.session_id);
               sessionStorage.setItem('chipipie_pos_last_activity', String(Date.now()));
@@ -12821,6 +12845,7 @@ $_CSRF_TOKEN = getCsrfToken();
             const isManager = (res.user.role === 'admin' || res.user.role === 'super_admin');
             activateApp(isManager);
           } else if (res.session_expired) {
+            document.documentElement.classList.remove('has-active-session');
             sessionStorage.removeItem('chipipie_pos_session_id');
             sessionStorage.removeItem('chipipie_csrf_token');
             sessionStorage.removeItem('chipipie_pos_last_activity');
@@ -12832,6 +12857,7 @@ $_CSRF_TOKEN = getCsrfToken();
             });
           } else if (res.pending_2fa && (res.role === 'admin' || res.role === 'super_admin')) {
             // Resume pending 2FA step if page was reloaded
+            document.documentElement.classList.remove('has-active-session');
             document.getElementById('pos-step-credentials').style.display = 'none';
             document.getElementById('pos-step-2fa').style.display = 'block';
             document.getElementById('pos-2fa-email').textContent = res.masked_email || 'Your Registered Email';
@@ -12841,10 +12867,22 @@ $_CSRF_TOKEN = getCsrfToken();
               document.getElementById('pos-dev-code-val').textContent = res.dev_code;
               codeInput.value = res.dev_code;
             }
+          } else {
+            // Not logged in or session expired
+            document.documentElement.classList.remove('has-active-session');
+            document.getElementById('app-wrapper').style.display = 'none';
+            document.getElementById('login-wrapper').style.display = 'flex';
+            playWaterDropLoginAnimation('#login-wrapper .login-card');
           }
-        }).catch(() => { });
+        }).catch(() => {
+          document.documentElement.classList.remove('has-active-session');
+          document.getElementById('app-wrapper').style.display = 'none';
+          document.getElementById('login-wrapper').style.display = 'flex';
+        });
       } else {
         // Brand new tab: Clean login screen! Ready to log in as Cashier 1, Cashier 2, or Admin!
+        document.documentElement.classList.remove('has-active-session');
+        playWaterDropLoginAnimation('#login-wrapper .login-card');
       }
     });
   </script>

@@ -10,7 +10,28 @@ $_CSRF_TOKEN = getCsrfToken();
 <html lang="en">
 <head>
   <meta charset="UTF-8">
-  <script>window.CSRF_TOKEN = "<?= htmlspecialchars($_CSRF_TOKEN, ENT_QUOTES, 'UTF-8') ?>"; var CSRF_TOKEN = window.CSRF_TOKEN;</script>
+  <script>
+    window.CSRF_TOKEN = "<?= htmlspecialchars($_CSRF_TOKEN, ENT_QUOTES, 'UTF-8') ?>";
+    var CSRF_TOKEN = window.CSRF_TOKEN;
+    // Anti-FOUC (Flash of Unauthenticated Content): hide login screen immediately if this tab has an active session
+    (function() {
+      try {
+        var sid = sessionStorage.getItem('chipipie_sa_session_id') || localStorage.getItem('chipipie_sa_session_id') || localStorage.getItem('chipipie_session_id');
+        if (sid) {
+          document.documentElement.classList.add('has-active-session');
+        }
+      } catch(e) {}
+    })();
+  </script>
+  <style>
+    /* Prevent login screen from briefly flashing on page refresh when user is already signed in */
+    html.has-active-session #sa-login-screen {
+      display: none !important;
+    }
+    html.has-active-session #sa-app {
+      display: flex !important;
+    }
+  </style>
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
   <title>ChipiPie — Super Admin Control Center</title>
   <meta name="description" content="ChipiPie Cafe Super Admin Panel — System-wide management and approval center">
@@ -3563,6 +3584,7 @@ if (typeof gsap === "undefined") { document.write('<script src="https://cdn.jsde
     }
 
     function activateSAApp() {
+      document.documentElement.classList.add('has-active-session');
       try {
         localStorage.setItem('chipipie_sa_last_activity', String(Date.now()));
       } catch (e) {}
@@ -3579,6 +3601,7 @@ if (typeof gsap === "undefined") { document.write('<script src="https://cdn.jsde
     async function saLogout() {
       stopSAInactivityMonitoring();
       // 1. Immediately reset client state and show login UI
+      document.documentElement.classList.remove('has-active-session');
       saCurrentUser = null;
       sessionStorage.removeItem('chipipie_sa_session_id');
       localStorage.removeItem('chipipie_sa_session_id');
@@ -3721,6 +3744,7 @@ if (typeof gsap === "undefined") { document.write('<script src="https://cdn.jsde
 
     function handleSASessionExpired(msg = 'Your session has expired. Please sign in again.') {
       stopSAInactivityMonitoring();
+      document.documentElement.classList.remove('has-active-session');
       saCurrentUser = null;
       sessionStorage.removeItem('chipipie_sa_session_id');
       localStorage.removeItem('chipipie_sa_session_id');
@@ -7210,36 +7234,54 @@ if (typeof gsap === "undefined") { document.write('<script src="https://cdn.jsde
       const SA_TIMEOUT_MS = SA_INACTIVITY_TIMEOUT_SECONDS * 1000; // 5 minutes
 
       if (saSid && lastSaAct > 0 && (now - lastSaAct >= SA_TIMEOUT_MS)) {
+        document.documentElement.classList.remove('has-active-session');
         handleSASessionExpired('Session expired due to 5 minutes of inactivity while tab was closed. Please sign in again.');
         return;
       }
 
-      playWaterDropLoginAnimation('#sa-login-screen .sa-login-card');
-      saApi('auth.php?action=session').then(res => {
-        if (res.success && res.loggedIn && res.user && res.user.role === 'super_admin') {
-          if (res.session_id) {
-            sessionStorage.setItem('chipipie_sa_session_id', res.session_id);
-            localStorage.setItem('chipipie_sa_session_id', res.session_id);
-            localStorage.setItem('chipipie_sa_last_activity', String(Date.now()));
+      if (saSid) {
+        saApi('auth.php?action=session').then(res => {
+          if (res.success && res.loggedIn && res.user && res.user.role === 'super_admin') {
+            document.documentElement.classList.add('has-active-session');
+            if (res.session_id) {
+              sessionStorage.setItem('chipipie_sa_session_id', res.session_id);
+              localStorage.setItem('chipipie_sa_session_id', res.session_id);
+              localStorage.setItem('chipipie_sa_last_activity', String(Date.now()));
+            }
+            saCurrentUser = res.user;
+            activateSAApp();
+          } else if (res.session_expired) {
+            document.documentElement.classList.remove('has-active-session');
+            handleSASessionExpired(res.message || 'Your Super Admin session has expired due to 5 minutes of inactivity. Please sign in again.');
+          } else if (res.pending_2fa) {
+            document.documentElement.classList.remove('has-active-session');
+            // Resume pending 2FA step if page reloaded
+            document.getElementById('sa-step-credentials').style.display = 'none';
+            document.getElementById('sa-step-2fa').style.display = 'block';
+            document.getElementById('sa-2fa-email-display').textContent = res.masked_email || 'your email';
+            const codeInput = document.getElementById('sa-2fa-code');
+            codeInput.value = '';
+            if (res.dev_code) {
+              document.getElementById('sa-dev-hint').style.display = 'block';
+              document.getElementById('sa-dev-code-val').textContent = res.dev_code;
+              codeInput.value = res.dev_code;
+            }
+          } else {
+            document.documentElement.classList.remove('has-active-session');
+            document.getElementById('sa-app').style.display = 'none';
+            document.getElementById('sa-login-screen').style.display = 'flex';
+            playWaterDropLoginAnimation('#sa-login-screen .sa-login-card');
           }
-          saCurrentUser = res.user;
-          activateSAApp();
-        } else if (res.session_expired) {
-          handleSASessionExpired(res.message || 'Your Super Admin session has expired due to 5 minutes of inactivity. Please sign in again.');
-        } else if (res.pending_2fa) {
-          // Resume pending 2FA step if page reloaded
-          document.getElementById('sa-step-credentials').style.display = 'none';
-          document.getElementById('sa-step-2fa').style.display = 'block';
-          document.getElementById('sa-2fa-email-display').textContent = res.masked_email || 'your email';
-          const codeInput = document.getElementById('sa-2fa-code');
-          codeInput.value = '';
-          if (res.dev_code) {
-            document.getElementById('sa-dev-hint').style.display = 'block';
-            document.getElementById('sa-dev-code-val').textContent = res.dev_code;
-            codeInput.value = res.dev_code;
-          }
-        }
-      }).catch(() => {});
+        }).catch(() => {
+          document.documentElement.classList.remove('has-active-session');
+          document.getElementById('sa-app').style.display = 'none';
+          document.getElementById('sa-login-screen').style.display = 'flex';
+          playWaterDropLoginAnimation('#sa-login-screen .sa-login-card');
+        });
+      } else {
+        document.documentElement.classList.remove('has-active-session');
+        playWaterDropLoginAnimation('#sa-login-screen .sa-login-card');
+      }
     });
   </script>
 </body>
