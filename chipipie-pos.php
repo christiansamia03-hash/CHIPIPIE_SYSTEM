@@ -861,6 +861,52 @@ $_CSRF_TOKEN = getCsrfToken();
       width: calc(100% - 44px);
       pointer-events: none;
     }
+    @media (max-width: 991px) {
+      .pizza-orders-notif-container {
+        top: 56px;
+        right: 10px;
+        max-width: 320px;
+        width: calc(100% - 20px);
+        gap: 8px;
+      }
+      .pizza-order-notif-card {
+        padding: 10px 12px;
+        border-radius: 14px;
+      }
+      .pizza-order-badge,
+      .cafe-order-badge {
+        font-size: 9.5px;
+        padding: 3px 8px;
+      }
+      .pizza-order-title {
+        font-size: 13px;
+        margin-top: 6px;
+        margin-bottom: 3px;
+      }
+      .pizza-order-items-preview {
+        font-size: 11px;
+        -webkit-line-clamp: 1;
+        max-height: 18px;
+        margin-bottom: 7px;
+      }
+      .pizza-order-footer {
+        padding-top: 7px;
+        margin-top: 4px;
+      }
+      .pizza-order-view-btn,
+      .pizza-order-ack-btn,
+      .pizza-order-finish-btn {
+        padding: 4px 10px;
+        font-size: 11px;
+        border-radius: 7px;
+        gap: 4px;
+      }
+      .pizza-order-dismiss-btn {
+        padding: 4px 8px;
+        font-size: 10.5px;
+        border-radius: 7px;
+      }
+    }
     .pizza-order-notif-card {
       pointer-events: auto;
       background: linear-gradient(135deg, #2b1307 0%, #4a210d 100%);
@@ -1055,10 +1101,28 @@ $_CSRF_TOKEN = getCsrfToken();
     }
     @media (max-width: 991px) {
       .station-orders-dock {
-        left: 16px;
-        bottom: 75px;
-        max-width: calc(100% - 32px);
-        width: calc(100% - 32px);
+        left: 12px;
+        bottom: 72px;
+        width: auto;
+        max-width: min(340px, calc(100% - 24px));
+      }
+      .station-mini-card {
+        padding: 5px 10px;
+        border-radius: 20px;
+        gap: 7px;
+      }
+      .station-mini-title {
+        font-size: 11.5px;
+      }
+      .station-mini-preview {
+        max-width: 90px;
+        font-size: 10.5px;
+      }
+      .station-mini-btn-view,
+      .station-mini-btn-finish {
+        padding: 3px 7px;
+        font-size: 10px;
+        border-radius: 7px;
       }
     }
 
@@ -3116,7 +3180,7 @@ $_CSRF_TOKEN = getCsrfToken();
         min-height: 40px;
       }
 
-      /* Modals */
+      /* Modals — portrait mobile */
       .pay-modal-overlay,
       .size-modal-overlay,
       .print-opts-overlay,
@@ -3129,11 +3193,58 @@ $_CSRF_TOKEN = getCsrfToken();
       .print-opts-card,
       .receipt-modal-card,
       .void-modal-card {
-        max-height: 92dvh;
-        overflow-y: auto;
+        max-height: calc(100dvh - 16px);
+        display: flex;
+        flex-direction: column;
+        overflow: hidden;
         width: 100%;
-        max-width: 400px;
+        max-width: 420px;
         border-radius: 16px;
+      }
+
+      /* Bootstrap modal mobile fix — portrait */
+      .modal-dialog {
+        margin: 10px auto !important;
+      }
+      .modal-dialog-centered {
+        min-height: calc(100dvh - 20px) !important;
+        align-items: center !important;
+      }
+      .modal-content {
+        max-height: calc(100dvh - 20px) !important;
+        display: flex !important;
+        flex-direction: column !important;
+        overflow: hidden !important;
+        border-radius: 14px !important;
+      }
+      .modal-body {
+        overflow-y: auto !important;
+        -webkit-overflow-scrolling: touch !important;
+        max-height: calc(100dvh - 140px) !important;
+      }
+
+      /* Print Options — portrait compact */
+      .print-opts-header {
+        padding: 14px 18px 10px !important;
+      }
+      .print-opts-header .poi-icon {
+        width: 44px !important;
+        height: 44px !important;
+        margin-bottom: 8px !important;
+      }
+      .print-opts-header .poi-icon i {
+        font-size: 18px !important;
+      }
+      .print-opts-body {
+        padding: 14px 16px !important;
+        gap: 10px !important;
+      }
+      .print-opt-btn {
+        padding: 12px 14px !important;
+        gap: 12px !important;
+      }
+      .print-opts-footer {
+        padding: 8px 16px 14px !important;
       }
     }
 
@@ -3649,7 +3760,86 @@ $_CSRF_TOKEN = getCsrfToken();
         flex-shrink: 0 !important;
       }
       .print-opts-card {
-        padding: 12px 16px !important;
+        padding: 0 !important;
+      }
+      .print-opts-header {
+        padding: 10px 16px 8px !important;
+        flex-shrink: 0 !important;
+      }
+      .print-opts-header .poi-icon {
+        width: 36px !important;
+        height: 36px !important;
+        margin-bottom: 5px !important;
+      }
+      .print-opts-header .poi-icon i {
+        font-size: 16px !important;
+      }
+      .print-opts-header h5 {
+        font-size: 13px !important;
+        margin-bottom: 2px !important;
+      }
+      .print-opts-header p {
+        font-size: 11px !important;
+      }
+      .print-opts-body {
+        padding: 8px 14px !important;
+        gap: 8px !important;
+        flex: 1 1 auto !important;
+        overflow-y: auto !important;
+        min-height: 0 !important;
+      }
+      .print-opt-btn {
+        padding: 10px 12px !important;
+        gap: 10px !important;
+        border-radius: 10px !important;
+      }
+      .print-opt-btn .pob-num {
+        width: 30px !important;
+        height: 30px !important;
+        font-size: 14px !important;
+      }
+      .print-opt-btn .pob-title {
+        font-size: 12px !important;
+      }
+      .print-opt-btn .pob-desc {
+        font-size: 10.5px !important;
+      }
+      .print-opt-btn .pob-icon {
+        font-size: 18px !important;
+      }
+      .print-opts-footer {
+        padding: 6px 14px 10px !important;
+        flex-shrink: 0 !important;
+      }
+
+      /* Bootstrap modal landscape fix */
+      .modal-dialog {
+        margin: 6px auto !important;
+      }
+      .modal-dialog-centered {
+        min-height: calc(100dvh - 12px) !important;
+        align-items: center !important;
+      }
+      .modal-content {
+        max-height: calc(100dvh - 12px) !important;
+        display: flex !important;
+        flex-direction: column !important;
+        overflow: hidden !important;
+        border-radius: 12px !important;
+      }
+      .modal-header {
+        padding: 8px 14px !important;
+        flex-shrink: 0 !important;
+      }
+      .modal-body {
+        overflow-y: auto !important;
+        -webkit-overflow-scrolling: touch !important;
+        max-height: calc(100dvh - 100px) !important;
+        padding: 10px 14px !important;
+      }
+      .modal-footer {
+        padding: 8px 14px !important;
+        flex-shrink: 0 !important;
       }
     }
 
@@ -3674,6 +3864,9 @@ $_CSRF_TOKEN = getCsrfToken();
       border-radius: 20px;
       width: 100%;
       max-width: 440px;
+      max-height: calc(100dvh - 40px);
+      display: flex;
+      flex-direction: column;
       box-shadow: 0 24px 64px rgba(0,0,0,0.7);
       overflow: hidden;
       animation: printOptsPop 0.22s cubic-bezier(0.16,1,0.3,1);
@@ -3687,6 +3880,7 @@ $_CSRF_TOKEN = getCsrfToken();
       background: #222230;
       border-bottom: 1px solid rgba(255,255,255,0.07);
       text-align: center;
+      flex-shrink: 0;
     }
     .print-opts-header .poi-icon {
       width: 52px; height: 52px;
@@ -3708,6 +3902,9 @@ $_CSRF_TOKEN = getCsrfToken();
       display: flex;
       flex-direction: column;
       gap: 12px;
+      flex: 1 1 auto;
+      overflow-y: auto;
+      -webkit-overflow-scrolling: touch;
     }
     .print-opt-btn {
       display: flex;
@@ -3756,6 +3953,7 @@ $_CSRF_TOKEN = getCsrfToken();
     .print-opts-footer {
       padding: 12px 22px 18px;
       text-align: center;
+      flex-shrink: 0;
     }
     .print-opts-skip {
       background: none; border: none; color: #6b7280;

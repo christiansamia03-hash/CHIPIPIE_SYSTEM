@@ -889,6 +889,58 @@ $_CSRF_TOKEN = getCsrfToken();
       .sa-grid-2 { grid-template-columns: 1fr !important; }
       .kpi-grid { grid-template-columns: 1fr 1fr; }
       .sa-form-grid { grid-template-columns: 1fr; }
+
+      /* SA Modal mobile fix */
+      .sa-modal {
+        max-height: calc(100dvh - 20px) !important;
+        overflow-y: auto !important;
+        width: 95% !important;
+        border-radius: 14px !important;
+      }
+      .sa-modal-header {
+        padding: 14px 18px 12px !important;
+      }
+      .sa-modal-body {
+        padding: 14px 18px !important;
+        max-height: calc(100dvh - 180px) !important;
+        overflow-y: auto !important;
+        -webkit-overflow-scrolling: touch !important;
+      }
+      .sa-modal-footer {
+        padding: 10px 18px 16px !important;
+      }
+    }
+
+    @media (max-height: 520px) and (orientation: landscape), (max-width: 950px) and (orientation: landscape) {
+      /* SA Modal landscape compact */
+      .sa-modal {
+        max-height: calc(100dvh - 12px) !important;
+        display: flex !important;
+        flex-direction: column !important;
+        overflow: hidden !important;
+        width: 90% !important;
+        max-width: 540px !important;
+        border-radius: 12px !important;
+      }
+      .sa-modal-header {
+        padding: 10px 16px 8px !important;
+        flex-shrink: 0 !important;
+      }
+      .sa-modal-title {
+        font-size: 13px !important;
+      }
+      .sa-modal-body {
+        padding: 10px 16px !important;
+        flex: 1 1 auto !important;
+        min-height: 0 !important;
+        overflow-y: auto !important;
+        -webkit-overflow-scrolling: touch !important;
+        max-height: unset !important;
+      }
+      .sa-modal-footer {
+        padding: 8px 16px 12px !important;
+        flex-shrink: 0 !important;
+      }
     }
 
     /* ── SCROLLBARS ── */
