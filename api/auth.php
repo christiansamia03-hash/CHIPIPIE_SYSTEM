@@ -1259,14 +1259,12 @@ function handleCheckSession() {
         }
         jsonResponse($resp);
     } else {
-        $hadSessionId = !empty($GLOBALS['_CHIPIPIE_SESSION_JUST_EXPIRED'])
-            || !empty($_SERVER['HTTP_X_SESSION_ID']) 
-            || !empty($_GET['session_id']);
+        $justExpired = !empty($GLOBALS['_CHIPIPIE_SESSION_JUST_EXPIRED']);
         jsonResponse([
             'success'         => true,
             'loggedIn'        => false,
-            'session_expired' => $hadSessionId,
-            'message'         => $hadSessionId ? 'Session expired due to 5 minutes of inactivity. Please sign in again.' : ''
+            'session_expired' => $justExpired,
+            'message'         => $justExpired ? 'Session expired due to 5 minutes of inactivity. Please sign in again.' : ''
         ]);
     }
 }

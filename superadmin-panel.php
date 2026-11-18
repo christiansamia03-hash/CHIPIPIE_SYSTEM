@@ -11,14 +11,17 @@ $_CSRF_TOKEN = getCsrfToken();
 <head>
   <meta charset="UTF-8">
   <script>
+    window._pageLoadStart = Date.now();
     window.CSRF_TOKEN = "<?= htmlspecialchars($_CSRF_TOKEN, ENT_QUOTES, 'UTF-8') ?>";
     var CSRF_TOKEN = window.CSRF_TOKEN;
     // Anti-FOUC (Flash of Unauthenticated Content): hide login screen immediately if this tab has an active session
     (function() {
       try {
-        var sid = sessionStorage.getItem('chipipie_sa_session_id') || localStorage.getItem('chipipie_sa_session_id') || localStorage.getItem('chipipie_session_id');
+        var sid = sessionStorage.getItem('chipipie_sa_session_id') || localStorage.getItem('chipipie_sa_session_id');
         if (sid) {
           document.documentElement.classList.add('has-active-session');
+        } else {
+          localStorage.removeItem('chipipie_session_id');
         }
       } catch(e) {}
     })();
@@ -30,9 +33,6 @@ $_CSRF_TOKEN = getCsrfToken();
     }
     html.has-active-session #sa-app {
       display: flex !important;
-    }
-    html:not(.has-active-session) #sa-loading-screen {
-      display: none !important;
     }
 
     /* ── SUPER ADMIN LOADING SCREEN ── */
@@ -3306,7 +3306,7 @@ if (typeof gsap === "undefined") { document.write('<script src="https://cdn.jsde
         },
         credentials: 'include'
       };
-      const sid = sessionStorage.getItem('chipipie_sa_session_id') || localStorage.getItem('chipipie_sa_session_id') || localStorage.getItem('chipipie_session_id');
+      const sid = sessionStorage.getItem('chipipie_sa_session_id') || localStorage.getItem('chipipie_sa_session_id');
       if (sid) {
         opts.headers['X-Session-Id'] = sid;
       }
@@ -3397,7 +3397,6 @@ if (typeof gsap === "undefined") { document.write('<script src="https://cdn.jsde
           if (res.session_id) {
             sessionStorage.setItem('chipipie_sa_session_id', res.session_id);
             localStorage.setItem('chipipie_sa_session_id', res.session_id);
-            localStorage.setItem('chipipie_session_id', res.session_id);
           }
           if (res.csrf_token) {
             window.CSRF_TOKEN = res.csrf_token;
@@ -3431,7 +3430,8 @@ if (typeof gsap === "undefined") { document.write('<script src="https://cdn.jsde
             localStorage.setItem('chipipie_sa_session_id', res.session_id);
           }
           saCurrentUser = res.user;
-          activateSAApp();
+          showSALoadingScreen('Loading control center...');
+          await activateSAApp();
         } else if (res.success && res.user.role !== 'super_admin') {
           errEl.textContent = 'This account does not have Super Admin privileges.';
           errEl.style.display = 'block';
@@ -3469,7 +3469,8 @@ if (typeof gsap === "undefined") { document.write('<script src="https://cdn.jsde
             localStorage.setItem('chipipie_sa_session_id', res.session_id);
           }
           saCurrentUser = res.user;
-          activateSAApp();
+          showSALoadingScreen('Loading control center...');
+          await activateSAApp();
         } else {
           errEl.textContent = res.message || 'Invalid or expired code.';
           errEl.style.display = 'block';
@@ -3701,15 +3702,19 @@ if (typeof gsap === "undefined") { document.write('<script src="https://cdn.jsde
       el.style.display = 'flex';
     }
 
-    function hideSALoadingScreen() {
+    function hideSALoadingScreen(minDelay = 450) {
       const el = document.getElementById('sa-loading-screen');
       if (!el) return;
-      el.classList.add('fade-out');
+      const elapsed = Date.now() - (window._pageLoadStart || Date.now());
+      const delay = Math.max(0, minDelay - elapsed);
       setTimeout(() => {
-        if (el.classList.contains('fade-out')) {
-          el.style.display = 'none';
-        }
-      }, 400);
+        el.classList.add('fade-out');
+        setTimeout(() => {
+          if (el.classList.contains('fade-out')) {
+            el.style.display = 'none';
+          }
+        }, 400);
+      }, delay);
     }
 
     async function activateSAApp() {
@@ -3742,8 +3747,11 @@ if (typeof gsap === "undefined") { document.write('<script src="https://cdn.jsde
       document.documentElement.classList.remove('has-active-session');
       saCurrentUser = null;
       sessionStorage.removeItem('chipipie_sa_session_id');
+      sessionStorage.removeItem('chipipie_csrf_token');
       localStorage.removeItem('chipipie_sa_session_id');
       localStorage.removeItem('chipipie_sa_last_activity');
+      localStorage.removeItem('chipipie_session_id');
+      document.cookie = 'CHIPIPIE_SA_SESS=; expires=Thu, 01 Jan 1970 00:00:00 GMT; path=/';
       try {
         const appEl = document.getElementById('sa-app');
         const loginEl = document.getElementById('sa-login-screen');
@@ -3886,8 +3894,11 @@ if (typeof gsap === "undefined") { document.write('<script src="https://cdn.jsde
       document.documentElement.classList.remove('has-active-session');
       saCurrentUser = null;
       sessionStorage.removeItem('chipipie_sa_session_id');
+      sessionStorage.removeItem('chipipie_csrf_token');
       localStorage.removeItem('chipipie_sa_session_id');
       localStorage.removeItem('chipipie_sa_last_activity');
+      localStorage.removeItem('chipipie_session_id');
+      document.cookie = 'CHIPIPIE_SA_SESS=; expires=Thu, 01 Jan 1970 00:00:00 GMT; path=/';
 
       // Reset UI to login screen immediately
       const appEl = document.getElementById('sa-app');
@@ -6924,7 +6935,7 @@ if (typeof gsap === "undefined") { document.write('<script src="https://cdn.jsde
 
       try {
         const endpoint = format === 'sql' ? 'superadmin.php?action=backup_export_sql' : 'superadmin.php?action=backup_export_json';
-        const sid = sessionStorage.getItem('chipipie_sa_session_id') || localStorage.getItem('chipipie_sa_session_id') || localStorage.getItem('chipipie_session_id');
+        const sid = sessionStorage.getItem('chipipie_sa_session_id') || localStorage.getItem('chipipie_sa_session_id');
         const headers = {
           'X-Portal': 'superadmin',
           'X-CSRF-Token': (typeof CSRF_TOKEN !== 'undefined' && CSRF_TOKEN ? CSRF_TOKEN : (localStorage.getItem('chipipie_csrf_token') || ''))
@@ -6963,7 +6974,7 @@ if (typeof gsap === "undefined") { document.write('<script src="https://cdn.jsde
 
     async function downloadArchiveFile(filename) {
       try {
-        const sid = sessionStorage.getItem('chipipie_sa_session_id') || localStorage.getItem('chipipie_sa_session_id') || localStorage.getItem('chipipie_session_id');
+        const sid = sessionStorage.getItem('chipipie_sa_session_id') || localStorage.getItem('chipipie_sa_session_id');
         const headers = {
           'X-Portal': 'superadmin',
           'X-CSRF-Token': (typeof CSRF_TOKEN !== 'undefined' && CSRF_TOKEN ? CSRF_TOKEN : (localStorage.getItem('chipipie_csrf_token') || ''))
@@ -7095,7 +7106,7 @@ if (typeof gsap === "undefined") { document.write('<script src="https://cdn.jsde
           const formData = new FormData();
           formData.append('backup_file', _activeRestoreSource.file);
 
-          const sid = sessionStorage.getItem('chipipie_sa_session_id') || localStorage.getItem('chipipie_sa_session_id') || localStorage.getItem('chipipie_session_id');
+          const sid = sessionStorage.getItem('chipipie_sa_session_id') || localStorage.getItem('chipipie_sa_session_id');
           const headers = {
             'X-Portal': 'superadmin',
             'X-CSRF-Token': (typeof CSRF_TOKEN !== 'undefined' && CSRF_TOKEN ? CSRF_TOKEN : (localStorage.getItem('chipipie_csrf_token') || ''))
@@ -7369,13 +7380,17 @@ if (typeof gsap === "undefined") { document.write('<script src="https://cdn.jsde
 
       // Check if session has expired while the tab was closed (>= 5 minutes = 300,000 ms)
       const lastSaAct = parseInt(localStorage.getItem('chipipie_sa_last_activity') || '0', 10);
-      const saSid = sessionStorage.getItem('chipipie_sa_session_id') || localStorage.getItem('chipipie_sa_session_id') || localStorage.getItem('chipipie_session_id');
+      const saSid = sessionStorage.getItem('chipipie_sa_session_id') || localStorage.getItem('chipipie_sa_session_id');
       const now = Date.now();
       const SA_TIMEOUT_MS = SA_INACTIVITY_TIMEOUT_SECONDS * 1000; // 5 minutes
 
       if (saSid && lastSaAct > 0 && (now - lastSaAct >= SA_TIMEOUT_MS)) {
         document.documentElement.classList.remove('has-active-session');
         hideSALoadingScreen();
+        sessionStorage.removeItem('chipipie_sa_session_id');
+        localStorage.removeItem('chipipie_sa_session_id');
+        localStorage.removeItem('chipipie_sa_last_activity');
+        localStorage.removeItem('chipipie_session_id');
         handleSASessionExpired('Session expired due to 5 minutes of inactivity while tab was closed. Please sign in again.');
         return;
       }
@@ -7394,6 +7409,10 @@ if (typeof gsap === "undefined") { document.write('<script src="https://cdn.jsde
           } else if (res.session_expired) {
             document.documentElement.classList.remove('has-active-session');
             hideSALoadingScreen();
+            sessionStorage.removeItem('chipipie_sa_session_id');
+            localStorage.removeItem('chipipie_sa_session_id');
+            localStorage.removeItem('chipipie_sa_last_activity');
+            localStorage.removeItem('chipipie_session_id');
             handleSASessionExpired(res.message || 'Your Super Admin session has expired due to 5 minutes of inactivity. Please sign in again.');
           } else if (res.pending_2fa) {
             document.documentElement.classList.remove('has-active-session');
@@ -7411,21 +7430,29 @@ if (typeof gsap === "undefined") { document.write('<script src="https://cdn.jsde
             }
           } else {
             document.documentElement.classList.remove('has-active-session');
+            sessionStorage.removeItem('chipipie_sa_session_id');
+            localStorage.removeItem('chipipie_sa_session_id');
+            localStorage.removeItem('chipipie_sa_last_activity');
+            localStorage.removeItem('chipipie_session_id');
             document.getElementById('sa-app').style.display = 'none';
             document.getElementById('sa-login-screen').style.display = 'flex';
-            hideSALoadingScreen();
+            hideSALoadingScreen(400);
             playWaterDropLoginAnimation('#sa-login-screen .sa-login-card');
           }
         }).catch(() => {
           document.documentElement.classList.remove('has-active-session');
+          sessionStorage.removeItem('chipipie_sa_session_id');
+          localStorage.removeItem('chipipie_sa_session_id');
+          localStorage.removeItem('chipipie_sa_last_activity');
+          localStorage.removeItem('chipipie_session_id');
           document.getElementById('sa-app').style.display = 'none';
           document.getElementById('sa-login-screen').style.display = 'flex';
-          hideSALoadingScreen();
+          hideSALoadingScreen(400);
           playWaterDropLoginAnimation('#sa-login-screen .sa-login-card');
         });
       } else {
         document.documentElement.classList.remove('has-active-session');
-        hideSALoadingScreen();
+        hideSALoadingScreen(400);
         playWaterDropLoginAnimation('#sa-login-screen .sa-login-card');
       }
     });

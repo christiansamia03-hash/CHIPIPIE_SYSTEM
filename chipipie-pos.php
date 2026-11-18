@@ -13,6 +13,7 @@ $_CSRF_TOKEN = getCsrfToken();
 <head>
   <meta charset="UTF-8">
   <script>
+    window._pageLoadStart = Date.now();
     window.CSRF_TOKEN = "<?= htmlspecialchars($_CSRF_TOKEN, ENT_QUOTES, 'UTF-8') ?>";
     var CSRF_TOKEN = window.CSRF_TOKEN;
     // Anti-FOUC (Flash of Unauthenticated Content): hide login screen immediately if this tab has an active session
@@ -32,9 +33,6 @@ $_CSRF_TOKEN = getCsrfToken();
     }
     html.has-active-session #app-wrapper {
       display: flex !important;
-    }
-    html:not(.has-active-session) #pos-loading-screen {
-      display: none !important;
     }
 
     /* ── POS LOADING SCREEN ── */
@@ -11343,6 +11341,7 @@ $_CSRF_TOKEN = getCsrfToken();
           if (res.offline_mode) {
             showToast('🌐 Logged in as ' + (res.user.role === 'admin' ? 'Administrator' : 'User') + ' (Offline Mode)');
           }
+          showPosLoadingScreen('Loading POS workstation...');
           await activateApp(res.user.role === 'admin' || res.user.role === 'super_admin');
         } else {
           if (res.is_super_admin) {
@@ -11392,6 +11391,7 @@ $_CSRF_TOKEN = getCsrfToken();
           updateUserInfoUI(res.user);
           document.getElementById('pos-step-2fa').style.display = 'none';
           document.getElementById('pos-step-credentials').style.display = 'block';
+          showPosLoadingScreen('Loading POS workstation...');
           await activateApp(res.user.role === 'admin' || res.user.role === 'super_admin');
         } else {
           errEl.textContent = res.message || 'Invalid or expired verification code.';
@@ -11492,15 +11492,19 @@ $_CSRF_TOKEN = getCsrfToken();
       el.style.display = 'flex';
     }
 
-    function hidePosLoadingScreen() {
+    function hidePosLoadingScreen(minDelay = 450) {
       const el = document.getElementById('pos-loading-screen');
       if (!el) return;
-      el.classList.add('fade-out');
+      const elapsed = Date.now() - (window._pageLoadStart || Date.now());
+      const delay = Math.max(0, minDelay - elapsed);
       setTimeout(() => {
-        if (el.classList.contains('fade-out')) {
-          el.style.display = 'none';
-        }
-      }, 400);
+        el.classList.add('fade-out');
+        setTimeout(() => {
+          if (el.classList.contains('fade-out')) {
+            el.style.display = 'none';
+          }
+        }, 400);
+      }, delay);
     }
 
     async function activateApp(isAdmin) {
@@ -12999,19 +13003,21 @@ $_CSRF_TOKEN = getCsrfToken();
             document.documentElement.classList.remove('has-active-session');
             document.getElementById('app-wrapper').style.display = 'none';
             document.getElementById('login-wrapper').style.display = 'flex';
-            hidePosLoadingScreen();
+            hidePosLoadingScreen(400);
             playWaterDropLoginAnimation('#login-wrapper .login-card');
           }
         }).catch(() => {
           document.documentElement.classList.remove('has-active-session');
           document.getElementById('app-wrapper').style.display = 'none';
           document.getElementById('login-wrapper').style.display = 'flex';
-          hidePosLoadingScreen();
+          hidePosLoadingScreen(400);
         });
       } else {
         // Brand new tab: Clean login screen! Ready to log in as Cashier 1, Cashier 2, or Admin!
         document.documentElement.classList.remove('has-active-session');
-        hidePosLoadingScreen();
+        document.getElementById('app-wrapper').style.display = 'none';
+        document.getElementById('login-wrapper').style.display = 'flex';
+        hidePosLoadingScreen(400);
         playWaterDropLoginAnimation('#login-wrapper .login-card');
       }
     });
