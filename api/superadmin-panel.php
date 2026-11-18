@@ -7033,6 +7033,7 @@ if (typeof gsap === "undefined") { document.write('<script src="https://cdn.jsde
 
     // Escape key — close only the topmost open modal
     document.addEventListener('keydown', e => {
+      if (e.key === 'Escape') {
         // Priority order: confirm > delete-menu > reject > photo > add-item > edit-user > create-user > review
         const priority = ['sa-confirm-modal','sa-delete-menu-modal','reject-request-modal','sa-photo-modal','sa-add-item-modal','edit-user-modal','create-user-modal','review-modal'];
         for (const id of priority) {
