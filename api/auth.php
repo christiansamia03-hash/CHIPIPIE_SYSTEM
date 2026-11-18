@@ -874,21 +874,56 @@ function handleResendApproval() {
     $request = $stmt->fetch();
 
     if (!$request) {
+        $checkAny = $db->prepare("SELECT status FROM admin_registration_requests WHERE id = ?");
+        $checkAny->execute([$requestId]);
+        $existingStatus = $checkAny->fetchColumn();
+        if ($existingStatus) {
+            jsonResponse(['success' => false, 'message' => "Registration request is already {$existingStatus}."], 400);
+        }
         jsonResponse(['success' => false, 'message' => 'Request not found or already processed.'], 404);
     }
 
     $role = !empty($request['role']) ? $request['role'] : 'admin';
     $roleLabel = ucfirst($role);
-    $ownerEmail = getSetting('owner_email');
     $storeName  = getSetting('store_name') ?: 'ChipiPie Cafe';
     $approveUrl = "http://" . ($_SERVER['HTTP_HOST'] ?? 'localhost') . "/CHIPIPIE_SYSTEM/api/auth.php?action=approve_admin&token=" . $request['approval_token'];
     $station    = $request['assigned_station'] ?? '';
 
     $emailBody = buildApprovalEmailTemplate($storeName, $roleLabel, $request['full_name'], $request['username'], $request['email'], $station, $approveUrl, true);
 
-    jsonResponseAndContinue(['success' => true, 'message' => "Approval notification resent to owner."]);
-    sendEmail($ownerEmail, "$storeName — $roleLabel Registration Approval Needed (Resent)", $emailBody);
-    exit;
+    // Collect all notification recipients (Owner and Super Admin)
+    $ownerEmail = getSetting('owner_email');
+    $saEmail    = getSetting('superadmin_email');
+    $recipients = array_values(array_filter(array_unique([
+        $ownerEmail,
+        $saEmail,
+        'christiansamia03@gmail.com'
+    ])));
+
+    $delivered = [];
+    $failed = [];
+    foreach ($recipients as $targetEmail) {
+        if (isValidSendableEmail($targetEmail)) {
+            $ok = sendEmail($targetEmail, "$storeName — $roleLabel Registration Approval Needed (Resent)", $emailBody);
+            if ($ok) {
+                $delivered[] = $targetEmail;
+            } else {
+                $failed[] = $targetEmail;
+            }
+        }
+    }
+
+    if (!empty($delivered)) {
+        jsonResponse([
+            'success' => true,
+            'message' => "Approval notification resent to " . implode(', ', $delivered) . "."
+        ]);
+    } else {
+        jsonResponse([
+            'success' => false,
+            'message' => "Could not deliver email to " . implode(', ', $recipients) . ". Please check SMTP settings."
+        ], 500);
+    }
 }
 
 function handleListUsers() {

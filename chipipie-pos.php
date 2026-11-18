@@ -11999,7 +11999,7 @@ $_CSRF_TOKEN = getCsrfToken();
       try {
         const res = await api('auth.php?action=resend_approval', { request_id: currentResendRequestId });
         showToast(res.success ? '📧 ' + res.message : '⚠ ' + res.message);
-        bootstrap.Modal.getInstance(document.getElementById('resendApprovalModal')).hide();
+        bootstrap.Modal.getInstance(document.getElementById('resendApprovalModal'))?.hide();
       } catch (e) {
         showToast('⚠ Connection error');
       } finally {
