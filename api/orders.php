@@ -112,7 +112,7 @@ function handleVoidOrder() {
     if (!$orderId) { jsonResponse(['success' => false, 'message' => 'Invalid order ID.'], 400); }
 
     $db = getDB();
-    $order = $db->prepare("SELECT id, status, total, user_id FROM orders WHERE id = ?");
+    $order = $db->prepare("SELECT id, order_number, status, total, user_id FROM orders WHERE id = ?");
     $order->execute([$orderId]);
     $order = $order->fetch();
     if (!$order) { jsonResponse(['success' => false, 'message' => 'Order not found.'], 404); }
@@ -121,6 +121,8 @@ function handleVoidOrder() {
     }
 
     $requester = $_SESSION['full_name'] ?? $_SESSION['username'];
+    $rawOrderNum = !empty($order['order_number']) ? $order['order_number'] : $orderId;
+    $cleanOrderNum = '#' . ltrim((string)$rawOrderNum, '#');
     
     // Generate a secure token for email approval and a 6-digit PIN for POS
     $approvalToken = bin2hex(random_bytes(32));
@@ -140,9 +142,9 @@ function handleVoidOrder() {
            'void_order',
            $_SESSION['user_id'],
            $requester,
-           "Void Order #{$orderId}",
+           "Void Order {$cleanOrderNum}",
            "Reason: {$reason}",
-           json_encode(['order_id' => $orderId, 'reason' => $reason, 'amount' => $order['total'], 'pin' => $pinCode]),
+           json_encode(['order_id' => $orderId, 'order_number' => $cleanOrderNum, 'reason' => $reason, 'amount' => $order['total'], 'pin' => $pinCode]),
            $approvalToken
        ]);
 
@@ -151,7 +153,7 @@ function handleVoidOrder() {
     $rejectUrl  = "http://" . ($_SERVER['HTTP_HOST'] ?? 'localhost') . "/CHIPIPIE_SYSTEM/api/orders.php?action=decide_void_refund&token=" . $approvalToken . "&decision=reject";
 
     $detailRows = "
-        <tr><td style='padding: 6px 0; font-weight: 600; color: #aaa;'>Order ID:</td><td style='font-weight: 700; color: #fff;'>#{$orderId}</td></tr>
+        <tr><td style='padding: 6px 0; font-weight: 600; color: #aaa;'>Order #:</td><td style='font-weight: 700; color: #fff;'>{$cleanOrderNum}</td></tr>
         <tr><td style='padding: 6px 0; font-weight: 600; color: #aaa;'>Requested By:</td><td>{$requester}</td></tr>
         <tr><td style='padding: 6px 0; font-weight: 600; color: #aaa;'>Amount:</td><td style='color: #dc2626; font-weight: bold;'>&#8369;" . number_format($order['total'], 2) . "</td></tr>
         <tr><td style='padding: 6px 0; font-weight: 600; color: #aaa;'>Reason:</td><td>{$reason}</td></tr>";
@@ -200,7 +202,7 @@ function handleRefundOrder() {
     if (!$orderId) { jsonResponse(['success' => false, 'message' => 'Invalid order ID.'], 400); }
 
     $db = getDB();
-    $order = $db->prepare("SELECT id, status, total, user_id FROM orders WHERE id = ?");
+    $order = $db->prepare("SELECT id, order_number, status, total, user_id FROM orders WHERE id = ?");
     $order->execute([$orderId]);
     $order = $order->fetch();
     if (!$order) { jsonResponse(['success' => false, 'message' => 'Order not found.'], 404); }
@@ -209,6 +211,8 @@ function handleRefundOrder() {
     }
 
     $requester = $_SESSION['full_name'] ?? $_SESSION['username'];
+    $rawOrderNum = !empty($order['order_number']) ? $order['order_number'] : $orderId;
+    $cleanOrderNum = '#' . ltrim((string)$rawOrderNum, '#');
 
     // Generate a secure token for email approval and a 6-digit PIN for POS
     $approvalToken = bin2hex(random_bytes(32));
@@ -228,9 +232,9 @@ function handleRefundOrder() {
            'refund_order',
            $_SESSION['user_id'],
            $requester,
-           "Refund Order #{$orderId}",
+           "Refund Order {$cleanOrderNum}",
            "Reason: {$reason}",
-           json_encode(['order_id' => $orderId, 'reason' => $reason, 'amount' => $order['total'], 'pin' => $pinCode]),
+           json_encode(['order_id' => $orderId, 'order_number' => $cleanOrderNum, 'reason' => $reason, 'amount' => $order['total'], 'pin' => $pinCode]),
            $approvalToken
        ]);
 
@@ -239,7 +243,7 @@ function handleRefundOrder() {
     $rejectUrl  = "http://" . ($_SERVER['HTTP_HOST'] ?? 'localhost') . "/CHIPIPIE_SYSTEM/api/orders.php?action=decide_void_refund&token=" . $approvalToken . "&decision=reject";
 
     $detailRows = "
-        <tr><td style='padding: 6px 0; font-weight: 600; color: #aaa;'>Order ID:</td><td style='font-weight: 700; color: #fff;'>#{$orderId}</td></tr>
+        <tr><td style='padding: 6px 0; font-weight: 600; color: #aaa;'>Order #:</td><td style='font-weight: 700; color: #fff;'>{$cleanOrderNum}</td></tr>
         <tr><td style='padding: 6px 0; font-weight: 600; color: #aaa;'>Requested By:</td><td>{$requester}</td></tr>
         <tr><td style='padding: 6px 0; font-weight: 600; color: #aaa;'>Amount:</td><td style='color: #ea580c; font-weight: bold;'>&#8369;" . number_format($order['total'], 2) . "</td></tr>
         <tr><td style='padding: 6px 0; font-weight: 600; color: #aaa;'>Reason:</td><td>{$reason}</td></tr>";
@@ -1150,19 +1154,22 @@ function handleRequestVoidBatch() {
             $perReason = trim($o['reason'] ?? ($type === 'void_order' ? 'Order cancelled' : 'Customer refund'));
             $reason = $manager ? "{$perReason} — Requested by: {$manager}" : $perReason;
             
-            $orderInfo = $db->prepare("SELECT id, status, total FROM orders WHERE id = ?");
+            $orderInfo = $db->prepare("SELECT id, order_number, status, total FROM orders WHERE id = ?");
             $orderInfo->execute([$orderId]);
             $orderData = $orderInfo->fetch();
             if (!$orderData || in_array($orderData['status'], ['Voided', 'Refunded'])) continue;
 
+            $rawOrderNum = !empty($orderData['order_number']) ? $orderData['order_number'] : $orderId;
+            $cleanOrderNum = '#' . ltrim((string)$rawOrderNum, '#');
+            $typeLabel = ucwords(str_replace('_', ' ', $type));
             $db->prepare("INSERT INTO system_requests (type, requested_by, requester_name, title, description, payload, approval_token) VALUES (?,?,?,?,?,?,?)")
                ->execute([
                    $type,
                    $_SESSION['user_id'],
                    $requester,
-                   ucwords(str_replace('_', ' ', $type)) . " #{$orderId}",
+                   "{$typeLabel} {$cleanOrderNum}",
                    "Reason: {$reason}",
-                   json_encode(['order_id' => $orderId, 'reason' => $reason, 'amount' => $orderData['total'], 'pin' => $pinCode]),
+                   json_encode(['order_id' => $orderId, 'order_number' => $cleanOrderNum, 'reason' => $reason, 'amount' => $orderData['total'], 'pin' => $pinCode]),
                    $approvalToken
                ]);
             $createdCount++;
@@ -1170,7 +1177,7 @@ function handleRequestVoidBatch() {
             $color = $type === 'void_order' ? '#dc2626' : '#ea580c';
             $orderListHtml .= "
             <tr>
-                <td style='padding: 6px 0; font-weight: 600; color: #aaa;'>#{$orderId}</td>
+                <td style='padding: 6px 0; font-weight: 600; color: #aaa;'>{$cleanOrderNum}</td>
                 <td style='padding: 6px 0; color: #fff;'>{$reason}</td>
                 <td style='padding: 6px 0; font-weight: bold; color: {$color};'>₱" . number_format($orderData['total'], 2) . "</td>
             </tr>";
@@ -1195,7 +1202,7 @@ function handleRequestVoidBatch() {
             <p style='color: #ddd; margin-top: 0;'>Requested By: {$requesterDesc}</p>
             <table style='width: 100%; font-size: 14px; text-align: left; margin: 0 0 16px 0; border-collapse: collapse;'>
                 <tr>
-                    <th style='border-bottom: 1px solid #444; padding-bottom: 4px; color:#888;'>ID</th>
+                    <th style='border-bottom: 1px solid #444; padding-bottom: 4px; color:#888;'>Order #</th>
                     <th style='border-bottom: 1px solid #444; padding-bottom: 4px; color:#888;'>Reason</th>
                     <th style='border-bottom: 1px solid #444; padding-bottom: 4px; color:#888;'>Amount</th>
                 </tr>

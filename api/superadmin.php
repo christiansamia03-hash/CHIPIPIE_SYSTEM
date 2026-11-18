@@ -396,6 +396,23 @@ function handleSARequests() {
               AND sr.type IN ('void_order', 'refund_order')
               AND o.status IN ('Voided', 'Refunded')
         ");
+        // Ensure void/refund request titles match the POS display order number
+        $db->exec("
+            UPDATE system_requests sr
+            JOIN orders o ON JSON_UNQUOTE(JSON_EXTRACT(sr.payload, '\$.order_id')) = CAST(o.id AS CHAR)
+            SET sr.title = CONCAT('Void Order #', TRIM(LEADING '#' FROM o.order_number))
+            WHERE sr.type = 'void_order'
+              AND o.order_number IS NOT NULL
+              AND o.order_number != ''
+        ");
+        $db->exec("
+            UPDATE system_requests sr
+            JOIN orders o ON JSON_UNQUOTE(JSON_EXTRACT(sr.payload, '\$.order_id')) = CAST(o.id AS CHAR)
+            SET sr.title = CONCAT('Refund Order #', TRIM(LEADING '#' FROM o.order_number))
+            WHERE sr.type = 'refund_order'
+              AND o.order_number IS NOT NULL
+              AND o.order_number != ''
+        ");
     } catch (Throwable $_e) {
         error_log('SA auto-sync error: ' . $_e->getMessage());
     }
@@ -413,15 +430,31 @@ function handleSARequests() {
 
     $stmt = $db->prepare("
         SELECT r.*,
-               u.full_name  AS reviewer_name
+               u.full_name   AS reviewer_name,
+               o.order_number AS order_number
         FROM system_requests r
         LEFT JOIN users u ON u.id = r.reviewed_by
+        LEFT JOIN orders o ON JSON_UNQUOTE(JSON_EXTRACT(r.payload, '\$.order_id')) = CAST(o.id AS CHAR)
         $whereClause
         ORDER BY r.created_at DESC
         LIMIT 200
     ");
     $stmt->execute($params);
     $requests = $stmt->fetchAll();
+
+    foreach ($requests as &$req) {
+        if (in_array($req['type'], ['void_order', 'refund_order'])) {
+            $pl = json_decode($req['payload'] ?? '{}', true) ?: [];
+            $ordNum = !empty($req['order_number']) ? $req['order_number'] : (!empty($pl['order_number']) ? $pl['order_number'] : null);
+            if ($ordNum) {
+                $cleanOrd = '#' . ltrim((string)$ordNum, '#');
+                $req['order_number'] = $cleanOrd;
+                $prefix = ($req['type'] === 'void_order') ? 'Void Order ' : 'Refund Order ';
+                $req['title'] = $prefix . $cleanOrd;
+            }
+        }
+    }
+    unset($req);
 
     // PHP-side deduplication: for pending void/refund requests, collapse duplicates
     // into one row (the latest) and expose a resend_count so the UI can show a badge
@@ -596,7 +629,11 @@ function handleSAApproveRequest() {
                         $db->prepare("INSERT INTO order_adjustments (order_id,type,amount,reason,processed_by) VALUES (?,'void',?,?,?)")
                            ->execute([$orderId, $payload['amount'] ?? 0, $payload['reason'] ?? '', $_SESSION['user_id']]);
                         $db->commit();
-                        $message = "Order #{$orderId} voided and stock restored.";
+                        $ordStmt = $db->prepare("SELECT order_number FROM orders WHERE id=?");
+                        $ordStmt->execute([$orderId]);
+                        $dbOrdNum = $ordStmt->fetchColumn();
+                        $displayNum = $dbOrdNum ? ('#' . ltrim($dbOrdNum, '#')) : "#{$orderId}";
+                        $message = "Order {$displayNum} voided and stock restored.";
                     } catch (Exception $e) {
                         $db->rollBack();
                     }
@@ -618,7 +655,11 @@ function handleSAApproveRequest() {
                         $db->prepare("INSERT INTO order_adjustments (order_id,type,amount,reason,processed_by) VALUES (?,'refund',?,?,?)")
                            ->execute([$orderId, $payload['amount'] ?? 0, $payload['reason'] ?? '', $_SESSION['user_id']]);
                         $db->commit();
-                        $message = "Order #{$orderId} refunded and stock restored.";
+                        $ordStmt = $db->prepare("SELECT order_number FROM orders WHERE id=?");
+                        $ordStmt->execute([$orderId]);
+                        $dbOrdNum = $ordStmt->fetchColumn();
+                        $displayNum = $dbOrdNum ? ('#' . ltrim($dbOrdNum, '#')) : "#{$orderId}";
+                        $message = "Order {$displayNum} refunded and stock restored.";
                     } catch (Exception $e) {
                         $db->rollBack();
                     }

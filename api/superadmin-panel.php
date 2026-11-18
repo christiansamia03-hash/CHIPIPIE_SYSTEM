@@ -4110,6 +4110,9 @@ if (typeof gsap === "undefined") { document.write('<script src="https://cdn.jsde
       } else if (data.type === 'void_order' || data.type === 'refund_order') {
         const isVoid = data.type === 'void_order';
         const pl = typeof data.payload === 'string' ? JSON.parse(data.payload||'{}') : (data.payload||{});
+        const orderNumDisplay = data.order_number ? ('#' + data.order_number.replace(/^#+/, '')) : 
+                               (pl.order_number ? ('#' + pl.order_number.replace(/^#+/, '')) : 
+                               (pl.order_id ? '#' + pl.order_id : '—'));
         const color = isVoid ? '#dc2626' : '#ea580c';
         const icon  = isVoid ? 'bi-slash-circle-fill' : 'bi-arrow-counterclockwise';
         document.getElementById('review-modal-title').textContent = isVoid ? 'Review Void Request' : 'Review Refund Request';
@@ -4127,8 +4130,8 @@ if (typeof gsap === "undefined") { document.write('<script src="https://cdn.jsde
           </div>
           <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:10px;">
             <div style="background:var(--sa-bg);border-radius:8px;padding:10px;">
-              <div style="font-size:10px;color:var(--sa-muted);text-transform:uppercase;letter-spacing:0.5px;margin-bottom:3px;">Order ID</div>
-              <div style="font-weight:700;font-size:15px;color:var(--sa-text);">#${pl.order_id || '—'}</div>
+              <div style="font-size:10px;color:var(--sa-muted);text-transform:uppercase;letter-spacing:0.5px;margin-bottom:3px;">Order Number</div>
+              <div style="font-weight:700;font-size:15px;color:var(--sa-text);">${orderNumDisplay}</div>
             </div>
             <div style="background:var(--sa-bg);border-radius:8px;padding:10px;">
               <div style="font-size:10px;color:var(--sa-muted);text-transform:uppercase;letter-spacing:0.5px;margin-bottom:3px;">Amount</div>
