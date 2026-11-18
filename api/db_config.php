@@ -59,6 +59,7 @@ define('SMTP_HOST',      'ssl://smtp.gmail.com');
 define('SMTP_PORT',      465);
 define('SMTP_USER',      'christiansamia03@gmail.com');
 define('SMTP_PASS',      'sfuvrhxavoqdztbe');   // Gmail App Password (no spaces)
+define('BREVO_API_KEY',  getenv('BREVO_API_KEY') ?: '');
 
 // Set to true to also return token in API response (for dev/testing)
 define('DEV_MODE', true);
@@ -703,7 +704,7 @@ function sendEmail($to, $subject, $body) {
     $debugLog = '';
 
     // ── Method 0: HTTPS REST API (Port 443 — Bypasses DigitalOcean & Cloud Port Blocks) ──
-    $brevoKey = getenv('BREVO_API_KEY') ?: getSetting('brevo_api_key');
+    $brevoKey = defined('BREVO_API_KEY') && BREVO_API_KEY ? BREVO_API_KEY : (getenv('BREVO_API_KEY') ?: getSetting('brevo_api_key'));
     if (!empty($brevoKey) && function_exists('curl_init')) {
         try {
             $payload = [
@@ -744,7 +745,7 @@ function sendEmail($to, $subject, $body) {
     }
 
     // ── Method 1: cURL SMTPS on Port 465 (Native SSL, works on Vercel + Local) ──
-    if (function_exists('curl_init')) {
+    if (!$sent && function_exists('curl_init')) {
         try {
             $ch = curl_init();
             curl_setopt($ch, CURLOPT_URL, 'smtps://smtp.gmail.com:465');
