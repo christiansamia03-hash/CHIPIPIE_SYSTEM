@@ -1018,6 +1018,9 @@ function handleSADeleteAdminRequest() {
     // Super Admin can delete any registration request (pending, approved, or rejected)
 
     $db->prepare("DELETE FROM admin_registration_requests WHERE id=?")->execute([$id]);
+    // Also resolve any pending removal system requests for this registration
+    $db->prepare("DELETE FROM system_requests WHERE type='registration_delete' AND (payload LIKE ? OR payload LIKE ?)")
+       ->execute(['%"request_id":' . $id . '%', '%"request_id":"' . $id . '"%']);
     logAction('delete_registration_request', 'admin_registration_request', $id, "Deleted registration request: {$req['full_name']} ({$req['username']})");
     jsonResponse(['success' => true, 'message' => "Registration request for '{$req['full_name']}' permanently removed."]);
 }
@@ -1366,6 +1369,7 @@ function handleSubmitRequest() {
     }
 
     $db = getDB();
+    ensureSystemRequestsTypeColumn($db);
     $db->prepare("INSERT INTO system_requests (type, requested_by, requester_name, title, description, payload) VALUES (?,?,?,?,?,?)")
        ->execute([
            $type,

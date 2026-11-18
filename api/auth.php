@@ -933,9 +933,22 @@ function handleListUsers() {
     $stmt2 = $db->query("SELECT id, username, full_name, email, COALESCE(role, 'cashier') AS role, status, approval_token, created_at FROM admin_registration_requests WHERE username NOT IN ('superadmin', 'super_admin') AND LOWER(full_name) NOT LIKE '%super admin%' ORDER BY created_at DESC");
     $pendingRequests = $stmt2->fetchAll();
 
+    // Find pending removal requests for registration accounts
+    $pendingRemovalIds = [];
+    try {
+        $remStmt = $db->query("SELECT payload FROM system_requests WHERE type='registration_delete' AND status='pending'");
+        while ($remRow = $remStmt->fetch()) {
+            $pl = json_decode($remRow['payload'] ?? '{}', true);
+            if (!empty($pl['request_id'])) {
+                $pendingRemovalIds[] = intval($pl['request_id']);
+            }
+        }
+    } catch (Exception $e) {}
+
     // In dev mode, include approval URLs for pending requests
     if (DEV_MODE) {
         foreach ($pendingRequests as &$req) {
+            $req['pending_removal'] = in_array(intval($req['id']), $pendingRemovalIds);
             if ($req['status'] === 'pending') {
                 $req['approve_url'] = "http://" . ($_SERVER['HTTP_HOST'] ?? 'localhost') . "/CHIPIPIE_SYSTEM/api/auth.php?action=approve_admin&token=" . $req['approval_token'];
             }
@@ -944,6 +957,7 @@ function handleListUsers() {
         unset($req);
     } else {
         foreach ($pendingRequests as &$req) {
+            $req['pending_removal'] = in_array(intval($req['id']), $pendingRemovalIds);
             unset($req['approval_token']);
         }
         unset($req);
@@ -952,7 +966,8 @@ function handleListUsers() {
     jsonResponse([
         'success' => true,
         'users' => $users,
-        'pending_admin_requests' => $pendingRequests
+        'pending_admin_requests' => $pendingRequests,
+        'pending_registration_deletions' => $pendingRemovalIds
     ]);
 }
 

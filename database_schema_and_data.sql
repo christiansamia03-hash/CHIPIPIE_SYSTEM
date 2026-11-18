@@ -355,7 +355,7 @@ DROP TABLE IF EXISTS `system_requests`;
 /*!40101 SET character_set_client = utf8 */;
 CREATE TABLE `system_requests` (
   `id` int(11) NOT NULL AUTO_INCREMENT,
-  `type` enum('admin_approval','void_order','refund_order','menu_change','setting_change','user_deactivate','user_activate','user_delete','other') NOT NULL,
+  `type` enum('admin_approval','void_order','refund_order','menu_change','setting_change','user_deactivate','user_activate','user_delete','registration_delete','other') NOT NULL,
   `requested_by` int(11) DEFAULT NULL,
   `requester_name` varchar(100) DEFAULT NULL,
   `title` varchar(200) NOT NULL,

@@ -323,6 +323,33 @@ function ensureRegistrationRequestsRoleColumn($pdo = null) {
 }
 
 /**
+ * Ensure system_requests type enum contains registration_delete
+ */
+function ensureSystemRequestsTypeColumn($pdo = null) {
+    static $ensured = false;
+    if ($ensured) return;
+    try {
+        $db = $pdo ?: getDB();
+        $col = $db->query("SHOW COLUMNS FROM system_requests LIKE 'type'")->fetch();
+        if ($col && strpos($col['Type'], "'registration_delete'") === false) {
+            $db->exec("ALTER TABLE system_requests MODIFY COLUMN `type` ENUM(
+                'admin_approval',
+                'void_order',
+                'refund_order',
+                'menu_change',
+                'setting_change',
+                'user_deactivate',
+                'user_activate',
+                'user_delete',
+                'registration_delete',
+                'other'
+            ) NOT NULL");
+        }
+        $ensured = true;
+    } catch (Exception $e) {}
+}
+
+/**
  * Register DB-backed session handler using TiDB / MySQL
  * This enables session persistence across Vercel serverless Lambda instances!
  */

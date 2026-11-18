@@ -11906,9 +11906,15 @@ $_CSRF_TOKEN = getCsrfToken();
                   <button class="btn btn-sm" style="background:var(--cafe-brown);color:#fff;border:none;border-radius:5px;height:26px;width:120px;font-size:11px;white-space:nowrap;display:inline-flex;align-items:center;justify-content:center;gap:4px;box-sizing:border-box;" onclick="resendApprovalEmail(${r.id})" title="Re-send the approval link to the owner's Gmail">
                     <i class="bi bi-envelope"></i> Resend
                   </button>
-                  <button class="btn btn-sm" style="background:#fee2e2;color:#b91c1c;border:none;border-radius:5px;height:26px;width:120px;font-size:11px;white-space:nowrap;display:inline-flex;align-items:center;justify-content:center;gap:4px;box-sizing:border-box;" onclick="requestDeleteAdminRequestPos(${r.id}, '${safeName}', '${safeUser}', '${reqRole}')" title="Request to remove registration request">
-                    <i class="bi bi-trash-fill"></i> Request Remove
-                  </button>
+                  ${r.pending_removal ? `
+                    <button class="btn btn-sm" style="background:#fef3c7;color:#92400e;border:1px solid #fde68a;border-radius:5px;height:26px;width:130px;font-size:11px;white-space:nowrap;display:inline-flex;align-items:center;justify-content:center;gap:4px;box-sizing:border-box;" disabled title="Removal request submitted to Super Admin">
+                      <i class="bi bi-hourglass-split"></i> Req Pending
+                    </button>
+                  ` : `
+                    <button class="btn btn-sm" style="background:#fee2e2;color:#b91c1c;border:none;border-radius:5px;height:26px;width:120px;font-size:11px;white-space:nowrap;display:inline-flex;align-items:center;justify-content:center;gap:4px;box-sizing:border-box;" onclick="requestDeleteAdminRequestPos(${r.id}, '${safeName}', '${safeUser}', '${reqRole}')" title="Request to remove registration request">
+                      <i class="bi bi-trash-fill"></i> Request Remove
+                    </button>
+                  `}
                 </div>
               ` : `<span style="color:#aaa;font-size:12px;">—</span>`}
             </td>

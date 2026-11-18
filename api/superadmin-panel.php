@@ -2,7 +2,7 @@
 header('Cache-Control: no-store, no-cache, must-revalidate, max-age=0');
 header('Pragma: no-cache');
 header('Expires: 0');
-require_once __DIR__ . '/db_config.php';
+require_once __DIR__ . '/api/db_config.php';
 startChipipieSession();
 $_CSRF_TOKEN = getCsrfToken();
 ?>
@@ -3971,7 +3971,7 @@ if (typeof gsap === "undefined") { document.write('<script src="https://cdn.jsde
             <td><span class="badge-sa badge-${r.status === 'approved' ? 'approved' : r.status === 'pending' ? 'pending' : 'rejected'}">${r.status}</span></td>
             <td style="color:var(--sa-muted);font-size:12px;">${new Date(r.created_at).toLocaleString('en-PH', {month:'short',day:'numeric',hour:'2-digit',minute:'2-digit'})}</td>
             <td style="text-align:center;">
-              <div style="display:inline-grid;grid-template-columns:80px 80px;gap:6px;align-items:center;justify-content:center;">
+              <div style="display:inline-grid;grid-template-columns:75px 75px 36px;gap:6px;align-items:center;justify-content:center;">
                 ${r.status === 'pending' ? `
                   <button class="sa-btn sa-btn-approve" style="width:100%;padding:5px 0;font-size:11px;display:inline-flex;align-items:center;justify-content:center;gap:4px;" onclick="openReviewModal('admin_reg', ${r.id}, {full_name:'${safeName}',username:'${safeUser}',email:'${safeEmail}',role:'${roleDisplay}'})">
                     <i class="bi bi-check-circle-fill"></i> Approve
@@ -3979,10 +3979,14 @@ if (typeof gsap === "undefined") { document.write('<script src="https://cdn.jsde
                   <button class="sa-btn sa-btn-reject" style="width:100%;padding:5px 0;font-size:11px;display:inline-flex;align-items:center;justify-content:center;gap:4px;" onclick="openRejectModal('admin_reg', ${r.id})" title="Reject Request">
                     <i class="bi bi-x-circle"></i> Reject
                   </button>
+                  <button class="sa-btn sa-btn-danger" style="width:100%;padding:5px 0;font-size:11px;display:inline-flex;align-items:center;justify-content:center;gap:4px;" onclick="deleteAdminRequest(${r.id}, '${safeName}')" title="Permanently delete registration request">
+                    <i class="bi bi-trash-fill"></i>
+                  </button>
                 ` : `
                   <div></div>
+                  <div></div>
                   <button class="sa-btn sa-btn-danger" style="width:100%;padding:5px 0;font-size:11px;display:inline-flex;align-items:center;justify-content:center;gap:4px;" onclick="deleteAdminRequest(${r.id}, '${safeName}')" title="Delete request">
-                    <i class="bi bi-trash-fill"></i> Delete
+                    <i class="bi bi-trash-fill"></i>
                   </button>
                 `}
               </div>
