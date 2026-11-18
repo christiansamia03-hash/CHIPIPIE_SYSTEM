@@ -6619,8 +6619,11 @@ $_CSRF_TOKEN = getCsrfToken();
       }
       const res = await fetch(API + endpoint, opts);
       const text = await res.text();
+      // Strip any PHP warnings/notices that may be prepended before the JSON
+      const jsonStart = text.search(/[{[]/);
+      const clean = jsonStart >= 0 ? text.slice(jsonStart) : text;
       try {
-        return JSON.parse(text);
+        return JSON.parse(clean);
       } catch (err) {
         console.error('API non-JSON response from ' + endpoint + ':', text);
         throw new Error('Server returned an invalid response. Please try again.');
@@ -11969,7 +11972,8 @@ $_CSRF_TOKEN = getCsrfToken();
         showToast(data.success ? '✅ ' + data.message : '⚠ ' + data.message);
         if (data.success) renderUsers();
       } catch (e) {
-        showToast('⚠ Connection error');
+        console.error('confirmDeleteAdminRequest error:', e);
+        showToast('⚠ ' + (e.message || 'Connection error. Please try again.'));
       } finally {
         if (btn) {
           btn.disabled = false;
@@ -12064,7 +12068,8 @@ $_CSRF_TOKEN = getCsrfToken();
         showToast(data.success ? '✅ ' + data.message : '⚠ ' + data.message);
         bootstrap.Modal.getInstance(document.getElementById('requestToggleModal')).hide();
       } catch (e) {
-        showToast('⚠ Connection error');
+        console.error('confirmDeleteAdminRequest error:', e);
+        showToast('⚠ ' + (e.message || 'Connection error. Please try again.'));
       } finally {
         btn.innerHTML = originalText;
         btn.disabled = false;

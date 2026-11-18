@@ -7,6 +7,7 @@
 
 // Suppress PHP notices/warnings from polluting JSON API responses
 error_reporting(E_ALL & ~E_NOTICE & ~E_WARNING & ~E_DEPRECATED);
+ini_set('display_errors', 0);  // Never output raw PHP errors to browser (would break JSON)
 
 // ============ TIMEZONE (must match MySQL) ============
 date_default_timezone_set('Asia/Manila');
