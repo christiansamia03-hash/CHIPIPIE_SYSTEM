@@ -14,6 +14,10 @@ require_once __DIR__ . '/db_config.php';
 
 $action = $_GET['action'] ?? '';
 
+if (php_sapi_name() === 'cli' && empty($action)) {
+    return;
+}
+
 switch ($action) {
     case 'login':
         handleLogin();
@@ -518,6 +522,131 @@ function handleLogout() {
 }
 
 // =====================================================
+// REGISTRATION & APPROVAL EMAIL TEMPLATES
+// =====================================================
+function buildApprovalEmailTemplate($storeName, $roleLabel, $fullName, $username, $email, $assignedStation, $approveUrl, $isResent = false) {
+    $storeNameSafe = htmlspecialchars($storeName ?: 'ChipiPie Cafe');
+    $roleLabelSafe = htmlspecialchars($roleLabel ?: 'Cashier');
+    $fullNameSafe  = htmlspecialchars($fullName ?: 'Staff Member');
+    $usernameSafe  = htmlspecialchars($username ?: '');
+    $emailSafe     = htmlspecialchars($email ?: '');
+    $stationLabel  = htmlspecialchars(ucfirst($assignedStation ?: 'Cafe / Front Counter'));
+
+    $isCashier   = strtolower($roleLabel) === 'cashier';
+    $roleBg      = $isCashier ? '#ecfdf5' : '#f5f3ff';
+    $roleColor   = $isCashier ? '#047857' : '#6d28d9';
+    $roleBorder  = $isCashier ? '#a7f3d0' : '#ddd6fe';
+
+    $badgeHtml = $isResent
+        ? "<span style='display:inline-block; background:#fffbeb; color:#b45309; border:1px solid #fde68a; font-size:11px; font-weight:700; text-transform:uppercase; letter-spacing:0.8px; padding:4px 14px; border-radius:999px;'>&#9201; Resent Approval Request</span>"
+        : "<span style='display:inline-block; background:#eff6ff; color:#1d4ed8; border:1px solid #bfdbfe; font-size:11px; font-weight:700; text-transform:uppercase; letter-spacing:0.8px; padding:4px 14px; border-radius:999px;'>New Registration Request</span>";
+
+    $actionText = $isResent
+        ? "A pending <strong>{$roleLabelSafe}</strong> registration awaits your review and approval:"
+        : "A new candidate has registered as <strong>{$roleLabelSafe}</strong> and requires owner authorization before account activation:";
+
+    return "
+    <div style='background-color: #f7f5f0; margin: 0; padding: 36px 12px; font-family: -apple-system, BlinkMacSystemFont, \"Segoe UI\", Roboto, Helvetica, Arial, sans-serif;'>
+        <div style='max-width: 520px; margin: 0 auto;'>
+            <!-- Header Brand -->
+            <div style='text-align: center; margin-bottom: 22px;'>
+                <div style='display: inline-block; width: 56px; height: 56px; background-color: #2b1810; background: linear-gradient(135deg, #2b1810 0%, #4a2818 100%); color: #f59e0b; border-radius: 16px; line-height: 56px; font-size: 28px; box-shadow: 0 6px 16px rgba(43,24,16,0.22);'>&#9749;</div>
+                <h1 style='color: #2b1810; margin: 12px 0 6px; font-size: 22px; font-weight: 800; letter-spacing: -0.3px;'>{$storeNameSafe}</h1>
+                <div>{$badgeHtml}</div>
+            </div>
+
+            <!-- Main Card -->
+            <div style='background: #ffffff; border-radius: 18px; padding: 28px 26px; border: 1px solid #e7ded4; box-shadow: 0 4px 18px rgba(0,0,0,0.05);'>
+                <p style='color: #2b1810; font-size: 15px; margin: 0 0 8px; font-weight: 600;'>Hello Store Owner,</p>
+                <p style='color: #57534e; font-size: 14px; line-height: 1.55; margin: 0 0 20px;'>{$actionText}</p>
+
+                <!-- Candidate Info Box -->
+                <div style='background: #faf8f5; border: 1px solid #ebdcd0; border-radius: 14px; padding: 18px 20px; margin-bottom: 22px;'>
+                    <table style='width: 100%; border-collapse: collapse; border-bottom: 1px solid #ebdcd0; margin-bottom: 14px;'>
+                        <tr>
+                            <td style='padding-bottom: 10px; vertical-align: middle;'>
+                                <div style='font-size: 11px; color: #8c786d; font-weight: 700; text-transform: uppercase; letter-spacing: 0.5px;'>Candidate</div>
+                                <div style='font-size: 17px; font-weight: 800; color: #2b1810; margin-top: 2px;'>{$fullNameSafe}</div>
+                            </td>
+                            <td style='text-align: right; padding-bottom: 10px; vertical-align: middle;'>
+                                <span style='display: inline-block; background: {$roleBg}; color: {$roleColor}; border: 1px solid {$roleBorder}; font-size: 11px; font-weight: 700; padding: 4px 12px; border-radius: 999px; text-transform: uppercase; letter-spacing: 0.5px;'>{$roleLabelSafe}</span>
+                            </td>
+                        </tr>
+                    </table>
+
+                    <table style='width: 100%; border-collapse: collapse; font-size: 13.5px;'>
+                        <tr>
+                            <td style='padding: 6px 0; color: #78716c; font-weight: 600; width: 110px;'>Username:</td>
+                            <td style='padding: 6px 0;'><code style='background: #f1ebe5; padding: 3px 8px; border-radius: 6px; font-family: Consolas, Monaco, monospace; color: #2b1810; font-size: 13px; font-weight: 600;'>@{$usernameSafe}</code></td>
+                        </tr>
+                        <tr>
+                            <td style='padding: 6px 0; color: #78716c; font-weight: 600;'>Email:</td>
+                            <td style='padding: 6px 0; color: #292524;'>{$emailSafe}</td>
+                        </tr>
+                        <tr>
+                            <td style='padding: 6px 0; color: #78716c; font-weight: 600;'>Station:</td>
+                            <td style='padding: 6px 0; color: #292524;'>{$stationLabel}</td>
+                        </tr>
+                        <tr>
+                            <td style='padding: 6px 0; color: #78716c; font-weight: 600;'>Status:</td>
+                            <td style='padding: 6px 0; color: #b45309; font-weight: 700;'>&#9203; Pending Owner Approval</td>
+                        </tr>
+                    </table>
+                </div>
+
+                <!-- CTA Button -->
+                <div style='text-align: center; margin: 24px 0 14px;'>
+                    <a href='{$approveUrl}' style='display: block; box-sizing: border-box; width: 100%; background-color: #2b1810; background: linear-gradient(135deg, #2b1810 0%, #4a2818 100%); color: #ffffff !important; padding: 15px 24px; border-radius: 12px; text-decoration: none !important; font-weight: 700; font-size: 15px; box-shadow: 0 4px 14px rgba(43,24,16,0.3); text-align: center; letter-spacing: 0.3px;'>
+                        &#9989; Approve {$roleLabelSafe} Registration
+                    </a>
+                </div>
+
+                <p style='font-size: 12px; color: #78716c; text-align: center; line-height: 1.5; margin: 12px 0 0;'>
+                    Clicking the button will immediately activate this account and email the staff member with their sign-in instructions.
+                </p>
+
+                <div style='margin-top: 22px; padding-top: 16px; border-top: 1px solid #f0e9e2; text-align: center; font-size: 11px; color: #a8a29e;'>
+                    &#128274; ChipiPie Cafe POS System &bull; ISO/IEC 25010 Security &amp; Access Controls
+                </div>
+            </div>
+        </div>
+    </div>";
+}
+
+function buildApprovalConfirmationEmailTemplate($storeName, $roleLabel, $fullName, $username, $posUrl) {
+    $storeNameSafe = htmlspecialchars($storeName ?: 'ChipiPie Cafe');
+    $roleLabelSafe = htmlspecialchars($roleLabel ?: 'Cashier');
+    $fullNameSafe  = htmlspecialchars($fullName ?: 'Staff Member');
+    $usernameSafe  = htmlspecialchars($username ?: '');
+
+    return "
+    <div style='background-color: #f7f5f0; margin: 0; padding: 36px 12px; font-family: -apple-system, BlinkMacSystemFont, \"Segoe UI\", Roboto, Helvetica, Arial, sans-serif;'>
+        <div style='max-width: 520px; margin: 0 auto;'>
+            <div style='text-align: center; margin-bottom: 22px;'>
+                <div style='display: inline-block; width: 56px; height: 56px; background-color: #166534; color: #ffffff; border-radius: 16px; line-height: 56px; font-size: 28px; box-shadow: 0 6px 16px rgba(22,101,52,0.25);'>&#127881;</div>
+                <h1 style='color: #2b1810; margin: 12px 0 6px; font-size: 22px; font-weight: 800;'>{$storeNameSafe}</h1>
+                <span style='display:inline-block; background:#dcfce7; color:#15803d; border:1px solid #bbf7d0; font-size:11px; font-weight:700; text-transform:uppercase; letter-spacing:0.8px; padding:3px 12px; border-radius:999px;'>Account Approved</span>
+            </div>
+            <div style='background: #ffffff; border-radius: 18px; padding: 28px 26px; border: 1px solid #e7ded4; box-shadow: 0 4px 18px rgba(0,0,0,0.05);'>
+                <p style='color: #2b1810; font-size: 16px; margin: 0 0 10px; font-weight: 700;'>Congratulations, {$fullNameSafe}!</p>
+                <p style='color: #57534e; font-size: 14px; line-height: 1.55; margin: 0 0 18px;'>Your <strong>{$roleLabelSafe}</strong> registration has been reviewed and approved by management. Your account is now active.</p>
+
+                <div style='background: #faf8f5; border: 1px solid #ebdcd0; border-radius: 14px; padding: 16px 18px; margin-bottom: 22px;'>
+                    <div style='font-size: 13px; color: #78716c; margin-bottom: 6px;'>Username: <code style='background: #f1ebe5; padding: 3px 8px; border-radius: 6px; font-family: Consolas, Monaco, monospace; color: #2b1810; font-weight: 700;'>@{$usernameSafe}</code></div>
+                    <div style='font-size: 13px; color: #78716c;'>Assigned Role: <strong style='color: #2b1810;'>{$roleLabelSafe}</strong></div>
+                </div>
+
+                <div style='text-align: center; margin: 20px 0 10px;'>
+                    <a href='{$posUrl}' style='display: block; box-sizing: border-box; width: 100%; background-color: #2b1810; background: linear-gradient(135deg, #2b1810 0%, #4a2818 100%); color: #ffffff !important; padding: 14px 24px; border-radius: 12px; text-decoration: none !important; font-weight: 700; font-size: 14.5px; box-shadow: 0 4px 14px rgba(43,24,16,0.3); text-align: center;'>
+                        &#9749; Open POS &amp; Sign In
+                    </a>
+                </div>
+            </div>
+        </div>
+    </div>";
+}
+
+// =====================================================
 // REGISTER
 // =====================================================
 function handleRegister() {
@@ -625,28 +754,7 @@ function handleRegister() {
     $ownerEmail  = $regSettings['owner_email'];
     $storeName   = $regSettings['store_name'] ?: 'ChipiPie Cafe';
     $approveUrl = "http://" . ($_SERVER['HTTP_HOST'] ?? 'localhost') . "/CHIPIPIE_SYSTEM/api/auth.php?action=approve_admin&token=" . $approvalToken;
-
-    $emailBody = "
-    <div style='font-family: Segoe UI, sans-serif; max-width: 500px; margin: 0 auto; padding: 30px; background: #faf9f7; border-radius: 16px;'>
-        <div style='text-align: center; margin-bottom: 20px;'>
-            <div style='display: inline-block; width: 50px; height: 50px; background: #838582; color: #fff; border-radius: 12px; line-height: 50px; font-size: 24px;'>☕</div>
-            <h2 style='color: #3a2f2d; margin: 10px 0 5px;'>$storeName</h2>
-            <p style='color: #888; font-size: 13px; margin: 0;'>$roleLabel Registration Request</p>
-        </div>
-        <div style='background: #fff; border-radius: 12px; padding: 24px; border: 1px solid #e5e0d8;'>
-            <p style='color: #333; font-size: 14px;'>A new <strong>$roleLabel</strong> registration has been requested:</p>
-            <table style='width: 100%; font-size: 14px; color: #444; margin: 16px 0;'>
-                <tr><td style='padding: 6px 0; font-weight: 600; color: #3a2f2d;'>Role:</td><td><strong style='color:#5c3d2e;'>$roleLabel</strong></td></tr>
-                <tr><td style='padding: 6px 0; font-weight: 600; color: #3a2f2d;'>Name:</td><td>$full_name</td></tr>
-                <tr><td style='padding: 6px 0; font-weight: 600; color: #3a2f2d;'>Username:</td><td>$username</td></tr>
-                <tr><td style='padding: 6px 0; font-weight: 600; color: #3a2f2d;'>Email:</td><td>$email</td></tr>
-            </table>
-            <a href='$approveUrl' style='display: block; text-align: center; background: #3a2f2d; color: #fff; padding: 12px 24px; border-radius: 10px; text-decoration: none; font-weight: 600; font-size: 14px; margin-top: 16px;'>
-                ✅ Approve $roleLabel Registration
-            </a>
-            <p style='font-size: 11px; color: #aaa; text-align: center; margin-top: 14px;'>If you did not expect this request, you can safely ignore this email.</p>
-        </div>
-    </div>";
+    $emailBody = buildApprovalEmailTemplate($storeName, $roleLabel, $full_name, $username, $email, $assignedStation, $approveUrl, false);
 
     $response = [
         'success' => true,
@@ -732,16 +840,8 @@ function handleApproveAdmin() {
 
     // Send confirmation email to the new user
     $storeName = getSetting('store_name') ?: 'ChipiPie Cafe';
-    $confirmBody = "
-    <div style='font-family: Segoe UI, sans-serif; max-width: 500px; margin: 0 auto; padding: 30px; background: #faf9f7; border-radius: 16px;'>
-        <div style='text-align: center; margin-bottom: 20px;'>
-            <h2 style='color: #3a2f2d;'>$storeName</h2>
-        </div>
-        <div style='background: #fff; border-radius: 12px; padding: 24px; border: 1px solid #e5e0d8;'>
-            <p style='font-size: 14px; color: #333;'>🎉 <strong>{$request['full_name']}</strong>, your {$roleLabel} account has been approved!</p>
-            <p style='font-size: 14px; color: #555;'>You can now log in to the POS system with your username: <strong>{$request['username']}</strong></p>
-        </div>
-    </div>";
+    $posUrl = "http://" . ($_SERVER['HTTP_HOST'] ?? 'localhost') . "/CHIPIPIE_SYSTEM/chipipie-pos.php";
+    $confirmBody = buildApprovalConfirmationEmailTemplate($storeName, $roleLabel, $request['full_name'], $request['username'], $posUrl);
     sendEmail($request['email'], "$storeName — {$roleLabel} Account Approved", $confirmBody);
 
     echo "
@@ -782,31 +882,12 @@ function handleResendApproval() {
     $ownerEmail = getSetting('owner_email');
     $storeName  = getSetting('store_name') ?: 'ChipiPie Cafe';
     $approveUrl = "http://" . ($_SERVER['HTTP_HOST'] ?? 'localhost') . "/CHIPIPIE_SYSTEM/api/auth.php?action=approve_admin&token=" . $request['approval_token'];
+    $station    = $request['assigned_station'] ?? '';
 
-    $emailBody = "
-    <div style='font-family: Segoe UI, sans-serif; max-width: 500px; margin: 0 auto; padding: 30px; background: #faf9f7; border-radius: 16px;'>
-        <div style='text-align: center; margin-bottom: 20px;'>
-            <div style='display: inline-block; width: 50px; height: 50px; background: #838582; color: #fff; border-radius: 12px; line-height: 50px; font-size: 24px;'>☕</div>
-            <h2 style='color: #3a2f2d; margin: 10px 0 5px;'>$storeName</h2>
-            <p style='color: #888; font-size: 13px; margin: 0;'>$roleLabel Registration Request (Resent)</p>
-        </div>
-        <div style='background: #fff; border-radius: 12px; padding: 24px; border: 1px solid #e5e0d8;'>
-            <p style='color: #333; font-size: 14px;'>A pending <strong>$roleLabel</strong> registration awaits your approval:</p>
-            <table style='width: 100%; font-size: 14px; color: #444; margin: 16px 0;'>
-                <tr><td style='padding: 6px 0; font-weight: 600; color: #3a2f2d;'>Role:</td><td><strong style='color:#5c3d2e;'>$roleLabel</strong></td></tr>
-                <tr><td style='padding: 6px 0; font-weight: 600; color: #3a2f2d;'>Name:</td><td>{$request['full_name']}</td></tr>
-                <tr><td style='padding: 6px 0; font-weight: 600; color: #3a2f2d;'>Username:</td><td>{$request['username']}</td></tr>
-                <tr><td style='padding: 6px 0; font-weight: 600; color: #3a2f2d;'>Email:</td><td>{$request['email']}</td></tr>
-            </table>
-            <a href='$approveUrl' style='display: block; text-align: center; background: #3a2f2d; color: #fff; padding: 12px 24px; border-radius: 10px; text-decoration: none; font-weight: 600; font-size: 14px; margin-top: 16px;'>
-                ✅ Approve $roleLabel Registration
-            </a>
-            <p style='font-size: 11px; color: #aaa; text-align: center; margin-top: 14px;'>If you did not expect this request, you can safely ignore this email.</p>
-        </div>
-    </div>";
+    $emailBody = buildApprovalEmailTemplate($storeName, $roleLabel, $request['full_name'], $request['username'], $request['email'], $station, $approveUrl, true);
 
     jsonResponseAndContinue(['success' => true, 'message' => "Approval notification resent to owner."]);
-    sendEmail($ownerEmail, "$storeName - $roleLabel Registration Approval Needed (Resent)", $emailBody);
+    sendEmail($ownerEmail, "$storeName — $roleLabel Registration Approval Needed (Resent)", $emailBody);
     exit;
 }
 
