@@ -702,6 +702,47 @@ function sendEmail($to, $subject, $body) {
     $sent = false;
     $debugLog = '';
 
+    // ── Method 0: HTTPS REST API (Port 443 — Bypasses DigitalOcean & Cloud Port Blocks) ──
+    $brevoKey = getenv('BREVO_API_KEY') ?: getSetting('brevo_api_key');
+    if (!empty($brevoKey) && function_exists('curl_init')) {
+        try {
+            $payload = [
+                'sender' => [
+                    'name'  => MAIL_FROM_NAME,
+                    'email' => MAIL_FROM
+                ],
+                'to' => array_map(function($e) { return ['email' => $e]; }, $recipients),
+                'subject' => $subject,
+                'htmlContent' => $body
+            ];
+
+            $ch = curl_init('https://api.brevo.com/v3/smtp/email');
+            curl_setopt($ch, CURLOPT_POST, true);
+            curl_setopt($ch, CURLOPT_POSTFIELDS, json_encode($payload));
+            curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+            curl_setopt($ch, CURLOPT_TIMEOUT, 10);
+            curl_setopt($ch, CURLOPT_CONNECTTIMEOUT, 5);
+            curl_setopt($ch, CURLOPT_HTTPHEADER, [
+                'accept: application/json',
+                'api-key: ' . $brevoKey,
+                'content-type: application/json'
+            ]);
+            $response = curl_exec($ch);
+            $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+            $curlErr  = curl_error($ch);
+            curl_close($ch);
+
+            if ($httpCode >= 200 && $httpCode < 300) {
+                $sent = true;
+                $debugLog .= "Method 0 (Brevo HTTPS 443): SUCCESS ($httpCode)\n";
+            } else {
+                $debugLog .= "Method 0 (Brevo HTTPS 443) failed ($httpCode): $response $curlErr\n";
+            }
+        } catch (Throwable $e) {
+            $debugLog .= "Method 0 Exception: " . $e->getMessage() . "\n";
+        }
+    }
+
     // ── Method 1: cURL SMTPS on Port 465 (Native SSL, works on Vercel + Local) ──
     if (function_exists('curl_init')) {
         try {

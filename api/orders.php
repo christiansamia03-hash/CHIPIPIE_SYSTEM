@@ -73,13 +73,20 @@ function getVoidRefundRecipients() {
         }
     }
 
-    // 3. Fallback only if NO recipients were ever configured in settings (active admins only)
+    // 3. Fallback only if NO recipients were ever configured in settings (active admins, owner, superadmin)
     if (empty($recipients)) {
         $admins = $db->query("SELECT email FROM users WHERE role IN ('admin','super_admin') AND email != '' AND is_active = 1")->fetchAll();
         foreach ($admins as $adm) {
             $em = trim($adm['email']);
             $low = strtolower($em);
             if (!isset($inactiveSet[$low]) && isValidSendableEmail($em)) {
+                $recipients[$low] = $em;
+            }
+        }
+        foreach ([getSetting('owner_email'), getSetting('superadmin_email')] as $fallbackEm) {
+            $em = trim((string)$fallbackEm);
+            $low = strtolower($em);
+            if (!empty($em) && !isset($inactiveSet[$low]) && isValidSendableEmail($em)) {
                 $recipients[$low] = $em;
             }
         }
@@ -177,15 +184,11 @@ function handleVoidOrder() {
     ];
     if (DEV_MODE) $resp['dev_token'] = $pinCode;
 
-    // Flush response to browser immediately (<50ms)
-    jsonResponseAndContinue($resp);
-
-    // Deliver emails in background
     $recipients = getVoidRefundRecipients();
-    foreach ($recipients as $email) {
-        sendEmail($email, "$storeName - Void Authorization Code: Order #{$orderId} ($pinCode)", $actionBody);
+    if (!empty($recipients)) {
+        sendEmail(array_values($recipients), "$storeName - Void Authorization Code: Order #{$orderId} ($pinCode)", $actionBody);
     }
-    exit;
+    jsonResponse($resp);
 }
 
 function handleRefundOrder() {
@@ -269,15 +272,11 @@ function handleRefundOrder() {
     ];
     if (DEV_MODE) $resp['dev_token'] = $pinCode;
 
-    // Flush response to browser immediately (<50ms)
-    jsonResponseAndContinue($resp);
-
-    // Deliver emails in background
     $recipients = getVoidRefundRecipients();
-    foreach ($recipients as $email) {
-        sendEmail($email, "$storeName - Refund Authorization Code: Order #{$orderId} ($pinCode)", $actionBody);
+    if (!empty($recipients)) {
+        sendEmail(array_values($recipients), "$storeName - Refund Authorization Code: Order #{$orderId} ($pinCode)", $actionBody);
     }
-    exit;
+    jsonResponse($resp);
 }
 
 function handleGetAdjustments() {
@@ -1236,18 +1235,10 @@ function handleRequestVoidBatch() {
         ];
         if (DEV_MODE) $resp['dev_token'] = $pinCode;
 
-        // Flush response to browser immediately (<50ms)
-        jsonResponseAndContinue($resp);
-
-        // Deliver batch emails in background
-        try {
-            foreach ($recipients as $email) {
-                sendEmail($email, "$storeName - Void/Refund Authorization Token ($pinCode)", $actionBody);
-            }
-        } catch (Throwable $mailEx) {
-            error_log("Failed to send void batch email: " . $mailEx->getMessage());
+        if (!empty($recipients)) {
+            sendEmail(array_values($recipients), "$storeName - Void/Refund Authorization Token ($pinCode)", $actionBody);
         }
-        exit;
+        jsonResponse($resp);
 
     } catch (Throwable $e) {
         error_log("handleRequestVoidBatch error: " . $e->getMessage());

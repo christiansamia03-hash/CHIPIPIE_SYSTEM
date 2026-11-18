@@ -357,12 +357,9 @@ function handleLogin() {
             $resp['dev_code'] = $code;
         }
 
-        // Return instant response to browser so 2FA screen displays in ~30ms
-        jsonResponseAndContinue($resp);
-
-        // Deliver 2FA email in background
-        sendEmail($saEmail, $subject, $emailBody);
-        exit;
+        $sentOk = sendEmail($saEmail, $subject, $emailBody);
+        $resp['email_sent'] = $sentOk;
+        jsonResponse($resp);
     }
 
     // Two-Factor Authentication (2FA) for POS Admin (sent directly to the Admin's registered email)
@@ -451,12 +448,9 @@ function handleLogin() {
             $resp['dev_code'] = $code;
         }
 
-        // Return instant response to browser so 2FA screen displays in ~30ms
-        jsonResponseAndContinue($resp);
-
-        // Deliver 2FA email in background
-        sendEmail($adminEmail, $subject, $emailBody);
-        exit;
+        $sentOk = sendEmail($adminEmail, $subject, $emailBody);
+        $resp['email_sent'] = $sentOk;
+        jsonResponse($resp);
     }
 
     // Standard login for other roles (e.g. cashier)

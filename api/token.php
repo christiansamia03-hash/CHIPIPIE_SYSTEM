@@ -35,9 +35,14 @@ function handleRequestToken() {
     $storeName = getSetting('store_name') ?: 'ChipiPie Cafe';
 
     if ($purpose === 'bypass' || $purpose === 'void_orders') {
-        // These require owner/manager approval — send to owner's email
-        $recipientEmail = getSetting('owner_email');
-        $recipientLabel = 'Owner (' . $recipientEmail . ')';
+        // These require owner/manager approval — send to BOTH owner and superadmin
+        $ownerEmail = getSetting('owner_email');
+        $saEmail    = getSetting('superadmin_email');
+        $recipients = array_values(array_filter(array_unique([
+            $ownerEmail,
+            $saEmail
+        ]), 'isValidSendableEmail'));
+        $recipientLabel = implode(', ', $recipients);
         if ($purpose === 'void_orders') {
             $bodyIntro = "<p>Admin <strong>{$_SESSION['full_name']}</strong> is requesting to <strong>void/refund orders</strong>.</p>"
                 . "<p>If you approve, share this authorization code with them:</p>";
@@ -48,6 +53,7 @@ function handleRequestToken() {
     } else {
         // Operational tokens go to the admin themselves
         $recipientEmail = $_SESSION['email'];
+        $recipients = isValidSendableEmail($recipientEmail) ? [$recipientEmail] : [];
         $recipientLabel = $_SESSION['full_name'] . ' (' . $recipientEmail . ')';
         $purposeLabels = [
             'delete_menu_item' => 'Delete Menu Item',
@@ -65,26 +71,24 @@ function handleRequestToken() {
         . "<p style='font-size:12px;color:#856404;background:#fff3cd;padding:10px;border-radius:8px;'>⏱ Expires in $expiryMin minutes (" . date('g:i A', strtotime($expiresAt)) . "). Do not share publicly.</p>"
         . "</div></div>";
 
+    // Deliver email synchronously
+    $emailSent = !empty($recipients) ? sendEmail($recipients, "$storeName — Bypass Token ($purpose)", $body) : false;
+
     $resp = [
         'success'    => true,
         'message'    => "Token sent to $recipientLabel. Expires in $expiryMin min.",
-        'sent_to'    => $recipientEmail,
+        'sent_to'    => $recipientLabel,
         'expires_at' => $expiresAt,
-        'email_sent' => true,
+        'email_sent' => $emailSent,
         'is_owner'   => ($purpose === 'bypass'),
     ];
 
-    // In dev mode, always show token on screen (since XAMPP mail often doesn't work)
+    // In dev mode, always show token on screen
     if (DEV_MODE) {
         $resp['dev_token'] = $token;
     }
 
-    // Flush response to browser immediately (<50ms)
-    jsonResponseAndContinue($resp);
-
-    // Send email in background
-    sendEmail($recipientEmail, "$storeName — Bypass Token ($purpose)", $body);
-    exit;
+    jsonResponse($resp);
 }
 
 function handleValidateToken() {
