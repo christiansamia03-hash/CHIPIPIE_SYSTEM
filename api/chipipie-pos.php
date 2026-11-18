@@ -11711,6 +11711,13 @@ $_CSRF_TOKEN = getCsrfToken();
     let _sessionExpiredCountdown = null;
 
     function showSessionExpiredModal(reason) {
+      // Clear session cookies client-side immediately so page reload won't re-trigger session_expired loop
+      document.cookie = 'CHIPIPIE_POS_SESS=; expires=Thu, 01 Jan 1970 00:00:00 GMT; path=/';
+      document.cookie = 'CHIPIPIE_SA_SESS=; expires=Thu, 01 Jan 1970 00:00:00 GMT; path=/';
+      // Ensure all storage cleared
+      ['chipipie_pos_session_id','chipipie_session_id','chipipie_csrf_token','chipipie_pos_last_activity']
+        .forEach(k => { try { sessionStorage.removeItem(k); localStorage.removeItem(k); } catch(e){} });
+
       // Determine copy based on reason
       const isManual   = (reason === 'manual_lock');
       const isTabClose = (reason === 'tab_closed');
@@ -12749,31 +12756,18 @@ $_CSRF_TOKEN = getCsrfToken();
       const POS_TIMEOUT_MS = (INACTIVITY_IDLE_SECONDS + INACTIVITY_COUNTDOWN_SECONDS) * 1000; // 5 minutes (300s)
 
       if (posSid && lastPosAct > 0 && (now - lastPosAct >= POS_TIMEOUT_MS)) {
-        // Tab was closed or idle for >= 5 minutes -> immediate auto logout
+        // Tab was closed or idle for >= 5 minutes -> immediate auto logout + modal
         sessionStorage.removeItem('chipipie_pos_session_id');
         sessionStorage.removeItem('chipipie_csrf_token');
         localStorage.removeItem('chipipie_pos_session_id');
         localStorage.removeItem('chipipie_session_id');
         localStorage.removeItem('chipipie_pos_last_activity');
+        localStorage.removeItem('chipipie_csrf_token');
         currentUser = null;
-        api('auth.php?action=logout', {}).catch(() => {});
-
-        playWaterDropLoginAnimation('#login-wrapper .login-card');
-        const errEl = document.getElementById('login-error');
-        if (errEl) {
-          errEl.innerHTML = `
-            <div style="display:flex;align-items:flex-start;gap:9px;text-align:left;">
-              <i class="bi bi-shield-lock-fill" style="font-size:19px;color:#dc2626;flex-shrink:0;margin-top:2px;"></i>
-              <div>
-                <strong style="color:#991b1b;">Session Expired:</strong>
-                <div style="font-size:12px;color:#4b5563;margin-top:2px;">
-                  Workstation was idle for 5 minutes while tab was closed. You have been logged out automatically.
-                </div>
-              </div>
-            </div>
-          `;
-          errEl.style.display = 'block';
-        }
+        // Expire server-side session & cookie BEFORE showing modal so reload is clean
+        api('auth.php?action=logout', {}).catch(() => {}).finally(() => {
+          showSessionExpiredModal('tab_closed');
+        });
         return;
       }
 
@@ -12804,7 +12798,10 @@ $_CSRF_TOKEN = getCsrfToken();
           localStorage.removeItem('chipipie_pos_last_activity');
           localStorage.removeItem('chipipie_csrf_token');
           currentUser = null;
-          showSessionExpiredModal('tab_closed');
+          // Expire server-side session & cookie so reload is clean (no loop)
+          api('auth.php?action=logout', {}).catch(() => {}).finally(() => {
+            showSessionExpiredModal('tab_closed');
+          });
         } else if (res.pending_2fa && (res.role === 'admin' || res.role === 'super_admin')) {
           // Resume pending 2FA step if page was reloaded
           document.getElementById('pos-step-credentials').style.display = 'none';
