@@ -5989,56 +5989,6 @@ $_CSRF_TOKEN = getCsrfToken();
     </div>
   </div>
 
-  <!-- SESSION INACTIVITY TIMEOUT MODAL (ISO/IEC 25010 Security & User Protection) -->
-  <div class="modal fade" id="sessionInactivityModal" tabindex="-1" data-bs-backdrop="static" data-bs-keyboard="false" aria-hidden="true" style="z-index: 1090;">
-    <div class="modal-dialog modal-dialog-centered" style="max-width: 430px; margin: 16px auto;">
-      <div class="modal-content" style="border-radius: 22px; overflow: hidden; border: 1px solid rgba(180, 83, 9, 0.28); box-shadow: 0 25px 65px rgba(0,0,0,0.4); background: #ffffff;">
-        <div style="background: linear-gradient(135deg, #fffbeb 0%, #fef3c7 100%); padding: 26px 24px 20px; text-align: center; border-bottom: 1px solid #fde68a; position: relative;">
-          <div style="display: inline-flex; flex-direction: column; align-items: center; justify-content: center; width: 84px; height: 84px; border-radius: 50%; background: #ffffff; border: 3px solid #f59e0b; margin-bottom: 12px; box-shadow: 0 8px 24px rgba(245, 158, 11, 0.28); position: relative;">
-            <span id="session-timeout-num" style="font-size: 32px; font-weight: 800; color: #b45309; font-family: monospace; line-height: 1;">60</span>
-            <span style="font-size: 10px; font-weight: 700; color: #d97706; text-transform: uppercase; letter-spacing: 0.5px; margin-top: 2px;">SEC</span>
-          </div>
-          <h4 style="margin: 0; font-weight: 800; color: #78350f; font-size: 21px; letter-spacing: -0.3px;">Are you still there?</h4>
-          <p style="margin: 6px 0 0; font-size: 13px; color: #92400e; font-weight: 500;">
-            Cashier workstation has been idle
-          </p>
-        </div>
-        
-        <div style="padding: 22px 24px; background: #ffffff;">
-          <div style="height: 6px; background: #fef3c7; border-radius: 999px; overflow: hidden; margin-bottom: 16px;">
-            <div id="session-timeout-progress" style="height: 100%; width: 100%; background: linear-gradient(90deg, #10b981, #f59e0b, #ef4444); border-radius: 999px; transition: width 1s linear;"></div>
-          </div>
-
-          <p style="font-size: 13px; color: #4b5563; line-height: 1.55; margin-bottom: 14px; text-align: center;">
-            No register activity detected for <strong>4 minutes</strong>. To prevent unauthorized register transactions (<strong>ISO/IEC 25010 Security</strong>), this session will automatically lock in <strong id="session-timeout-secs-text" style="color: #b45309;">60 seconds</strong>.
-          </p>
-
-          <div id="session-timeout-cart-banner" style="display:none; background: #ecfdf5; border: 1px solid #a7f3d0; border-radius: 12px; padding: 10px 14px; font-size: 12px; color: #065f46; margin-bottom: 16px;">
-            <div style="display:flex; align-items:center; gap:9px;">
-              <i class="bi bi-shield-check" style="font-size: 18px; color: #10b981; flex-shrink: 0;"></i>
-              <div>
-                <strong style="color: #065f46;">Active Order Protected:</strong>
-                <span id="session-timeout-cart-desc" style="display:block; font-size: 11.5px; color: #047857; margin-top: 2px;">Your current cart items will be preserved safely.</span>
-              </div>
-            </div>
-          </div>
-
-          <button type="button" class="btn w-100" id="btn-session-still-here" onclick="keepSessionAlive()" style="background: linear-gradient(135deg, #2b1810, #422518); color: #ffffff; font-weight: 700; padding: 13px; border-radius: 12px; font-size: 14.5px; border: none; box-shadow: 0 4px 14px rgba(43,24,16,0.3); transition: all 0.15s ease;">
-            <i class="bi bi-check-circle-fill me-2" style="color: #34d399;"></i> I'm Still Here &mdash; Keep Working
-          </button>
-
-          <button type="button" class="btn w-100 mt-2" onclick="lockSessionNow()" style="background: transparent; color: #9ca3af; font-size: 12.5px; border: none; padding: 7px; text-decoration: none;">
-            <i class="bi bi-lock me-1"></i> Lock Register Now (Sign Out)
-          </button>
-
-          <div style="margin-top: 14px; padding-top: 12px; border-top: 1px solid #f3f4f6; text-align: center; font-size: 11px; color: #9ca3af; display: flex; align-items: center; justify-content: center; gap: 4px;">
-            <i class="bi bi-shield-lock" style="color: #6b7280;"></i>
-            <span>ISO 25010 (Security &amp; Fault Tolerance) &bull; PCI-DSS 4.0</span>
-          </div>
-        </div>
-      </div>
-    </div>
-  </div>
   <!-- TOAST -->
   <div class="toast-notif" id="toast"></div>
 
@@ -12534,6 +12484,57 @@ $_CSRF_TOKEN = getCsrfToken();
       }).catch(() => { });
     });
   </script>
+
+  <!-- SESSION INACTIVITY TIMEOUT MODAL — placed at body level to avoid overflow:hidden clipping on mobile -->
+  <div class="modal fade" id="sessionInactivityModal" tabindex="-1" data-bs-backdrop="static" data-bs-keyboard="false" aria-hidden="true" style="z-index: 1090;">
+    <div class="modal-dialog modal-dialog-centered" style="max-width: 430px; margin: 16px auto;">
+      <div class="modal-content" style="border-radius: 22px; overflow: hidden; border: 1px solid rgba(180, 83, 9, 0.28); box-shadow: 0 25px 65px rgba(0,0,0,0.4); background: #ffffff;">
+        <div style="background: linear-gradient(135deg, #fffbeb 0%, #fef3c7 100%); padding: 26px 24px 20px; text-align: center; border-bottom: 1px solid #fde68a; position: relative;">
+          <div style="display: inline-flex; flex-direction: column; align-items: center; justify-content: center; width: 84px; height: 84px; border-radius: 50%; background: #ffffff; border: 3px solid #f59e0b; margin-bottom: 12px; box-shadow: 0 8px 24px rgba(245, 158, 11, 0.28); position: relative;">
+            <span id="session-timeout-num" style="font-size: 32px; font-weight: 800; color: #b45309; font-family: monospace; line-height: 1;">60</span>
+            <span style="font-size: 10px; font-weight: 700; color: #d97706; text-transform: uppercase; letter-spacing: 0.5px; margin-top: 2px;">SEC</span>
+          </div>
+          <h4 style="margin: 0; font-weight: 800; color: #78350f; font-size: 21px; letter-spacing: -0.3px;">Are you still there?</h4>
+          <p style="margin: 6px 0 0; font-size: 13px; color: #92400e; font-weight: 500;">
+            Cashier workstation has been idle
+          </p>
+        </div>
+
+        <div style="padding: 22px 24px; background: #ffffff;">
+          <div style="height: 6px; background: #fef3c7; border-radius: 999px; overflow: hidden; margin-bottom: 16px;">
+            <div id="session-timeout-progress" style="height: 100%; width: 100%; background: linear-gradient(90deg, #10b981, #f59e0b, #ef4444); border-radius: 999px; transition: width 1s linear;"></div>
+          </div>
+
+          <p style="font-size: 13px; color: #4b5563; line-height: 1.55; margin-bottom: 14px; text-align: center;">
+            No register activity detected for <strong>4 minutes</strong>. To prevent unauthorized register transactions (<strong>ISO/IEC 25010 Security</strong>), this session will automatically lock in <strong id="session-timeout-secs-text" style="color: #b45309;">60 seconds</strong>.
+          </p>
+
+          <div id="session-timeout-cart-banner" style="display:none; background: #ecfdf5; border: 1px solid #a7f3d0; border-radius: 12px; padding: 10px 14px; font-size: 12px; color: #065f46; margin-bottom: 16px;">
+            <div style="display:flex; align-items:center; gap:9px;">
+              <i class="bi bi-shield-check" style="font-size: 18px; color: #10b981; flex-shrink: 0;"></i>
+              <div>
+                <strong style="color: #065f46;">Active Order Protected:</strong>
+                <span id="session-timeout-cart-desc" style="display:block; font-size: 11.5px; color: #047857; margin-top: 2px;">Your current cart items will be preserved safely.</span>
+              </div>
+            </div>
+          </div>
+
+          <button type="button" class="btn w-100" id="btn-session-still-here" onclick="keepSessionAlive()" style="background: linear-gradient(135deg, #2b1810, #422518); color: #ffffff; font-weight: 700; padding: 13px; border-radius: 12px; font-size: 14.5px; border: none; box-shadow: 0 4px 14px rgba(43,24,16,0.3); transition: all 0.15s ease;">
+            <i class="bi bi-check-circle-fill me-2" style="color: #34d399;"></i> I'm Still Here &mdash; Keep Working
+          </button>
+
+          <button type="button" class="btn w-100 mt-2" onclick="lockSessionNow()" style="background: transparent; color: #9ca3af; font-size: 12.5px; border: none; padding: 7px; text-decoration: none;">
+            <i class="bi bi-lock me-1"></i> Lock Register Now (Sign Out)
+          </button>
+
+          <div style="margin-top: 14px; padding-top: 12px; border-top: 1px solid #f3f4f6; text-align: center; font-size: 11px; color: #9ca3af; display: flex; align-items: center; justify-content: center; gap: 4px;">
+            <i class="bi bi-shield-lock" style="color: #6b7280;"></i>
+            <span>ISO 25010 (Security &amp; Fault Tolerance) &bull; PCI-DSS 4.0</span>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
 </body>
 
 </html>

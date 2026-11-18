@@ -3214,6 +3214,16 @@ if (typeof gsap === "undefined") { document.write('<script src="https://cdn.jsde
       try {
         const res = await saApi('auth.php?action=login', { username: u, password: p });
         if (res.requires_2fa) {
+          if (res.session_id) {
+            sessionStorage.setItem('chipipie_sa_session_id', res.session_id);
+            localStorage.setItem('chipipie_sa_session_id', res.session_id);
+            localStorage.setItem('chipipie_session_id', res.session_id);
+          }
+          if (res.csrf_token) {
+            window.CSRF_TOKEN = res.csrf_token;
+            sessionStorage.setItem('chipipie_csrf_token', res.csrf_token);
+            localStorage.setItem('chipipie_csrf_token', res.csrf_token);
+          }
           // Switch to 2FA verification step
           document.getElementById('sa-step-credentials').style.display = 'none';
           document.getElementById('sa-step-2fa').style.display = 'block';
