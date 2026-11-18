@@ -6592,8 +6592,9 @@ $_CSRF_TOKEN = getCsrfToken();
     /* ========== API HELPERS ========== */
     const API = 'api/';
 
-    async function api(endpoint, data = null, method = null) {
+    async function api(endpoint, data = null, method = null, signal = null) {
       const opts = { credentials: 'include' };
+      if (signal) opts.signal = signal;
       const csrf = (typeof CSRF_TOKEN !== 'undefined' && CSRF_TOKEN) 
                 || sessionStorage.getItem('chipipie_csrf_token') 
                 || localStorage.getItem('chipipie_csrf_token') 
@@ -11997,11 +11998,20 @@ $_CSRF_TOKEN = getCsrfToken();
       btn.disabled = true;
 
       try {
-        const res = await api('auth.php?action=resend_approval', { request_id: currentResendRequestId });
+        // 12-second timeout to prevent infinite spinner
+        const controller = new AbortController();
+        const timeout = setTimeout(() => controller.abort(), 12000);
+        const res = await api('auth.php?action=resend_approval', { request_id: currentResendRequestId }, null, controller.signal);
+        clearTimeout(timeout);
         showToast(res.success ? '📧 ' + res.message : '⚠ ' + res.message);
         bootstrap.Modal.getInstance(document.getElementById('resendApprovalModal'))?.hide();
       } catch (e) {
-        showToast('⚠ Connection error');
+        if (e.name === 'AbortError') {
+          showToast('📧 Email is being sent in the background.');
+          bootstrap.Modal.getInstance(document.getElementById('resendApprovalModal'))?.hide();
+        } else {
+          showToast('⚠ Connection error. Please try again.');
+        }
       } finally {
         btn.innerHTML = originalText;
         btn.disabled = false;

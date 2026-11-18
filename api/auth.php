@@ -896,34 +896,28 @@ function handleResendApproval() {
     $saEmail    = getSetting('superadmin_email');
     $recipients = array_values(array_filter(array_unique([
         $ownerEmail,
-        $saEmail,
-        'christiansamia03@gmail.com'
-    ])));
+        $saEmail
+    ]), function($e) { return isValidSendableEmail($e); }));
 
-    $delivered = [];
-    $failed = [];
-    foreach ($recipients as $targetEmail) {
-        if (isValidSendableEmail($targetEmail)) {
-            $ok = sendEmail($targetEmail, "$storeName — $roleLabel Registration Approval Needed (Resent)", $emailBody);
-            if ($ok) {
-                $delivered[] = $targetEmail;
-            } else {
-                $failed[] = $targetEmail;
-            }
-        }
-    }
-
-    if (!empty($delivered)) {
-        jsonResponse([
-            'success' => true,
-            'message' => "Approval notification resent to " . implode(', ', $delivered) . "."
-        ]);
-    } else {
+    if (empty($recipients)) {
         jsonResponse([
             'success' => false,
-            'message' => "Could not deliver email to " . implode(', ', $recipients) . ". Please check SMTP settings."
+            'message' => 'No valid recipient emails configured. Check owner/superadmin email settings.'
         ], 500);
     }
+
+    // Send instant response to browser so button stops spinning immediately
+    jsonResponseAndContinue([
+        'success' => true,
+        'message' => "Approval notification is being resent to " . implode(', ', $recipients) . "."
+    ]);
+
+    // Now deliver emails in background (browser already received response)
+    $subject = "$storeName — $roleLabel Registration Approval Needed (Resent)";
+    foreach ($recipients as $targetEmail) {
+        sendEmail($targetEmail, $subject, $emailBody);
+    }
+    exit;
 }
 
 function handleListUsers() {

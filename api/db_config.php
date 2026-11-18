@@ -664,8 +664,8 @@ function sendEmail($to, $subject, $body) {
 
     try {
         // Open SSL socket directly to Gmail SMTP
-        $socket = fsockopen(SMTP_HOST, SMTP_PORT, $errno, $errstr, 8);
-        if ($socket) stream_set_timeout($socket, 8);
+        $socket = fsockopen(SMTP_HOST, SMTP_PORT, $errno, $errstr, 5);
+        if ($socket) stream_set_timeout($socket, 5);
         if (!$socket) throw new Exception("Socket error $errno: $errstr");
 
         $read = function() use ($socket, &$smtpLog) {
@@ -745,7 +745,7 @@ function _loadSettingsCache() {
 }
 
 /**
- * Get a system setting (cached — only one DB query per PHP request regardless of how many times called)
+ * Get a system setting (cached â€” only one DB query per PHP request regardless of how many times called)
  */
 function getSetting($key) {
     $cache = _loadSettingsCache();
@@ -1042,7 +1042,7 @@ function enforceApiRateLimit() {
     recordRateLimitHit('api_rpm', $ip, $rpm, 60, 60);
 }
 
-// Set CORS headers — only allow same-host and known Vercel deployment origins.
+// Set CORS headers â€” only allow same-host and known Vercel deployment origins.
 // Never echo back arbitrary $origin; wildcard is disallowed when credentials are used.
 $origin         = $_SERVER['HTTP_ORIGIN'] ?? '';
 $host           = $_SERVER['HTTP_HOST']   ?? '';
@@ -1058,9 +1058,9 @@ if ($origin && in_array(rtrim($origin, '/'), $allowedOrigins, true)) {
     header("Access-Control-Allow-Origin: $origin");
     header('Access-Control-Allow-Credentials: true');
 } elseif (!$origin) {
-    // Same-origin request (no Origin header) — no CORS header needed
+    // Same-origin request (no Origin header) â€” no CORS header needed
 } else {
-    // Unknown origin — reject preflight, allow response without credentials
+    // Unknown origin â€” reject preflight, allow response without credentials
     header('Access-Control-Allow-Origin: null');
 }
 header('Access-Control-Allow-Methods: GET, POST, OPTIONS');
