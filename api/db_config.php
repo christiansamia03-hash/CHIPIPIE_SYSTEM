@@ -565,6 +565,7 @@ function ensureSession() {
         if (isset($_SESSION['user_id'])) {
             $lastAct = $_SESSION['last_activity'] ?? $_SESSION['sa_last_activity'] ?? null;
             if ($lastAct !== null && (time() - intval($lastAct) > $maxIdle)) {
+                $GLOBALS['_CHIPIPIE_SESSION_JUST_EXPIRED'] = true;
                 $expiredSid = session_id();
                 $_SESSION = [];
                 @session_destroy();
@@ -621,6 +622,7 @@ function ensureSession() {
         if (isset($_SESSION['user_id'])) {
             $lastAct = $_SESSION['last_activity'] ?? $_SESSION['sa_last_activity'] ?? null;
             if ($lastAct !== null && (time() - intval($lastAct) > $maxIdle)) {
+                $GLOBALS['_CHIPIPIE_SESSION_JUST_EXPIRED'] = true;
                 $expiredSid = session_id();
                 $_SESSION = [];
                 if (session_status() === PHP_SESSION_ACTIVE) {

@@ -1256,15 +1256,14 @@ function handleCheckSession() {
         }
         jsonResponse($resp);
     } else {
-        $hadSessionId = !empty($_SERVER['HTTP_X_SESSION_ID']) 
-            || !empty($_COOKIE['CHIPIPIE_POS_SESS']) 
-            || !empty($_COOKIE['CHIPIPIE_SA_SESS'])
+        $hadSessionId = !empty($GLOBALS['_CHIPIPIE_SESSION_JUST_EXPIRED'])
+            || !empty($_SERVER['HTTP_X_SESSION_ID']) 
             || !empty($_GET['session_id']);
         jsonResponse([
             'success'         => true,
             'loggedIn'        => false,
             'session_expired' => $hadSessionId,
-            'message'         => 'Session expired due to 5 minutes of inactivity. Please sign in again.'
+            'message'         => $hadSessionId ? 'Session expired due to 5 minutes of inactivity. Please sign in again.' : ''
         ]);
     }
 }

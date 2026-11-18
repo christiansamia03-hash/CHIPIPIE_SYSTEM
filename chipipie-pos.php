@@ -11769,6 +11769,24 @@ $_CSRF_TOKEN = getCsrfToken();
       }, 1000);
     }
 
+    function dismissSessionExpiredModal() {
+      if (_sessionExpiredCountdown) {
+        clearInterval(_sessionExpiredCountdown);
+        _sessionExpiredCountdown = null;
+      }
+      const modalEl = document.getElementById('sessionExpiredModal');
+      if (modalEl) {
+        const inst = bootstrap.Modal.getInstance(modalEl);
+        if (inst) inst.hide();
+      }
+      document.querySelectorAll('.modal-backdrop').forEach(el => el.remove());
+      document.body.classList.remove('modal-open');
+      document.body.style.removeProperty('overflow');
+      document.body.style.removeProperty('padding-right');
+      const userInp = document.getElementById('login-user');
+      if (userInp) setTimeout(() => userInp.focus(), 150);
+    }
+
     async function handleInactivityExpiration(isManualLock = false) {
       stopInactivityMonitoring();
 
@@ -12718,6 +12736,12 @@ $_CSRF_TOKEN = getCsrfToken();
 
     /* ========== INIT ========== */
     window.addEventListener('DOMContentLoaded', () => {
+      // Safety: purge any orphaned modal backdrops so login form is never blocked
+      document.querySelectorAll('.modal-backdrop').forEach(el => el.remove());
+      document.body.classList.remove('modal-open');
+      document.body.style.removeProperty('overflow');
+      document.body.style.removeProperty('padding-right');
+
       const sNav = document.querySelector('.sidebar-nav');
       if (sNav) {
         sNav.scrollLeft = 0;
@@ -12790,7 +12814,7 @@ $_CSRF_TOKEN = getCsrfToken();
           updateUserInfoUI(res.user);
           const isManager = (res.user.role === 'admin' || res.user.role === 'super_admin');
           activateApp(isManager);
-        } else if (res.session_expired) {
+        } else if (res.session_expired && posSid) {
           sessionStorage.removeItem('chipipie_pos_session_id');
           sessionStorage.removeItem('chipipie_csrf_token');
           localStorage.removeItem('chipipie_pos_session_id');
@@ -12853,11 +12877,17 @@ $_CSRF_TOKEN = getCsrfToken();
             Refreshing in <strong id="sess-exp-countdown" style="color: #dc2626; font-size: 14px;">5</strong> second(s)…
           </p>
 
-          <!-- Refresh now button -->
-          <button type="button" class="btn w-100" onclick="location.reload()"
-                  style="background: linear-gradient(135deg, #7f1d1d, #991b1b); color: #ffffff; font-weight: 700; padding: 13px; border-radius: 12px; font-size: 14.5px; border: none; box-shadow: 0 4px 14px rgba(127,29,29,0.3);">
-            <i class="bi bi-arrow-clockwise me-2"></i>Refresh &amp; Sign In Now
-          </button>
+          <!-- Action buttons -->
+          <div style="display:flex; flex-direction:column; gap:8px;">
+            <button type="button" class="btn w-100" onclick="dismissSessionExpiredModal()"
+                    style="background: linear-gradient(135deg, #7f1d1d, #991b1b); color: #ffffff; font-weight: 700; padding: 12px; border-radius: 12px; font-size: 14.5px; border: none; box-shadow: 0 4px 14px rgba(127,29,29,0.3);">
+              <i class="bi bi-box-arrow-in-right me-2"></i>Sign In Now
+            </button>
+            <button type="button" class="btn w-100" onclick="location.reload()"
+                    style="background: transparent; color: #6b7280; font-size: 12.5px; border: none; padding: 6px;">
+              <i class="bi bi-arrow-clockwise me-1"></i>Refresh Page
+            </button>
+          </div>
 
           <!-- Footer badge -->
           <div style="margin-top: 14px; padding-top: 12px; border-top: 1px solid #f3f4f6; text-align: center; font-size: 11px; color: #9ca3af; display: flex; align-items: center; justify-content: center; gap: 4px;">
