@@ -11963,13 +11963,8 @@ $_CSRF_TOKEN = getCsrfToken();
             role: currentDeleteReqData.role
           }
         };
-        const res = await fetch('api/superadmin.php?action=submit_request', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json',
-            'X-CSRF-Token': (typeof CSRF_TOKEN !== 'undefined' && CSRF_TOKEN ? CSRF_TOKEN : (localStorage.getItem('chipipie_csrf_token') || '')) },
-          body: JSON.stringify(reqBody)
-        });
-        const data = await res.json();
+        // Use the api() helper so session cookies + X-Portal + X-Session-Id headers are sent correctly
+        const data = await api('superadmin.php?action=submit_request', reqBody);
         bootstrap.Modal.getInstance(document.getElementById('deleteAdminRequestModal'))?.hide();
         showToast(data.success ? '✅ ' + data.message : '⚠ ' + data.message);
         if (data.success) renderUsers();
@@ -12064,15 +12059,8 @@ $_CSRF_TOKEN = getCsrfToken();
       btn.disabled = true;
 
       try {
-        const res = await fetch('api/superadmin.php?action=submit_request', {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'X-CSRF-Token': (typeof CSRF_TOKEN !== 'undefined' ? CSRF_TOKEN : (localStorage.getItem('chipipie_csrf_token') || ''))
-          },
-          body: JSON.stringify(req)
-        });
-        const data = await res.json();
+        // Use the api() helper so session cookies + X-Portal + X-Session-Id headers are sent correctly
+        const data = await api('superadmin.php?action=submit_request', req);
         showToast(data.success ? '✅ ' + data.message : '⚠ ' + data.message);
         bootstrap.Modal.getInstance(document.getElementById('requestToggleModal')).hide();
       } catch (e) {
