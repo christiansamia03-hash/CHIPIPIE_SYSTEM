@@ -499,6 +499,10 @@ function getPortalContext() {
  * Synchronize a companion session for the other portal so Super Admin can be logged into both portals simultaneously
  */
 function syncCompanionSession($user, $targetPortal) {
+    // Prevent Super Admin logins from overwriting active POS cashier sessions
+    if ($targetPortal === 'pos' && (($user['role'] ?? '') === 'super_admin')) {
+        return null;
+    }
     $sessName = ($targetPortal === 'superadmin') ? 'CHIPIPIE_SA_SESS' : 'CHIPIPIE_POS_SESS';
     $prefix   = ($targetPortal === 'superadmin') ? 'sa' : 'pos';
     $newSid   = $prefix . bin2hex(random_bytes(16));

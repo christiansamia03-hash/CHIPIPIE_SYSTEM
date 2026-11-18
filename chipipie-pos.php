@@ -6793,18 +6793,16 @@ $_CSRF_TOKEN = getCsrfToken();
     async function api(endpoint, data = null, method = null, signal = null) {
       const opts = { credentials: 'include' };
       if (signal) opts.signal = signal;
-      const csrf = (typeof CSRF_TOKEN !== 'undefined' && CSRF_TOKEN) 
-                || sessionStorage.getItem('chipipie_csrf_token') 
-                || localStorage.getItem('chipipie_csrf_token') 
+      const csrf = sessionStorage.getItem('chipipie_csrf_token') 
+                || (typeof CSRF_TOKEN !== 'undefined' && CSRF_TOKEN) 
                 || '';
       opts.headers = {
         'X-Portal': 'pos',
         'X-Offline': navigator.onLine ? '0' : '1',
         'X-CSRF-Token': csrf
       };
-      const sid = sessionStorage.getItem('chipipie_pos_session_id') 
-               || localStorage.getItem('chipipie_pos_session_id') 
-               || localStorage.getItem('chipipie_session_id');
+      // Strict tab isolation: prioritize this tab's own sessionStorage ID
+      const sid = sessionStorage.getItem('chipipie_pos_session_id');
       if (sid) {
         opts.headers['X-Session-Id'] = sid;
       }
@@ -11181,12 +11179,12 @@ $_CSRF_TOKEN = getCsrfToken();
         if (res.requires_2fa) {
           if (res.session_id) {
             sessionStorage.setItem('chipipie_pos_session_id', res.session_id);
-            localStorage.setItem('chipipie_pos_session_id', res.session_id);
+            sessionStorage.setItem('chipipie_pos_last_activity', String(Date.now()));
+            localStorage.setItem('chipipie_pos_act_' + res.session_id, String(Date.now()));
           }
           if (res.csrf_token) {
             window.CSRF_TOKEN = res.csrf_token;
             sessionStorage.setItem('chipipie_csrf_token', res.csrf_token);
-            localStorage.setItem('chipipie_csrf_token', res.csrf_token);
           }
           // Admin 2FA in POS: show POS 2FA screen
           document.getElementById('pos-step-credentials').style.display = 'none';
@@ -11216,13 +11214,12 @@ $_CSRF_TOKEN = getCsrfToken();
         if (res.success) {
           if (res.session_id) {
             sessionStorage.setItem('chipipie_pos_session_id', res.session_id);
-            localStorage.setItem('chipipie_pos_session_id', res.session_id);
-            localStorage.setItem('chipipie_session_id', res.session_id);
+            sessionStorage.setItem('chipipie_pos_last_activity', String(Date.now()));
+            localStorage.setItem('chipipie_pos_act_' + res.session_id, String(Date.now()));
           }
           if (res.csrf_token) {
             window.CSRF_TOKEN = res.csrf_token;
             sessionStorage.setItem('chipipie_csrf_token', res.csrf_token);
-            localStorage.setItem('chipipie_csrf_token', res.csrf_token);
           }
           currentUser = res.user;
           updateUserInfoUI(res.user);
@@ -11267,13 +11264,12 @@ $_CSRF_TOKEN = getCsrfToken();
         if (res.success && res.user) {
           if (res.session_id) {
             sessionStorage.setItem('chipipie_pos_session_id', res.session_id);
-            localStorage.setItem('chipipie_pos_session_id', res.session_id);
-            localStorage.setItem('chipipie_session_id', res.session_id);
+            sessionStorage.setItem('chipipie_pos_last_activity', String(Date.now()));
+            localStorage.setItem('chipipie_pos_act_' + res.session_id, String(Date.now()));
           }
           if (res.csrf_token) {
             window.CSRF_TOKEN = res.csrf_token;
             sessionStorage.setItem('chipipie_csrf_token', res.csrf_token);
-            localStorage.setItem('chipipie_csrf_token', res.csrf_token);
           }
           currentUser = res.user;
           updateUserInfoUI(res.user);
@@ -11451,16 +11447,19 @@ $_CSRF_TOKEN = getCsrfToken();
     async function logout() {
       stopInactivityMonitoring();
       stopPizzaOrderMonitoring();
-      const currentSid = sessionStorage.getItem('chipipie_pos_session_id') || localStorage.getItem('chipipie_pos_session_id');
-      try { await api('auth.php?action=logout', {}); } catch (e) { }
+      const currentSid = sessionStorage.getItem('chipipie_pos_session_id');
+      if (currentSid) {
+        try { await api('auth.php?action=logout', { session_id: currentSid }); } catch (e) { }
+        localStorage.removeItem('chipipie_pos_act_' + currentSid);
+      }
       sessionStorage.removeItem('chipipie_pos_session_id');
       sessionStorage.removeItem('chipipie_csrf_token');
+      sessionStorage.removeItem('chipipie_pos_last_activity');
+      sessionStorage.removeItem('chipipie_pos_user');
       if (localStorage.getItem('chipipie_pos_session_id') === currentSid) {
         localStorage.removeItem('chipipie_pos_session_id');
         localStorage.removeItem('chipipie_session_id');
       }
-      localStorage.removeItem('chipipie_pos_last_activity');
-      localStorage.removeItem('chipipie_csrf_token');
       window.CSRF_TOKEN = '';
       currentUser = null;
       _isUserAdmin = false;
@@ -11501,14 +11500,18 @@ $_CSRF_TOKEN = getCsrfToken();
       if (!_isWarningModalOpen) {
         _lastActivityTimestamp = Date.now();
         try {
-          localStorage.setItem('chipipie_pos_last_activity', String(Date.now()));
+          sessionStorage.setItem('chipipie_pos_last_activity', String(Date.now()));
+          const sid = sessionStorage.getItem('chipipie_pos_session_id');
+          if (sid) localStorage.setItem('chipipie_pos_act_' + sid, String(Date.now()));
         } catch (e) {}
       }
     }
 
     function persistPOSActivityTimestamp() {
       try {
-        localStorage.setItem('chipipie_pos_last_activity', String(Date.now()));
+        sessionStorage.setItem('chipipie_pos_last_activity', String(Date.now()));
+        const sid = sessionStorage.getItem('chipipie_pos_session_id');
+        if (sid) localStorage.setItem('chipipie_pos_act_' + sid, String(Date.now()));
       } catch (e) {}
     }
 
@@ -11519,8 +11522,8 @@ $_CSRF_TOKEN = getCsrfToken();
       if (document.visibilityState === 'hidden') {
         persistPOSActivityTimestamp();
       } else if (document.visibilityState === 'visible' && currentUser) {
-        // When cashier switches back to tab, check if 5 minutes elapsed
-        const lastAct = parseInt(localStorage.getItem('chipipie_pos_last_activity') || '0', 10);
+        const sid = sessionStorage.getItem('chipipie_pos_session_id');
+        const lastAct = parseInt(sessionStorage.getItem('chipipie_pos_last_activity') || (sid ? localStorage.getItem('chipipie_pos_act_' + sid) : '0') || '0', 10);
         if (lastAct > 0 && (Date.now() - lastAct >= (INACTIVITY_IDLE_SECONDS + INACTIVITY_COUNTDOWN_SECONDS) * 1000)) {
           handleInactivityExpiration();
         } else {
@@ -11529,9 +11532,10 @@ $_CSRF_TOKEN = getCsrfToken();
       }
     });
 
-    // Cross-tab sync for POS activity
+    // Cross-tab sync for POS activity of THIS session
     window.addEventListener('storage', function(e) {
-      if (e.key === 'chipipie_pos_last_activity' && e.newValue) {
+      const sid = sessionStorage.getItem('chipipie_pos_session_id');
+      if (sid && e.key === ('chipipie_pos_act_' + sid) && e.newValue) {
         _lastActivityTimestamp = parseInt(e.newValue, 10) || Date.now();
       }
     });
@@ -11714,9 +11718,13 @@ $_CSRF_TOKEN = getCsrfToken();
       // Clear session cookies client-side immediately so page reload won't re-trigger session_expired loop
       document.cookie = 'CHIPIPIE_POS_SESS=; expires=Thu, 01 Jan 1970 00:00:00 GMT; path=/';
       document.cookie = 'CHIPIPIE_SA_SESS=; expires=Thu, 01 Jan 1970 00:00:00 GMT; path=/';
-      // Ensure all storage cleared
-      ['chipipie_pos_session_id','chipipie_session_id','chipipie_csrf_token','chipipie_pos_last_activity']
-        .forEach(k => { try { sessionStorage.removeItem(k); localStorage.removeItem(k); } catch(e){} });
+      const curExpiredSid = sessionStorage.getItem('chipipie_pos_session_id');
+      if (curExpiredSid) {
+        localStorage.removeItem('chipipie_pos_act_' + curExpiredSid);
+      }
+      // Ensure THIS tab's storage cleared without wiping other tabs
+      ['chipipie_pos_session_id','chipipie_csrf_token','chipipie_pos_last_activity','chipipie_pos_user']
+        .forEach(k => { try { sessionStorage.removeItem(k); } catch(e){} });
 
       // Determine copy based on reason
       const isManual   = (reason === 'manual_lock');
@@ -12774,8 +12782,8 @@ $_CSRF_TOKEN = getCsrfToken();
       }
 
       // Check if session has expired while the tab was closed (>= 5 minutes = 300,000 ms)
-      const lastPosAct = parseInt(localStorage.getItem('chipipie_pos_last_activity') || '0', 10);
-      const posSid = sessionStorage.getItem('chipipie_pos_session_id') || localStorage.getItem('chipipie_pos_session_id') || localStorage.getItem('chipipie_session_id');
+      const posSid = sessionStorage.getItem('chipipie_pos_session_id');
+      const lastPosAct = parseInt(sessionStorage.getItem('chipipie_pos_last_activity') || (posSid ? localStorage.getItem('chipipie_pos_act_' + posSid) : '0') || '0', 10);
       const now = Date.now();
       const POS_TIMEOUT_MS = (INACTIVITY_IDLE_SECONDS + INACTIVITY_COUNTDOWN_SECONDS) * 1000; // 5 minutes (300s)
 
@@ -12783,62 +12791,61 @@ $_CSRF_TOKEN = getCsrfToken();
         // Tab was closed or idle for >= 5 minutes -> immediate auto logout + modal
         sessionStorage.removeItem('chipipie_pos_session_id');
         sessionStorage.removeItem('chipipie_csrf_token');
-        localStorage.removeItem('chipipie_pos_session_id');
-        localStorage.removeItem('chipipie_session_id');
-        localStorage.removeItem('chipipie_pos_last_activity');
-        localStorage.removeItem('chipipie_csrf_token');
+        sessionStorage.removeItem('chipipie_pos_last_activity');
+        sessionStorage.removeItem('chipipie_pos_user');
+        localStorage.removeItem('chipipie_pos_act_' + posSid);
         currentUser = null;
-        // Expire server-side session & cookie BEFORE showing modal so reload is clean
-        api('auth.php?action=logout', {}).catch(() => {}).finally(() => {
+        // Expire server-side session for THIS tab before showing modal
+        api('auth.php?action=logout', { session_id: posSid }).catch(() => {}).finally(() => {
           showSessionExpiredModal('tab_closed');
         });
         return;
       }
 
-      // Check for existing session
+      // Check for existing session in THIS tab
       playWaterDropLoginAnimation('#login-wrapper .login-card');
-      api('auth.php?action=session').then(res => {
-        if (res.success && res.loggedIn) {
-          if (res.session_id) {
-            sessionStorage.setItem('chipipie_pos_session_id', res.session_id);
-            localStorage.setItem('chipipie_pos_session_id', res.session_id);
-            localStorage.setItem('chipipie_session_id', res.session_id);
-            localStorage.setItem('chipipie_pos_last_activity', String(Date.now()));
+      if (posSid) {
+        api('auth.php?action=session').then(res => {
+          if (res.success && res.loggedIn) {
+            if (res.session_id) {
+              sessionStorage.setItem('chipipie_pos_session_id', res.session_id);
+              sessionStorage.setItem('chipipie_pos_last_activity', String(Date.now()));
+              localStorage.setItem('chipipie_pos_act_' + res.session_id, String(Date.now()));
+            }
+            if (res.csrf_token) {
+              window.CSRF_TOKEN = res.csrf_token;
+              sessionStorage.setItem('chipipie_csrf_token', res.csrf_token);
+            }
+            currentUser = res.user;
+            updateUserInfoUI(res.user);
+            const isManager = (res.user.role === 'admin' || res.user.role === 'super_admin');
+            activateApp(isManager);
+          } else if (res.session_expired) {
+            sessionStorage.removeItem('chipipie_pos_session_id');
+            sessionStorage.removeItem('chipipie_csrf_token');
+            sessionStorage.removeItem('chipipie_pos_last_activity');
+            sessionStorage.removeItem('chipipie_pos_user');
+            localStorage.removeItem('chipipie_pos_act_' + posSid);
+            currentUser = null;
+            api('auth.php?action=logout', { session_id: posSid }).catch(() => {}).finally(() => {
+              showSessionExpiredModal('tab_closed');
+            });
+          } else if (res.pending_2fa && (res.role === 'admin' || res.role === 'super_admin')) {
+            // Resume pending 2FA step if page was reloaded
+            document.getElementById('pos-step-credentials').style.display = 'none';
+            document.getElementById('pos-step-2fa').style.display = 'block';
+            document.getElementById('pos-2fa-email').textContent = res.masked_email || 'Your Registered Email';
+            const codeInput = document.getElementById('pos-2fa-code');
+            if (res.dev_code) {
+              document.getElementById('pos-dev-hint').style.display = 'block';
+              document.getElementById('pos-dev-code-val').textContent = res.dev_code;
+              codeInput.value = res.dev_code;
+            }
           }
-          if (res.csrf_token) {
-            window.CSRF_TOKEN = res.csrf_token;
-            sessionStorage.setItem('chipipie_csrf_token', res.csrf_token);
-            localStorage.setItem('chipipie_csrf_token', res.csrf_token);
-          }
-          currentUser = res.user;
-          updateUserInfoUI(res.user);
-          const isManager = (res.user.role === 'admin' || res.user.role === 'super_admin');
-          activateApp(isManager);
-        } else if (res.session_expired && posSid) {
-          sessionStorage.removeItem('chipipie_pos_session_id');
-          sessionStorage.removeItem('chipipie_csrf_token');
-          localStorage.removeItem('chipipie_pos_session_id');
-          localStorage.removeItem('chipipie_session_id');
-          localStorage.removeItem('chipipie_pos_last_activity');
-          localStorage.removeItem('chipipie_csrf_token');
-          currentUser = null;
-          // Expire server-side session & cookie so reload is clean (no loop)
-          api('auth.php?action=logout', {}).catch(() => {}).finally(() => {
-            showSessionExpiredModal('tab_closed');
-          });
-        } else if (res.pending_2fa && (res.role === 'admin' || res.role === 'super_admin')) {
-          // Resume pending 2FA step if page was reloaded
-          document.getElementById('pos-step-credentials').style.display = 'none';
-          document.getElementById('pos-step-2fa').style.display = 'block';
-          document.getElementById('pos-2fa-email').textContent = res.masked_email || 'Your Registered Email';
-          const codeInput = document.getElementById('pos-2fa-code');
-          if (res.dev_code) {
-            document.getElementById('pos-dev-hint').style.display = 'block';
-            document.getElementById('pos-dev-code-val').textContent = res.dev_code;
-            codeInput.value = res.dev_code;
-          }
-        }
-      }).catch(() => { });
+        }).catch(() => { });
+      } else {
+        // Brand new tab: Clean login screen! Ready to log in as Cashier 1, Cashier 2, or Admin!
+      }
     });
   </script>
 
