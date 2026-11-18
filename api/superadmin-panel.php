@@ -4296,7 +4296,7 @@ if (typeof gsap === "undefined") { document.write('<script src="https://cdn.jsde
           return;
         }
 
-        tbody.innerHTML = res.users.map(u => {
+        tbody.innerHTML = res.users.map((u, index) => {
           const roleBadge = u.role === 'super_admin'
             ? `<span class="badge-sa badge-super">⚡ Super Admin</span>`
             : u.role === 'admin'
@@ -4307,7 +4307,7 @@ if (typeof gsap === "undefined") { document.write('<script src="https://cdn.jsde
           const isSA = u.role === 'super_admin';
 
           return `<tr>
-            <td style="color:var(--sa-muted);font-size:12px;">${u.id}</td>
+            <td style="color:var(--sa-muted);font-size:12px;">${index + 1}</td>
             <td style="font-weight:600;">${u.full_name}${isMe ? ' <span style="font-size:10px;color:#a855f7;">(you)</span>' : ''}</td>
             <td><code style="color:#94a3b8;font-size:12px;">${u.username}</code></td>
             <td style="font-size:12px;color:var(--sa-muted);">${u.email || '—'}</td>
