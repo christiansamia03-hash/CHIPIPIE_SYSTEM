@@ -11700,6 +11700,68 @@ $_CSRF_TOKEN = getCsrfToken();
       await handleInactivityExpiration(true);
     }
 
+    /* ── Session Expired Modal ───────────────────────────────────────────
+       Shows a non-dismissible modal on:
+         • tab_closed  — page reloaded after 5-min tab-close gap
+         • inactivity  — idle-timeout countdown finished
+         • manual_lock — cashier clicked "Lock Register Now"
+       Auto-refreshes the page after a 5-second countdown so the
+       login screen is always clean on next use.
+    ─────────────────────────────────────────────────────────────────── */
+    let _sessionExpiredCountdown = null;
+
+    function showSessionExpiredModal(reason) {
+      // Determine copy based on reason
+      const isManual   = (reason === 'manual_lock');
+      const isTabClose = (reason === 'tab_closed');
+
+      const iconHtml = isManual
+        ? '<i class="bi bi-lock-fill" style="font-size:38px;color:#dc2626;"></i>'
+        : '<i class="bi bi-shield-lock-fill" style="font-size:38px;color:#dc2626;"></i>';
+
+      const headline = isManual
+        ? 'Register Locked'
+        : 'Session Expired';
+
+      const bodyMsg = isManual
+        ? 'The register has been locked manually. The page will refresh so a new cashier can sign in.'
+        : isTabClose
+          ? 'Your session expired because the tab was closed for more than 5 minutes. The page will refresh for security.'
+          : 'No register activity was detected for 5 minutes. The session has been locked automatically (ISO/IEC 25010 Security Safeguard).';
+
+      // Inject content
+      const iconEl   = document.getElementById('sess-exp-icon');
+      const titleEl  = document.getElementById('sess-exp-title');
+      const msgEl    = document.getElementById('sess-exp-msg');
+      const countEl  = document.getElementById('sess-exp-countdown');
+      const barEl    = document.getElementById('sess-exp-bar');
+      if (iconEl)  iconEl.innerHTML  = iconHtml;
+      if (titleEl) titleEl.textContent = headline;
+      if (msgEl)   msgEl.textContent   = bodyMsg;
+
+      // Show modal (static backdrop — no X, no ESC)
+      const modalEl = document.getElementById('sessionExpiredModal');
+      if (!modalEl) { location.reload(); return; }
+      const modal = new bootstrap.Modal(modalEl, { backdrop: 'static', keyboard: false });
+      modal.show();
+
+      // 5-second auto-refresh countdown
+      let secs = 5;
+      if (countEl) countEl.textContent = secs;
+      if (barEl)   barEl.style.width   = '100%';
+      if (_sessionExpiredCountdown) clearInterval(_sessionExpiredCountdown);
+      _sessionExpiredCountdown = setInterval(() => {
+        secs--;
+        if (countEl) countEl.textContent = Math.max(0, secs);
+        if (barEl)   barEl.style.width   = Math.max(0, (secs / 5) * 100) + '%';
+        if (secs <= 0) {
+          clearInterval(_sessionExpiredCountdown);
+          _sessionExpiredCountdown = null;
+          location.reload();
+        }
+      }, 1000);
+    }
+
     async function handleInactivityExpiration(isManualLock = false) {
       stopInactivityMonitoring();
 
@@ -11717,22 +11779,8 @@ $_CSRF_TOKEN = getCsrfToken();
       // Logout session
       await logout();
 
-      // Show security lockout message on login screen
-      const errEl = document.getElementById('login-error');
-      if (errEl) {
-        errEl.innerHTML = `
-          <div style="display:flex;align-items:flex-start;gap:9px;text-align:left;">
-            <i class="bi bi-shield-lock-fill" style="font-size:19px;color:#dc2626;flex-shrink:0;margin-top:2px;"></i>
-            <div>
-              <strong style="color:#991b1b;">Register Locked for Security:</strong>
-              <div style="font-size:12px;color:#4b5563;margin-top:2px;">
-                ${isManualLock ? 'Register was locked manually.' : 'Terminal was inactive for 5 minutes (ISO 25010 Security Safeguard). Please sign in to resume.'}
-              </div>
-            </div>
-          </div>
-        `;
-        errEl.style.display = 'block';
-      }
+      // Show session-expired modal (non-dismissible, auto-refresh)
+      showSessionExpiredModal(isManualLock ? 'manual_lock' : 'inactivity');
     }
 
     function restorePreservedCartIfAny() {
@@ -12756,21 +12804,7 @@ $_CSRF_TOKEN = getCsrfToken();
           localStorage.removeItem('chipipie_pos_last_activity');
           localStorage.removeItem('chipipie_csrf_token');
           currentUser = null;
-          const errEl = document.getElementById('login-error');
-          if (errEl) {
-            errEl.innerHTML = `
-              <div style="display:flex;align-items:flex-start;gap:9px;text-align:left;">
-                <i class="bi bi-shield-lock-fill" style="font-size:19px;color:#dc2626;flex-shrink:0;margin-top:2px;"></i>
-                <div>
-                  <strong style="color:#991b1b;">Session Expired:</strong>
-                  <div style="font-size:12px;color:#4b5563;margin-top:2px;">
-                    Session expired due to 5 minutes of inactivity. Please sign in again.
-                  </div>
-                </div>
-              </div>
-            `;
-            errEl.style.display = 'block';
-          }
+          showSessionExpiredModal('tab_closed');
         } else if (res.pending_2fa && (res.role === 'admin' || res.role === 'super_admin')) {
           // Resume pending 2FA step if page was reloaded
           document.getElementById('pos-step-credentials').style.display = 'none';
@@ -12786,6 +12820,58 @@ $_CSRF_TOKEN = getCsrfToken();
       }).catch(() => { });
     });
   </script>
+
+  <!-- SESSION EXPIRED MODAL — non-dismissible, auto-refreshes page after 5 s -->
+  <div class="modal fade" id="sessionExpiredModal" tabindex="-1"
+       data-bs-backdrop="static" data-bs-keyboard="false" aria-hidden="true"
+       style="z-index: 1095;">
+    <div class="modal-dialog modal-dialog-centered" style="max-width: 400px; margin: 16px auto;">
+      <div class="modal-content" style="border-radius: 22px; overflow: hidden; border: 1px solid rgba(220,38,38,0.25); box-shadow: 0 25px 65px rgba(0,0,0,0.45); background: #ffffff;">
+
+        <!-- Header -->
+        <div style="background: linear-gradient(135deg, #fff1f1 0%, #fee2e2 100%); padding: 28px 24px 20px; text-align: center; border-bottom: 1px solid #fecaca; position: relative;">
+          <!-- Lock icon circle -->
+          <div style="display: inline-flex; align-items: center; justify-content: center; width: 80px; height: 80px; border-radius: 50%; background: #ffffff; border: 3px solid #ef4444; margin-bottom: 14px; box-shadow: 0 8px 24px rgba(239,68,68,0.22);">
+            <span id="sess-exp-icon"><i class="bi bi-shield-lock-fill" style="font-size:38px;color:#dc2626;"></i></span>
+          </div>
+          <h4 id="sess-exp-title" style="margin: 0; font-weight: 800; color: #7f1d1d; font-size: 22px; letter-spacing: -0.3px;">Session Expired</h4>
+          <p style="margin: 6px 0 0; font-size: 13px; color: #991b1b; font-weight: 500;">Security lock triggered</p>
+        </div>
+
+        <!-- Body -->
+        <div style="padding: 22px 24px 20px; background: #ffffff;">
+
+          <!-- Message -->
+          <p id="sess-exp-msg" style="font-size: 13.5px; color: #374151; line-height: 1.6; margin-bottom: 18px; text-align: center;">
+            Your session has expired. The page will refresh automatically.
+          </p>
+
+          <!-- Auto-refresh progress bar -->
+          <div style="background: #fee2e2; border-radius: 999px; overflow: hidden; height: 6px; margin-bottom: 10px;">
+            <div id="sess-exp-bar" style="height: 100%; width: 100%; background: linear-gradient(90deg, #ef4444, #b91c1c); border-radius: 999px; transition: width 1s linear;"></div>
+          </div>
+
+          <!-- Countdown label -->
+          <p style="text-align: center; font-size: 12px; color: #9ca3af; margin-bottom: 18px;">
+            Refreshing in <strong id="sess-exp-countdown" style="color: #dc2626; font-size: 14px;">5</strong> second(s)…
+          </p>
+
+          <!-- Refresh now button -->
+          <button type="button" class="btn w-100" onclick="location.reload()"
+                  style="background: linear-gradient(135deg, #7f1d1d, #991b1b); color: #ffffff; font-weight: 700; padding: 13px; border-radius: 12px; font-size: 14.5px; border: none; box-shadow: 0 4px 14px rgba(127,29,29,0.3);">
+            <i class="bi bi-arrow-clockwise me-2"></i>Refresh &amp; Sign In Now
+          </button>
+
+          <!-- Footer badge -->
+          <div style="margin-top: 14px; padding-top: 12px; border-top: 1px solid #f3f4f6; text-align: center; font-size: 11px; color: #9ca3af; display: flex; align-items: center; justify-content: center; gap: 4px;">
+            <i class="bi bi-shield-lock" style="color: #6b7280;"></i>
+            <span>ISO 25010 (Security &amp; Fault Tolerance) &bull; PCI-DSS 4.0</span>
+          </div>
+        </div>
+
+      </div>
+    </div>
+  </div>
 
   <!-- SESSION INACTIVITY TIMEOUT MODAL — placed at body level to avoid overflow:hidden clipping on mobile -->
   <div class="modal fade" id="sessionInactivityModal" tabindex="-1" data-bs-backdrop="static" data-bs-keyboard="false" aria-hidden="true" style="z-index: 1090;">
