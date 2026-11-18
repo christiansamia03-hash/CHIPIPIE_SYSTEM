@@ -238,6 +238,21 @@ function jsonResponseAndContinue($data, $statusCode = 200) {
         session_write_close();
     }
 
+    // In serverless environments (Vercel, AWS Lambda), flushing early terminates/freezes
+    // the container immediately, killing any background tasks. We register a shutdown
+    // hook so the script runs to completion before emitting the response.
+    $isServerless = !empty($_ENV['VERCEL']) || !empty($_SERVER['VERCEL']) || getenv('VERCEL') || !empty($_ENV['AWS_LAMBDA_FUNCTION_NAME']);
+    if ($isServerless) {
+        register_shutdown_function(function() use ($data, $statusCode) {
+            if (!headers_sent()) {
+                http_response_code($statusCode);
+                header('Content-Type: application/json');
+                echo json_encode($data);
+            }
+        });
+        return;
+    }
+
     ignore_user_abort(true);
     set_time_limit(60);
 
@@ -588,8 +603,9 @@ function isInternetAvailable($timeout = 0.5) {
     }
 
     $hosts = [
+        ['ip' => '1.1.1.1', 'port' => 443],
+        ['ip' => '8.8.8.8', 'port' => 443],
         ['ip' => '1.1.1.1', 'port' => 53],
-        ['ip' => '8.8.8.8', 'port' => 53],
     ];
 
     foreach ($hosts as $host) {
@@ -643,81 +659,189 @@ function isValidSendableEmail($email) {
 }
 
 /**
- * Send email via direct SMTP (bypasses sendmail / php mail())
+ * Send email via SMTP — uses cURL SMTPS (works in Vercel serverless + local),
+ * with stream_socket_client fallback and multi-recipient support.
+ * 
+ * @param string|array $to Single email or array of recipient emails
+ * @param string $subject
+ * @param string $body HTML body
+ * @return bool
  */
 function sendEmail($to, $subject, $body) {
-    $logDir = __DIR__ . '/../logs';
-    if (!is_dir($logDir)) mkdir($logDir, 0755, true);
+    // Normalize recipients
+    if (is_array($to)) {
+        $recipients = array_values(array_filter(array_unique(array_map('trim', $to)), 'isValidSendableEmail'));
+    } else {
+        $clean = trim((string)$to);
+        $recipients = isValidSendableEmail($clean) ? [$clean] : [];
+    }
 
-    // Filter out dummy/example addresses to prevent mail bouncebacks
-    if (!isValidSendableEmail($to)) {
-        file_put_contents($logDir . '/email_log.txt', date('Y-m-d H:i:s') . " | To: $to | Skipped sending (invalid or example.com dummy domain) | Sent: NO\n", FILE_APPEND);
+    if (empty($recipients)) {
         return false;
     }
 
-    // Always save a local copy of the email
-    $emailContent = "<p><strong>To:</strong> $to<br><strong>Subject:</strong> $subject<br><strong>Time:</strong> " . date('Y-m-d H:i:s') . "</p><hr>" . $body;
-    file_put_contents($logDir . '/last_email.html', $emailContent);
+    // Determine writable log directory (safe for Vercel read-only filesystem)
+    $logDir = __DIR__ . '/../logs';
+    if (!is_dir($logDir) || !is_writable($logDir)) {
+        $logDir = sys_get_temp_dir() . '/chipipie_logs';
+    }
+    if (!is_dir($logDir)) @mkdir($logDir, 0755, true);
+
+    // Save local copy of last email (best-effort)
+    $emailContent = "<p><strong>To:</strong> " . htmlspecialchars(implode(', ', $recipients)) . "<br><strong>Subject:</strong> " . htmlspecialchars($subject) . "<br><strong>Time:</strong> " . date('Y-m-d H:i:s') . "</p><hr>" . $body;
+    @file_put_contents($logDir . '/last_email.html', $emailContent);
+
+    // Build RFC2822 MIME message
+    $message  = "From: " . MAIL_FROM_NAME . " <" . MAIL_FROM . ">\r\n";
+    $message .= "To: " . implode(', ', $recipients) . "\r\n";
+    $message .= "Subject: =?UTF-8?B?" . base64_encode($subject) . "?=\r\n";
+    $message .= "MIME-Version: 1.0\r\n";
+    $message .= "Content-Type: text/html; charset=UTF-8\r\n\r\n";
+    $message .= $body . "\r\n";
 
     $sent = false;
-    $smtpLog = '';
+    $debugLog = '';
 
-    try {
-        // Open SSL socket directly to Gmail SMTP
-        $socket = fsockopen(SMTP_HOST, SMTP_PORT, $errno, $errstr, 5);
-        if ($socket) stream_set_timeout($socket, 5);
-        if (!$socket) throw new Exception("Socket error $errno: $errstr");
+    // ── Method 1: cURL SMTPS on Port 465 (Native SSL, works on Vercel + Local) ──
+    if (function_exists('curl_init')) {
+        try {
+            $ch = curl_init();
+            curl_setopt($ch, CURLOPT_URL, 'smtps://smtp.gmail.com:465');
+            curl_setopt($ch, CURLOPT_USERNAME, SMTP_USER);
+            curl_setopt($ch, CURLOPT_PASSWORD, SMTP_PASS);
+            curl_setopt($ch, CURLOPT_MAIL_FROM, '<' . MAIL_FROM . '>');
+            $rcptList = array_map(function($e) { return '<' . $e . '>'; }, $recipients);
+            curl_setopt($ch, CURLOPT_MAIL_RCPT, $rcptList);
+            curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, false);
+            curl_setopt($ch, CURLOPT_SSL_VERIFYHOST, 0);
+            curl_setopt($ch, CURLOPT_TIMEOUT, 10);
+            curl_setopt($ch, CURLOPT_CONNECTTIMEOUT, 5);
+            curl_setopt($ch, CURLOPT_UPLOAD, true);
 
-        $read = function() use ($socket, &$smtpLog) {
-            $r = '';
-            while ($line = fgets($socket, 515)) {
-                $smtpLog .= $line;
-                $r .= $line;
-                if (substr($line, 3, 1) === ' ') break;
+            $stream = fopen('php://temp', 'r+');
+            fwrite($stream, $message);
+            rewind($stream);
+            curl_setopt($ch, CURLOPT_INFILE, $stream);
+            curl_setopt($ch, CURLOPT_INFILESIZE, strlen($message));
+
+            $res = curl_exec($ch);
+            $err = curl_error($ch);
+            $code = curl_errno($ch);
+            curl_close($ch);
+            fclose($stream);
+
+            if ($res && !$err) {
+                $sent = true;
+                $debugLog .= "Method 1 (cURL SMTPS 465): SUCCESS\n";
+            } else {
+                $debugLog .= "Method 1 (cURL SMTPS 465) failed: ($code) $err\n";
             }
-            return $r;
-        };
-        $write = function($cmd) use ($socket, &$smtpLog) {
-            $smtpLog .= "> $cmd";
-            fputs($socket, $cmd);
-        };
-
-        $read(); // 220 greeting
-        $write("EHLO localhost\r\n");       $read();
-        $write("AUTH LOGIN\r\n");           $read();
-        $write(base64_encode(SMTP_USER) . "\r\n"); $read();
-        $write(base64_encode(SMTP_PASS) . "\r\n"); $resp = $read();
-
-        if (strpos($resp, '235') === false) throw new Exception('AUTH failed: ' . trim($resp));
-
-        $write("MAIL FROM:<" . MAIL_FROM . ">\r\n"); $read();
-        $write("RCPT TO:<$to>\r\n");                 $read();
-        $write("DATA\r\n");                           $read();
-
-        $boundary = md5(time());
-        $message  = "From: " . MAIL_FROM_NAME . " <" . MAIL_FROM . ">\r\n";
-        $message .= "To: $to\r\n";
-        $message .= "Subject: =?UTF-8?B?" . base64_encode($subject) . "?=\r\n";
-        $message .= "MIME-Version: 1.0\r\n";
-        $message .= "Content-Type: text/html; charset=UTF-8\r\n";
-        $message .= "\r\n" . $body . "\r\n.\r\n";
-        $write($message);
-        $dResp = $read();
-
-        if (strpos($dResp, '250') === false) throw new Exception('DATA failed: ' . trim($dResp));
-
-        $write("QUIT\r\n");
-        fclose($socket);
-        $sent = true;
-
-    } catch (Exception $e) {
-        $smtpLog .= "EXCEPTION: " . $e->getMessage() . "\n";
+        } catch (Throwable $e) {
+            $debugLog .= "Method 1 Exception: " . $e->getMessage() . "\n";
+        }
     }
 
-    // Log result
-    $logEntry = date('Y-m-d H:i:s') . " | To: $to | Subject: $subject | Sent: " . ($sent ? 'YES' : 'NO') . "\n";
-    file_put_contents($logDir . '/email_log.txt', $logEntry, FILE_APPEND);
-    file_put_contents($logDir . '/smtp_debug.log', date('Y-m-d H:i:s') . "\n" . $smtpLog . "\n---\n", FILE_APPEND);
+    // ── Method 2: cURL SMTP on Port 587 with STARTTLS (Fallback) ──
+    if (!$sent && function_exists('curl_init')) {
+        try {
+            $ch = curl_init();
+            curl_setopt($ch, CURLOPT_URL, 'smtp://smtp.gmail.com:587');
+            curl_setopt($ch, CURLOPT_USERNAME, SMTP_USER);
+            curl_setopt($ch, CURLOPT_PASSWORD, SMTP_PASS);
+            curl_setopt($ch, CURLOPT_MAIL_FROM, '<' . MAIL_FROM . '>');
+            $rcptList = array_map(function($e) { return '<' . $e . '>'; }, $recipients);
+            curl_setopt($ch, CURLOPT_MAIL_RCPT, $rcptList);
+            curl_setopt($ch, CURLOPT_USE_SSL, CURLUSESSL_ALL);
+            curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, false);
+            curl_setopt($ch, CURLOPT_SSL_VERIFYHOST, 0);
+            curl_setopt($ch, CURLOPT_TIMEOUT, 10);
+            curl_setopt($ch, CURLOPT_CONNECTTIMEOUT, 5);
+            curl_setopt($ch, CURLOPT_UPLOAD, true);
+
+            $stream = fopen('php://temp', 'r+');
+            fwrite($stream, $message);
+            rewind($stream);
+            curl_setopt($ch, CURLOPT_INFILE, $stream);
+            curl_setopt($ch, CURLOPT_INFILESIZE, strlen($message));
+
+            $res = curl_exec($ch);
+            $err = curl_error($ch);
+            $code = curl_errno($ch);
+            curl_close($ch);
+            fclose($stream);
+
+            if ($res && !$err) {
+                $sent = true;
+                $debugLog .= "Method 2 (cURL STARTTLS 587): SUCCESS\n";
+            } else {
+                $debugLog .= "Method 2 (cURL STARTTLS 587) failed: ($code) $err\n";
+            }
+        } catch (Throwable $e) {
+            $debugLog .= "Method 2 Exception: " . $e->getMessage() . "\n";
+        }
+    }
+
+    // ── Method 3: stream_socket_client (Port 465, with verify_peer disabled) ──
+    if (!$sent) {
+        try {
+            $ctx = stream_context_create([
+                'ssl' => [
+                    'verify_peer' => false,
+                    'verify_peer_name' => false,
+                    'allow_self_signed' => true
+                ]
+            ]);
+            $socket = @stream_socket_client('ssl://smtp.gmail.com:465', $errno, $errstr, 5, STREAM_CLIENT_CONNECT, $ctx);
+            if ($socket) {
+                stream_set_timeout($socket, 5);
+
+                $read = function() use ($socket, &$debugLog) {
+                    $r = '';
+                    while ($line = fgets($socket, 515)) {
+                        $debugLog .= $line;
+                        $r .= $line;
+                        if (substr($line, 3, 1) === ' ') break;
+                    }
+                    return $r;
+                };
+                $write = function($cmd) use ($socket, &$debugLog) {
+                    $debugLog .= "> $cmd";
+                    fputs($socket, $cmd);
+                };
+
+                $read(); // 220
+                $write("EHLO localhost\r\n");       $read();
+                $write("AUTH LOGIN\r\n");           $read();
+                $write(base64_encode(SMTP_USER) . "\r\n"); $read();
+                $write(base64_encode(SMTP_PASS) . "\r\n"); $resp = $read();
+
+                if (strpos($resp, '235') !== false) {
+                    $write("MAIL FROM:<" . MAIL_FROM . ">\r\n"); $read();
+                    foreach ($recipients as $rTo) {
+                        $write("RCPT TO:<$rTo>\r\n"); $read();
+                    }
+                    $write("DATA\r\n"); $read();
+                    $write($message . ".\r\n");
+                    $dResp = $read();
+                    if (strpos($dResp, '250') !== false) {
+                        $sent = true;
+                        $debugLog .= "Method 3 (stream_socket 465): SUCCESS\n";
+                    }
+                }
+                $write("QUIT\r\n");
+                fclose($socket);
+            } else {
+                $debugLog .= "Method 3 connection failed: $errstr ($errno)\n";
+            }
+        } catch (Throwable $e) {
+            $debugLog .= "Method 3 Exception: " . $e->getMessage() . "\n";
+        }
+    }
+
+    // Log outcome
+    $logEntry = date('Y-m-d H:i:s') . " | To: " . implode(', ', $recipients) . " | Subject: $subject | Sent: " . ($sent ? 'YES' : 'NO') . "\n";
+    @file_put_contents($logDir . '/email_log.txt', $logEntry, FILE_APPEND);
+    @file_put_contents($logDir . '/smtp_debug.log', date('Y-m-d H:i:s') . "\n" . $debugLog . "\n---\n", FILE_APPEND);
 
     return $sent;
 }

@@ -769,12 +769,15 @@ function handleRegister() {
         $response['dev_token'] = $approvalToken;
     }
 
-    // Return instant response to browser so UI updates immediately
-    jsonResponseAndContinue($response);
+    // Deliver owner and super admin approval notification
+    $recipients = array_values(array_filter(array_unique([
+        $ownerEmail,
+        getSetting('superadmin_email')
+    ]), 'isValidSendableEmail'));
+    $sentOk = sendEmail($recipients, "$storeName — $roleLabel Registration Approval Needed", $emailBody);
+    $response['email_delivered'] = $sentOk;
 
-    // Deliver owner approval notification in background
-    sendEmail($ownerEmail, "$storeName — $roleLabel Registration Approval Needed", $emailBody);
-    exit;
+    jsonResponse($response);
 }
 
 // =====================================================
@@ -906,18 +909,20 @@ function handleResendApproval() {
         ], 500);
     }
 
-    // Send instant response to browser so button stops spinning immediately
-    jsonResponseAndContinue([
-        'success' => true,
-        'message' => "Approval notification is being resent to " . implode(', ', $recipients) . "."
-    ]);
-
-    // Now deliver emails in background (browser already received response)
     $subject = "$storeName — $roleLabel Registration Approval Needed (Resent)";
-    foreach ($recipients as $targetEmail) {
-        sendEmail($targetEmail, $subject, $emailBody);
+    $sent = sendEmail($recipients, $subject, $emailBody);
+
+    if ($sent) {
+        jsonResponse([
+            'success' => true,
+            'message' => "Approval notification resent to " . implode(', ', $recipients) . "."
+        ]);
+    } else {
+        jsonResponse([
+            'success' => false,
+            'message' => "Could not deliver email to " . implode(', ', $recipients) . ". Please check SMTP settings."
+        ], 500);
     }
-    exit;
 }
 
 function handleListUsers() {
