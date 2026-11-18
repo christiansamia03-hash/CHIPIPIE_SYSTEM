@@ -67,6 +67,7 @@ define('DEV_MODE', true);
 
 // ============ TOKEN CONFIG ============
 define('TOKEN_EXPIRY_MINUTES', 15);
+define('SESSION_INACTIVITY_TIMEOUT', 300); // 5 minutes (300 seconds) inactivity timeout across POS and Super Admin
 
 // ============ CSRF PROTECTION ============
 /**
@@ -370,10 +371,29 @@ function registerDbSessionHandler() {
         function($sessionId) {
             try {
                 $db = getDB();
-                $stmt = $db->prepare("SELECT data FROM php_sessions WHERE id = ?");
+                $stmt = $db->prepare("SELECT data, last_activity FROM php_sessions WHERE id = ?");
                 $stmt->execute([$sessionId]);
                 $row = $stmt->fetch();
-                return ($row && isset($row['data'])) ? (string)$row['data'] : '';
+                if (!$row || !isset($row['data'])) return '';
+
+                // Inactivity check: 5 minutes (300 seconds)
+                // When tab is closed or idle for >= 5 minutes, session data is expired and purged
+                $maxIdle = defined('SESSION_INACTIVITY_TIMEOUT') ? SESSION_INACTIVITY_TIMEOUT : 300;
+                if (isset($row['last_activity']) && (time() - intval($row['last_activity']) > $maxIdle)) {
+                    $db->prepare("DELETE FROM php_sessions WHERE id = ?")->execute([$sessionId]);
+                    return '';
+                }
+
+                $data = (string)$row['data'];
+                // Backward compatibility: Convert serialize() to PHP session serialization if needed
+                if (str_starts_with($data, 'a:') && ($arr = @unserialize($data)) !== false && is_array($arr)) {
+                    $raw = '';
+                    foreach ($arr as $k => $v) {
+                        $raw .= $k . '|' . serialize($v);
+                    }
+                    return $raw;
+                }
+                return $data;
             } catch (Exception $e) {
                 return '';
             }
@@ -398,7 +418,8 @@ function registerDbSessionHandler() {
         function($maxlifetime) {
             try {
                 $db = getDB();
-                $expire = time() - $maxlifetime;
+                $maxIdle = 300; // 5 minutes inactivity purge
+                $expire = time() - $maxIdle;
                 return $db->prepare("DELETE FROM php_sessions WHERE last_activity < ?")->execute([$expire]);
             } catch (Exception $e) {
                 return false;
@@ -446,13 +467,19 @@ function syncCompanionSession($user, $targetPortal) {
     $prefix   = ($targetPortal === 'superadmin') ? 'sa' : 'pos';
     $newSid   = $prefix . bin2hex(random_bytes(16));
     $userId   = $user['id'] ?? ($user['user_id'] ?? 0);
-    $data = serialize([
-        'user_id'   => $userId,
-        'username'  => $user['username'] ?? '',
-        'full_name' => $user['full_name'] ?? '',
-        'email'     => $user['email'] ?? '',
-        'role'      => $user['role'] ?? 'super_admin'
-    ]);
+    $payload  = [
+        'user_id'          => $userId,
+        'username'         => $user['username'] ?? '',
+        'full_name'        => $user['full_name'] ?? '',
+        'email'            => $user['email'] ?? '',
+        'role'             => $user['role'] ?? 'super_admin',
+        'last_activity'    => time(),
+        'sa_last_activity' => time()
+    ];
+    $data = '';
+    foreach ($payload as $k => $v) {
+        $data .= $k . '|' . serialize($v);
+    }
     try {
         $db = getDB();
         $db->prepare("REPLACE INTO php_sessions (id, data, last_activity) VALUES (?, ?, ?)")
@@ -494,25 +521,46 @@ function startFreshSession($portal = null) {
 }
 
 function ensureSession() {
+    $portal = getPortalContext();
+    $cookieName = ($portal === 'superadmin') ? 'CHIPIPIE_SA_SESS' : 'CHIPIPIE_POS_SESS';
+    $maxIdle = defined('SESSION_INACTIVITY_TIMEOUT') ? SESSION_INACTIVITY_TIMEOUT : 300; // 5 minutes
+
     if (session_status() === PHP_SESSION_ACTIVE) {
+        if (isset($_SESSION['user_id'])) {
+            $lastAct = $_SESSION['last_activity'] ?? $_SESSION['sa_last_activity'] ?? null;
+            if ($lastAct !== null && (time() - intval($lastAct) > $maxIdle)) {
+                $expiredSid = session_id();
+                $_SESSION = [];
+                @session_destroy();
+                if ($expiredSid) {
+                    try {
+                        getDB()->prepare("DELETE FROM php_sessions WHERE id = ?")->execute([$expiredSid]);
+                    } catch (Exception $e) {}
+                }
+                if (ini_get('session.use_cookies')) {
+                    $p = session_get_cookie_params();
+                    setcookie($cookieName, '', time() - 86400, $p['path'], $p['domain'], $p['secure'], $p['httponly']);
+                    setcookie($cookieName, '', time() - 86400, '/');
+                }
+                return;
+            }
+            $_SESSION['last_activity'] = time();
+            $_SESSION['sa_last_activity'] = time();
+        }
         return;
     }
 
     // Dedicated session name: CHIPIPIE_SA_SESS for Super Admin, CHIPIPIE_POS_SESS for POS
-    $portal = getPortalContext();
-    $cookieName = ($portal === 'superadmin') ? 'CHIPIPIE_SA_SESS' : 'CHIPIPIE_POS_SESS';
     session_name($cookieName);
 
     // Prioritize explicit session ID in request header / parameter to allow multi-tab & multi-device isolation
-    if (!session_id()) {
-        $altId = $_SERVER['HTTP_X_SESSION_ID'] 
-            ?? $_SERVER['HTTP_AUTHORIZATION'] 
-            ?? ($_GET['session_id'] ?? '');
-        if ($altId) {
-            $altId = preg_replace('/^Bearer\s+/i', '', trim($altId));
-            if (preg_match('/^[a-zA-Z0-9,-]{16,128}$/', $altId)) {
-                session_id($altId);
-            }
+    $altId = $_SERVER['HTTP_X_SESSION_ID'] 
+        ?? $_SERVER['HTTP_AUTHORIZATION'] 
+        ?? ($_GET['session_id'] ?? '');
+    if ($altId) {
+        $altId = preg_replace('/^Bearer\s+/i', '', trim($altId));
+        if (preg_match('/^[a-zA-Z0-9,-]{16,128}$/', $altId)) {
+            session_id($altId);
         }
     }
 
@@ -533,18 +581,30 @@ function ensureSession() {
         ]);
         @session_start();
 
-    // Inactivity timeout: 30 minutes server-side limit for Super Admin
-    if (isset($_SESSION['user_id']) && isset($_SESSION['role']) && $_SESSION['role'] === 'super_admin') {
-        $saMaxIdle = 1800; // 30 minutes
-        if (isset($_SESSION['sa_last_activity']) && (time() - $_SESSION['sa_last_activity'] > $saMaxIdle)) {
-            $_SESSION = [];
-            if (session_status() === PHP_SESSION_ACTIVE) {
-                session_destroy();
+        // Inactivity timeout: 5 minutes (300 seconds) server-side limit for ALL authenticated sessions
+        if (isset($_SESSION['user_id'])) {
+            $lastAct = $_SESSION['last_activity'] ?? $_SESSION['sa_last_activity'] ?? null;
+            if ($lastAct !== null && (time() - intval($lastAct) > $maxIdle)) {
+                $expiredSid = session_id();
+                $_SESSION = [];
+                if (session_status() === PHP_SESSION_ACTIVE) {
+                    @session_destroy();
+                }
+                if ($expiredSid) {
+                    try {
+                        getDB()->prepare("DELETE FROM php_sessions WHERE id = ?")->execute([$expiredSid]);
+                    } catch (Exception $e) {}
+                }
+                if (ini_get('session.use_cookies')) {
+                    $p = session_get_cookie_params();
+                    setcookie($cookieName, '', time() - 86400, $p['path'], $p['domain'], $p['secure'], $p['httponly']);
+                    setcookie($cookieName, '', time() - 86400, '/');
+                }
+                return;
             }
-            return;
+            $_SESSION['last_activity'] = time();
+            $_SESSION['sa_last_activity'] = time();
         }
-        $_SESSION['sa_last_activity'] = time();
-    }
     }
 }
 

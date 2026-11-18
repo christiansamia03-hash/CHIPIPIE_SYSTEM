@@ -254,6 +254,8 @@ function handleLogin() {
             $_SESSION['full_name'] = $user['full_name'];
             $_SESSION['email']     = $user['email'];
             $_SESSION['role']      = $user['role'];
+            $_SESSION['last_activity'] = time();
+            $_SESSION['sa_last_activity'] = time();
 
             $companionPortal = ($portal === 'superadmin') ? 'pos' : 'superadmin';
             syncCompanionSession($user, $companionPortal);
@@ -461,6 +463,8 @@ function handleLogin() {
     $_SESSION['email']    = $user['email'];
     $_SESSION['role']     = $user['role'];
     $_SESSION['assigned_station'] = $user['assigned_station'] ?? 'cafe';
+    $_SESSION['last_activity'] = time();
+    $_SESSION['sa_last_activity'] = time();
 
     $response = [
         'success'    => true,
@@ -1252,7 +1256,16 @@ function handleCheckSession() {
         }
         jsonResponse($resp);
     } else {
-        jsonResponse(['success' => true, 'loggedIn' => false]);
+        $hadSessionId = !empty($_SERVER['HTTP_X_SESSION_ID']) 
+            || !empty($_COOKIE['CHIPIPIE_POS_SESS']) 
+            || !empty($_COOKIE['CHIPIPIE_SA_SESS'])
+            || !empty($_GET['session_id']);
+        jsonResponse([
+            'success'         => true,
+            'loggedIn'        => false,
+            'session_expired' => $hadSessionId,
+            'message'         => 'Session expired due to 5 minutes of inactivity. Please sign in again.'
+        ]);
     }
 }
 
@@ -1342,6 +1355,8 @@ function handleVerify2FA() {
     $_SESSION['full_name'] = $pending['full_name'];
     $_SESSION['email']     = $pending['email'];
     $_SESSION['role']      = $pending['role'];
+    $_SESSION['last_activity'] = time();
+    $_SESSION['sa_last_activity'] = time();
     unset($_SESSION['pending_2fa']);
 
     // When super_admin logs in, synchronize companion session so both Super Admin & POS are logged in at the same time

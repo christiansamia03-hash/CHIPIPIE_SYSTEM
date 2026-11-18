@@ -3,7 +3,7 @@ header('Cache-Control: no-store, no-cache, must-revalidate, max-age=0');
 header('Pragma: no-cache');
 header('Expires: 0');
 // Start session and generate CSRF token for this page
-require_once __DIR__ . '/api/db_config.php';
+require_once file_exists(__DIR__ . '/api/db_config.php') ? __DIR__ . '/api/db_config.php' : __DIR__ . '/db_config.php';
 startChipipieSession();
 $_CSRF_TOKEN = getCsrfToken();
 ?>
@@ -11236,8 +11236,8 @@ $_CSRF_TOKEN = getCsrfToken();
       initGCashKey();
 
       // Start ISO 25010 Cashier Inactivity & Productivity Safeguard
-      // DISABLED: Session timeout warning modal removed per user request
-      // startInactivityMonitoring();
+      recordUserActivity();
+      startInactivityMonitoring();
       restorePreservedCartIfAny();
       // Station Allocation: Automatically switch branch based on staff assignment
       const userStation = (currentUser && currentUser.assigned_station) || _userAssignedStation || 'cafe';
@@ -11261,6 +11261,7 @@ $_CSRF_TOKEN = getCsrfToken();
         localStorage.removeItem('chipipie_pos_session_id');
         localStorage.removeItem('chipipie_session_id');
       }
+      localStorage.removeItem('chipipie_pos_last_activity');
       currentUser = null;
       _isUserAdmin = false;
       window.posIsAdmin = false;
@@ -11299,8 +11300,41 @@ $_CSRF_TOKEN = getCsrfToken();
     function recordUserActivity() {
       if (!_isWarningModalOpen) {
         _lastActivityTimestamp = Date.now();
+        try {
+          localStorage.setItem('chipipie_pos_last_activity', String(Date.now()));
+        } catch (e) {}
       }
     }
+
+    function persistPOSActivityTimestamp() {
+      try {
+        localStorage.setItem('chipipie_pos_last_activity', String(Date.now()));
+      } catch (e) {}
+    }
+
+    // Persist activity timestamp on tab close, page hide, or background
+    window.addEventListener('beforeunload', persistPOSActivityTimestamp);
+    window.addEventListener('pagehide', persistPOSActivityTimestamp);
+    document.addEventListener('visibilitychange', () => {
+      if (document.visibilityState === 'hidden') {
+        persistPOSActivityTimestamp();
+      } else if (document.visibilityState === 'visible' && currentUser) {
+        // When cashier switches back to tab, check if 5 minutes elapsed
+        const lastAct = parseInt(localStorage.getItem('chipipie_pos_last_activity') || '0', 10);
+        if (lastAct > 0 && (Date.now() - lastAct >= (INACTIVITY_IDLE_SECONDS + INACTIVITY_COUNTDOWN_SECONDS) * 1000)) {
+          handleInactivityExpiration();
+        } else {
+          recordUserActivity();
+        }
+      }
+    });
+
+    // Cross-tab sync for POS activity
+    window.addEventListener('storage', function(e) {
+      if (e.key === 'chipipie_pos_last_activity' && e.newValue) {
+        _lastActivityTimestamp = parseInt(e.newValue, 10) || Date.now();
+      }
+    });
 
     function playInactivityChime() {
       try {
@@ -12460,6 +12494,41 @@ $_CSRF_TOKEN = getCsrfToken();
         return; // Present fresh login for this tab
       }
 
+      // Check if session has expired while the tab was closed (>= 5 minutes = 300,000 ms)
+      const lastPosAct = parseInt(localStorage.getItem('chipipie_pos_last_activity') || '0', 10);
+      const posSid = sessionStorage.getItem('chipipie_pos_session_id') || localStorage.getItem('chipipie_pos_session_id') || localStorage.getItem('chipipie_session_id');
+      const now = Date.now();
+      const POS_TIMEOUT_MS = (INACTIVITY_IDLE_SECONDS + INACTIVITY_COUNTDOWN_SECONDS) * 1000; // 5 minutes (300s)
+
+      if (posSid && lastPosAct > 0 && (now - lastPosAct >= POS_TIMEOUT_MS)) {
+        // Tab was closed or idle for >= 5 minutes -> immediate auto logout
+        sessionStorage.removeItem('chipipie_pos_session_id');
+        sessionStorage.removeItem('chipipie_csrf_token');
+        localStorage.removeItem('chipipie_pos_session_id');
+        localStorage.removeItem('chipipie_session_id');
+        localStorage.removeItem('chipipie_pos_last_activity');
+        currentUser = null;
+        api('auth.php?action=logout', {}).catch(() => {});
+
+        playWaterDropLoginAnimation('#login-wrapper .login-card');
+        const errEl = document.getElementById('login-error');
+        if (errEl) {
+          errEl.innerHTML = `
+            <div style="display:flex;align-items:flex-start;gap:9px;text-align:left;">
+              <i class="bi bi-shield-lock-fill" style="font-size:19px;color:#dc2626;flex-shrink:0;margin-top:2px;"></i>
+              <div>
+                <strong style="color:#991b1b;">Session Expired:</strong>
+                <div style="font-size:12px;color:#4b5563;margin-top:2px;">
+                  Workstation was idle for 5 minutes while tab was closed. You have been logged out automatically.
+                </div>
+              </div>
+            </div>
+          `;
+          errEl.style.display = 'block';
+        }
+        return;
+      }
+
       // Check for existing session
       playWaterDropLoginAnimation('#login-wrapper .login-card');
       api('auth.php?action=session').then(res => {
@@ -12468,6 +12537,7 @@ $_CSRF_TOKEN = getCsrfToken();
             sessionStorage.setItem('chipipie_pos_session_id', res.session_id);
             localStorage.setItem('chipipie_pos_session_id', res.session_id);
             localStorage.setItem('chipipie_session_id', res.session_id);
+            localStorage.setItem('chipipie_pos_last_activity', String(Date.now()));
           }
           if (res.csrf_token) {
             window.CSRF_TOKEN = res.csrf_token;
@@ -12478,6 +12548,28 @@ $_CSRF_TOKEN = getCsrfToken();
           updateUserInfoUI(res.user);
           const isManager = (res.user.role === 'admin' || res.user.role === 'super_admin');
           activateApp(isManager);
+        } else if (res.session_expired) {
+          sessionStorage.removeItem('chipipie_pos_session_id');
+          sessionStorage.removeItem('chipipie_csrf_token');
+          localStorage.removeItem('chipipie_pos_session_id');
+          localStorage.removeItem('chipipie_session_id');
+          localStorage.removeItem('chipipie_pos_last_activity');
+          currentUser = null;
+          const errEl = document.getElementById('login-error');
+          if (errEl) {
+            errEl.innerHTML = `
+              <div style="display:flex;align-items:flex-start;gap:9px;text-align:left;">
+                <i class="bi bi-shield-lock-fill" style="font-size:19px;color:#dc2626;flex-shrink:0;margin-top:2px;"></i>
+                <div>
+                  <strong style="color:#991b1b;">Session Expired:</strong>
+                  <div style="font-size:12px;color:#4b5563;margin-top:2px;">
+                    Session expired due to 5 minutes of inactivity. Please sign in again.
+                  </div>
+                </div>
+              </div>
+            `;
+            errEl.style.display = 'block';
+          }
         } else if (res.pending_2fa && (res.role === 'admin' || res.role === 'super_admin')) {
           // Resume pending 2FA step if page was reloaded
           document.getElementById('pos-step-credentials').style.display = 'none';

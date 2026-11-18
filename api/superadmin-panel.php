@@ -2,7 +2,7 @@
 header('Cache-Control: no-store, no-cache, must-revalidate, max-age=0');
 header('Pragma: no-cache');
 header('Expires: 0');
-require_once __DIR__ . '/api/db_config.php';
+require_once file_exists(__DIR__ . '/api/db_config.php') ? __DIR__ . '/api/db_config.php' : __DIR__ . '/db_config.php';
 startChipipieSession();
 $_CSRF_TOKEN = getCsrfToken();
 ?>
@@ -3511,6 +3511,9 @@ if (typeof gsap === "undefined") { document.write('<script src="https://cdn.jsde
     }
 
     function activateSAApp() {
+      try {
+        localStorage.setItem('chipipie_sa_last_activity', String(Date.now()));
+      } catch (e) {}
       document.getElementById('sa-login-screen').style.display = 'none';
       document.getElementById('sa-step-2fa').style.display = 'none';
       document.getElementById('sa-step-credentials').style.display = 'block';
@@ -3527,6 +3530,7 @@ if (typeof gsap === "undefined") { document.write('<script src="https://cdn.jsde
       saCurrentUser = null;
       sessionStorage.removeItem('chipipie_sa_session_id');
       localStorage.removeItem('chipipie_sa_session_id');
+      localStorage.removeItem('chipipie_sa_last_activity');
       try {
         const appEl = document.getElementById('sa-app');
         const loginEl = document.getElementById('sa-login-screen');
@@ -3571,11 +3575,46 @@ if (typeof gsap === "undefined") { document.write('<script src="https://cdn.jsde
 
     function recordSAActivity() {
       _lastSAActivityTimestamp = Date.now();
+      try {
+        localStorage.setItem('chipipie_sa_last_activity', String(Date.now()));
+      } catch (e) {}
     }
+
+    function persistSAActivityTimestamp() {
+      try {
+        localStorage.setItem('chipipie_sa_last_activity', String(Date.now()));
+      } catch (e) {}
+    }
+
+    // Persist activity timestamp on tab close, page hide, or background
+    window.addEventListener('beforeunload', persistSAActivityTimestamp);
+    window.addEventListener('pagehide', persistSAActivityTimestamp);
+    document.addEventListener('visibilitychange', () => {
+      if (document.visibilityState === 'hidden') {
+        persistSAActivityTimestamp();
+      } else if (document.visibilityState === 'visible' && saCurrentUser) {
+        const lastAct = parseInt(localStorage.getItem('chipipie_sa_last_activity') || '0', 10);
+        if (lastAct > 0 && (Date.now() - lastAct >= SA_INACTIVITY_TIMEOUT_SECONDS * 1000)) {
+          handleSASessionExpired('Session expired due to 5 minutes of inactivity while away. You have been signed out.');
+        } else {
+          recordSAActivity();
+        }
+      }
+    });
+
+    // Cross-tab sync for Super Admin activity
+    window.addEventListener('storage', (e) => {
+      if (e.key === 'chipipie_sa_last_activity' && e.newValue) {
+        _lastSAActivityTimestamp = parseInt(e.newValue, 10) || Date.now();
+      }
+    });
 
     function startSAInactivityMonitoring() {
       stopSAInactivityMonitoring();
       _lastSAActivityTimestamp = Date.now();
+      try {
+        localStorage.setItem('chipipie_sa_last_activity', String(Date.now()));
+      } catch (e) {}
 
       const events = ['mousemove', 'mousedown', 'keydown', 'touchstart', 'scroll', 'click'];
       let lastThrottle = 0;
@@ -3633,6 +3672,7 @@ if (typeof gsap === "undefined") { document.write('<script src="https://cdn.jsde
       saCurrentUser = null;
       sessionStorage.removeItem('chipipie_sa_session_id');
       localStorage.removeItem('chipipie_sa_session_id');
+      localStorage.removeItem('chipipie_sa_last_activity');
 
       // Reset UI to login screen immediately
       const appEl = document.getElementById('sa-app');
@@ -7108,15 +7148,29 @@ if (typeof gsap === "undefined") { document.write('<script src="https://cdn.jsde
         return;
       }
 
+      // Check if session has expired while the tab was closed (>= 5 minutes = 300,000 ms)
+      const lastSaAct = parseInt(localStorage.getItem('chipipie_sa_last_activity') || '0', 10);
+      const saSid = sessionStorage.getItem('chipipie_sa_session_id') || localStorage.getItem('chipipie_sa_session_id') || localStorage.getItem('chipipie_session_id');
+      const now = Date.now();
+      const SA_TIMEOUT_MS = SA_INACTIVITY_TIMEOUT_SECONDS * 1000; // 5 minutes
+
+      if (saSid && lastSaAct > 0 && (now - lastSaAct >= SA_TIMEOUT_MS)) {
+        handleSASessionExpired('Session expired due to 5 minutes of inactivity while tab was closed. Please sign in again.');
+        return;
+      }
+
       playWaterDropLoginAnimation('#sa-login-screen .sa-login-card');
       saApi('auth.php?action=session').then(res => {
         if (res.success && res.loggedIn && res.user && res.user.role === 'super_admin') {
           if (res.session_id) {
             sessionStorage.setItem('chipipie_sa_session_id', res.session_id);
             localStorage.setItem('chipipie_sa_session_id', res.session_id);
+            localStorage.setItem('chipipie_sa_last_activity', String(Date.now()));
           }
           saCurrentUser = res.user;
           activateSAApp();
+        } else if (res.session_expired) {
+          handleSASessionExpired(res.message || 'Your Super Admin session has expired due to 5 minutes of inactivity. Please sign in again.');
         } else if (res.pending_2fa) {
           // Resume pending 2FA step if page reloaded
           document.getElementById('sa-step-credentials').style.display = 'none';
