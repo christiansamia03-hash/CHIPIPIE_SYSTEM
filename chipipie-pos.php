@@ -1,4 +1,4 @@
-<?php
+﻿<?php
 header('Cache-Control: no-store, no-cache, must-revalidate, max-age=0');
 header('Pragma: no-cache');
 header('Expires: 0');
@@ -5167,7 +5167,7 @@ $_CSRF_TOKEN = getCsrfToken();
               style="display:inline-flex;align-items:center;gap:6px;font-size:12.5px;font-weight:600;padding:7px 16px;border-radius:10px;border:1.5px solid #16a34a;background:#fff;color:#16a34a;cursor:pointer;transition:background 0.15s,color 0.15s;"
               onmouseover="this.style.background='#16a34a';this.style.color='#fff';"
               onmouseout="this.style.background='#fff';this.style.color='#16a34a';">
-              <i class="bi bi-file-earmark-excel-fill"></i> Export to Excel / CSV
+              <i class="bi bi-file-earmark-excel-fill"></i> Export to Excel
             </button>
           </div>
         </div>
@@ -11113,151 +11113,148 @@ $_CSRF_TOKEN = getCsrfToken();
       }
     }
 
+
     function printAnalyticsReport() {
       const stats = _cachedStats;
       if (!stats) { showToast('Please wait for analytics to load first.', 'info'); return; }
 
       const now = new Date();
-      const monthLabel = now.toLocaleString('en-PH', { month: 'long', year: 'numeric' });
+      const monthLabel  = now.toLocaleString('en-PH', { month: 'long', year: 'numeric' });
       const generatedAt = now.toLocaleString('en-PH', { dateStyle: 'full', timeStyle: 'short' });
-      const storeName = (window._storeSettings && window._storeSettings.store_name) || 'ChipiPie Cafe & Pizza';
-      const branch   = (window._storeSettings && window._storeSettings.branch_name) || 'Pampang Branch';
+      const storeName   = (window._storeSettings && window._storeSettings.store_name) || 'ChipiPie Cafe & Pizza';
+      const branch      = (window._storeSettings && window._storeSettings.branch_name) || 'Pampang Branch';
+      const adminName   = (currentUser && (currentUser.full_name || currentUser.username)) || 'Admin';
 
       const fmt  = v => Number(v || 0).toLocaleString('en-PH', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
       const fmtN = v => Number(v || 0).toLocaleString();
 
-      // ── KPIs ──
-      const kpiMonth = `₱${fmt(stats.month?.revenue)}`;
-      const kpiOrders = fmtN(stats.month?.orders);
-      const avgDaily = stats.month?.orders > 0 ? Math.round(stats.month.revenue / 30) : 0;
-      const brd = stats.best_revenue_day;
-      const bestDay  = brd && brd.revenue > 0 ? `${brd.day_name}, ${brd.date}` : '—';
-      const bestRev  = brd && brd.revenue > 0 ? `₱${fmt(brd.revenue)} (${brd.period})` : '—';
+      // Capture live Chart.js canvases as base64 PNG
+      const getCanvasImg = (id) => {
+        try { const c = document.getElementById(id); return (c && c.getContext) ? c.toDataURL('image/png') : ''; }
+        catch(e) { return ''; }
+      };
+      const weeklyImgSrc  = getCanvasImg('repWeeklyChart');
+      const hourlyImgSrc  = getCanvasImg('hourlyChart');
+      const monthlyImgSrc = getCanvasImg('monthlyChart');
+      const itemImgSrc    = getCanvasImg('itemChart');
 
-      // ── Item Performance Table ──
+      const imgBlock = (src, label) => src
+        ? `<div class="chart-wrap"><div class="clbl">${escHtml(label)}</div><img src="${src}" class="chart-img" alt="${escHtml(label)}"></div>`
+        : '';
+
+      const brd      = stats.best_revenue_day;
+      const vol      = stats.volume_breakdown || {};
+      const catData  = stats.cat_breakdown || [];
       const itemPerf = stats.item_performance || [];
-      const itemRows = itemPerf.map((it, i) => `
-        <tr>
-          <td>${i + 1}</td>
-          <td>${escHtml(it.name)}</td>
-          <td style="text-align:right;">${fmtN(it.sold)}</td>
-          <td style="text-align:right;">₱${fmt(it.revenue || 0)}</td>
-          <td>${i < 3 ? '🏆 Top Seller' : (i >= itemPerf.length - 2 ? '⚠️ Slow Moving' : '')}</td>
-        </tr>`).join('');
-
-      // ── Category Breakdown ──
-      const catData = stats.cat_breakdown || [];
-      const totalCatQty = catData.reduce((s, c) => s + parseInt(c.qty), 0);
-      const catRows = catData.map(c => `
-        <tr>
-          <td>${escHtml(c.name)}</td>
-          <td style="text-align:right;">${fmtN(c.qty)}</td>
-          <td style="text-align:right;">${totalCatQty ? Math.round((parseInt(c.qty) / totalCatQty) * 100) : 0}%</td>
-        </tr>`).join('');
-
-      // ── Volume Breakdown ──
-      const vol = stats.volume_breakdown || {};
-      const volRows = [
-        ['Today',      vol.today],
-        ['This Week',  vol.week],
-        ['This Month', vol.month],
-        ['This Year',  vol.year],
-      ].map(([label, v]) => `
-        <tr>
-          <td>${label}</td>
-          <td style="text-align:right;">${fmtN(v?.cups)}</td>
-          <td style="text-align:right;">${fmtN(v?.food)}</td>
-        </tr>`).join('');
-
-      // ── Weekly chart data as table ──
       const weekDays = ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
-      const weeklyData = stats.weekly_chart || [];
-      const weeklyRows = weeklyData.map((v, i) => `
-        <tr><td>${weekDays[i] || 'Day ' + (i+1)}</td><td style="text-align:right;">₱${fmt(v)}</td></tr>`).join('');
+      const weeklyData   = stats.weekly_chart || [];
+      const avgDaily     = stats.month?.orders > 0 ? Math.round(stats.month.revenue / 30) : 0;
+      const totalCatQty  = catData.reduce((s,c) => s + parseInt(c.qty), 0);
 
-      const html = `<!DOCTYPE html>
-<html lang="en">
-<head>
-<meta charset="UTF-8">
-<title>Analytics Report — ${monthLabel}</title>
+      const th = t => `<th style="background:#5c2a00;color:#fff;padding:6px 10px;font-size:11px;text-align:left">${t}</th>`;
+
+      const itemRows = itemPerf.map((it,i) => `<tr>
+        <td>${i+1}</td><td>${escHtml(it.name)}</td>
+        <td style="text-align:right">${fmtN(it.sold)}</td>
+        <td style="text-align:right">&#8369;${fmt(it.revenue||0)}</td>
+        <td>${i<3?'&#127942; Top Seller':(i>=itemPerf.length-2?'&#9888;&#65039; Slow Moving':'')}</td>
+      </tr>`).join('');
+
+      const catRows = catData.map(c => `<tr>
+        <td>${escHtml(c.name)}</td>
+        <td style="text-align:right">${fmtN(c.qty)}</td>
+        <td style="text-align:right">${totalCatQty?Math.round((parseInt(c.qty)/totalCatQty)*100):0}%</td>
+      </tr>`).join('');
+
+      const volRows = [['Today',vol.today],['This Week',vol.week],['This Month',vol.month],['This Year',vol.year]]
+        .map(([lbl,v]) => `<tr><td>${lbl}</td><td style="text-align:right">${fmtN(v?.cups)}</td><td style="text-align:right">${fmtN(v?.food)}</td></tr>`).join('');
+
+      const weeklyTableRows = weeklyData.map((v,i) =>
+        `<tr><td>${weekDays[i]||'Day '+(i+1)}</td><td style="text-align:right">&#8369;${fmt(v)}</td></tr>`).join('');
+
+      const html = `<!DOCTYPE html><html lang="en"><head><meta charset="UTF-8">
+<title>Analytics Report - ${monthLabel}</title>
 <style>
-  @page { size: A4 portrait; margin: 18mm 15mm; }
-  * { box-sizing: border-box; margin: 0; padding: 0; }
-  body { font-family: 'Segoe UI', Arial, sans-serif; font-size: 12px; color: #111; background: #fff; }
-  .rpt-header { text-align: center; border-bottom: 2.5px solid #5c2a00; padding-bottom: 10px; margin-bottom: 16px; }
-  .rpt-header h1 { font-size: 20px; color: #5c2a00; font-weight: 800; letter-spacing: 0.5px; }
-  .rpt-header p { font-size: 11px; color: #666; margin-top: 2px; }
-  .rpt-section { margin-bottom: 18px; }
-  .rpt-section h2 { font-size: 13px; font-weight: 700; color: #5c2a00; border-bottom: 1px solid #d4c5b9; padding-bottom: 5px; margin-bottom: 10px; }
-  .kpi-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; }
-  .kpi-box { border: 1px solid #d4c5b9; border-radius: 7px; padding: 10px 12px; background: #fdf8f4; }
-  .kpi-box .label { font-size: 10px; color: #888; text-transform: uppercase; letter-spacing: 0.5px; }
-  .kpi-box .value { font-size: 16px; font-weight: 800; color: #5c2a00; margin: 3px 0 1px; }
-  .kpi-box .sub { font-size: 10px; color: #aaa; }
-  table { width: 100%; border-collapse: collapse; }
-  th { background: #5c2a00; color: #fff; font-size: 11px; font-weight: 700; padding: 6px 10px; text-align: left; }
-  td { font-size: 11.5px; padding: 5px 10px; border-bottom: 1px solid #eee; }
-  tr:nth-child(even) td { background: #faf7f4; }
-  .rpt-footer { font-size: 10px; color: #aaa; text-align: center; margin-top: 20px; border-top: 1px solid #eee; padding-top: 8px; }
-  .two-col { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
-  @media print {
-    body { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
-  }
-</style>
-</head>
-<body>
-  <div class="rpt-header">
-    <h1>${escHtml(storeName)}</h1>
-    <p>${escHtml(branch)} &nbsp;|&nbsp; Analytics Report &nbsp;|&nbsp; ${monthLabel}</p>
-    <p style="font-size:10px; color:#aaa; margin-top:3px;">Generated: ${generatedAt}</p>
-  </div>
+@page{size:A4 portrait;margin:14mm 13mm}
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:'Segoe UI',Arial,sans-serif;font-size:12px;color:#111;background:#fff}
+.rpt-header{text-align:center;border-bottom:2.5px solid #5c2a00;padding-bottom:10px;margin-bottom:16px}
+.rpt-header h1{font-size:20px;color:#5c2a00;font-weight:800}
+.rpt-header p{font-size:11px;color:#666;margin-top:3px}
+h2{font-size:12.5px;font-weight:700;color:#5c2a00;border-bottom:1px solid #d4c5b9;padding-bottom:5px;margin:16px 0 10px}
+.kpi-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin-bottom:16px}
+.kpi-box{border:1px solid #d4c5b9;border-radius:7px;padding:9px 11px;background:#fdf8f4}
+.kpi-box .lbl{font-size:9px;color:#888;text-transform:uppercase;letter-spacing:.4px}
+.kpi-box .val{font-size:15px;font-weight:800;color:#5c2a00;margin:3px 0 1px}
+.kpi-box .sub{font-size:9px;color:#aaa}
+.chart-wrap{background:#fdf8f4;border:1px solid #d4c5b9;border-radius:8px;padding:9px 11px;margin-bottom:14px;page-break-inside:avoid}
+.chart-wrap .clbl{font-size:11px;font-weight:700;color:#5c2a00;margin-bottom:7px}
+.chart-img{width:100%;border-radius:5px;border:1px solid #e8ddd5;display:block}
+.two-col{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:14px}
+.nb{page-break-inside:avoid}
+table{width:100%;border-collapse:collapse}
+th{background:#5c2a00;color:#fff;font-size:11px;font-weight:700;padding:6px 10px;text-align:left}
+td{font-size:11px;padding:4px 9px;border-bottom:1px solid #eee}
+tr:nth-child(even) td{background:#faf7f4}
+.footer{font-size:9.5px;color:#aaa;text-align:center;margin-top:16px;border-top:1px solid #eee;padding-top:7px}
+@media print{body{-webkit-print-color-adjust:exact;print-color-adjust:exact}}
+</style></head><body>
 
-  <div class="rpt-section">
-    <h2>📊 Monthly Summary — ${monthLabel}</h2>
-    <div class="kpi-grid">
-      <div class="kpi-box"><div class="label">Total Revenue</div><div class="value">${kpiMonth}</div><div class="sub">${monthLabel}</div></div>
-      <div class="kpi-box"><div class="label">Total Orders</div><div class="value">${kpiOrders}</div><div class="sub">${monthLabel}</div></div>
-      <div class="kpi-box"><div class="label">Avg Daily Revenue</div><div class="value">₱${fmt(avgDaily)}</div><div class="sub">Last 30 days</div></div>
-      <div class="kpi-box"><div class="label">Best Revenue Day</div><div class="value" style="font-size:13px;">${bestDay}</div><div class="sub">${bestRev}</div></div>
-    </div>
-  </div>
+<div class="rpt-header">
+  <h1>${escHtml(storeName)}</h1>
+  <p>${escHtml(branch)} &nbsp;|&nbsp; Analytics Report &nbsp;|&nbsp; ${monthLabel}</p>
+  <p style="font-size:9.5px;color:#aaa;margin-top:3px">Generated: ${generatedAt}</p>
+</div>
 
-  <div class="two-col">
-    <div class="rpt-section">
-      <h2>🗓️ Weekly Sales (This Week)</h2>
-      <table><thead><tr><th>Day</th><th style="text-align:right;">Revenue</th></tr></thead>
-      <tbody>${weeklyRows || '<tr><td colspan="2" style="color:#aaa;">No data</td></tr>'}</tbody></table>
-    </div>
-    <div class="rpt-section">
-      <h2>📦 Sales Volume Breakdown</h2>
-      <table><thead><tr><th>Period</th><th style="text-align:right;">Drinks</th><th style="text-align:right;">Food</th></tr></thead>
-      <tbody>${volRows}</tbody></table>
-    </div>
+<div class="nb">
+  <h2>&#128202; Monthly Summary &mdash; ${monthLabel}</h2>
+  <div class="kpi-grid">
+    <div class="kpi-box"><div class="lbl">Total Revenue</div><div class="val">&#8369;${fmt(stats.month?.revenue)}</div><div class="sub">${monthLabel}</div></div>
+    <div class="kpi-box"><div class="lbl">Total Orders</div><div class="val">${fmtN(stats.month?.orders)}</div><div class="sub">${monthLabel}</div></div>
+    <div class="kpi-box"><div class="lbl">Avg Daily Revenue</div><div class="val">&#8369;${fmt(avgDaily)}</div><div class="sub">Last 30 days</div></div>
+    <div class="kpi-box"><div class="lbl">Best Revenue Day</div><div class="val" style="font-size:12px">${escHtml(brd&&brd.revenue>0?brd.day_name+', '+brd.date:'N/A')}</div><div class="sub">${escHtml(brd&&brd.revenue>0?'&#8369;'+fmt(brd.revenue)+' ('+brd.period+')':'No data')}</div></div>
   </div>
+</div>
 
-  <div class="rpt-section">
-    <h2>🏆 Item Sales Performance</h2>
-    <table>
-      <thead><tr><th>#</th><th>Item Name</th><th style="text-align:right;">Qty Sold</th><th style="text-align:right;">Revenue</th><th>Status</th></tr></thead>
-      <tbody>${itemRows || '<tr><td colspan="5" style="color:#aaa;">No sales data yet</td></tr>'}</tbody>
-    </table>
-  </div>
+${weeklyImgSrc ? `<div class="nb"><h2>&#128200; Weekly Sales Overview</h2>${imgBlock(weeklyImgSrc,'Weekly Sales Chart')}</div>` : ''}
 
-  <div class="rpt-section">
-    <h2>🗂️ Category Breakdown (This Month)</h2>
-    <table>
-      <thead><tr><th>Category</th><th style="text-align:right;">Qty Sold</th><th style="text-align:right;">Share</th></tr></thead>
-      <tbody>${catRows || '<tr><td colspan="3" style="color:#aaa;">No data</td></tr>'}</tbody>
-    </table>
-  </div>
+${(hourlyImgSrc||monthlyImgSrc)?`<div class="two-col nb">
+  ${hourlyImgSrc?`<div><h2>&#128336; Hourly Sales</h2>${imgBlock(hourlyImgSrc,'Hourly Sales')}</div>`:'<div></div>'}
+  ${monthlyImgSrc?`<div><h2>&#128197; Monthly Revenue Trend</h2>${imgBlock(monthlyImgSrc,'Monthly Revenue Trend')}</div>`:'<div></div>'}
+</div>`:''}
 
-  <div class="rpt-footer">
-    ChipiPie Cafe &amp; Pizza POS System &nbsp;|&nbsp; Printed by ${escHtml((currentUser && (currentUser.full_name || currentUser.username)) || 'Admin')} &nbsp;|&nbsp; ${generatedAt}
+${itemImgSrc?`<div class="nb"><h2>&#127942; Item Sales Performance</h2>${imgBlock(itemImgSrc,'Item Sales Chart')}</div>`:''}
+
+<div class="nb">
+  <h2>&#127942; Item Sales Data</h2>
+  <table><thead><tr>${th('#')}${th('Item Name')}${th('Qty Sold')}${th('Revenue')}${th('Status')}</tr></thead>
+  <tbody>${itemRows||'<tr><td colspan="5" style="color:#aaa;padding:5px 10px">No data yet</td></tr>'}</tbody></table>
+</div>
+
+<div class="two-col nb" style="margin-top:14px">
+  <div>
+    <h2>&#128198; Weekly Sales Data</h2>
+    <table><thead><tr>${th('Day')}${th('Revenue')}</tr></thead>
+    <tbody>${weeklyTableRows||'<tr><td colspan="2" style="color:#aaa">No data</td></tr>'}</tbody></table>
   </div>
-<script>window.onload = function() { window.print(); };<\/script>
+  <div>
+    <h2>&#128230; Sales Volume Breakdown</h2>
+    <table><thead><tr>${th('Period')}${th('Drinks')}${th('Food')}</tr></thead>
+    <tbody>${volRows}</tbody></table>
+  </div>
+</div>
+
+<div class="nb" style="margin-top:14px">
+  <h2>&#128193; Category Breakdown (This Month)</h2>
+  <table style="width:55%"><thead><tr>${th('Category')}${th('Qty Sold')}${th('Share')}</tr></thead>
+  <tbody>${catRows||'<tr><td colspan="3" style="color:#aaa;padding:5px 10px">No data</td></tr>'}</tbody></table>
+</div>
+
+<div class="footer">ChipiPie Cafe &amp; Pizza POS System &nbsp;|&nbsp; Printed by ${escHtml(adminName)} &nbsp;|&nbsp; ${generatedAt}</div>
+<script>window.onload=function(){window.print()};<\/script>
 </body></html>`;
 
-      const win = window.open('', '_blank', 'width=900,height=700,scrollbars=yes,resizable=yes');
+      const win = window.open('', '_blank', 'width=960,height=750,scrollbars=yes,resizable=yes');
       if (!win) { showToast('Pop-up blocked. Please allow pop-ups for this page.', 'error'); return; }
       win.document.write(html);
       win.document.close();
@@ -11268,94 +11265,139 @@ $_CSRF_TOKEN = getCsrfToken();
       if (!stats) { showToast('Please wait for analytics to load first.', 'info'); return; }
 
       const now = new Date();
-      const monthLabel = now.toLocaleString('en-PH', { month: 'long', year: 'numeric' });
+      const monthLabel  = now.toLocaleString('en-PH', { month: 'long', year: 'numeric' });
       const generatedAt = now.toLocaleString('en-PH', { dateStyle: 'short', timeStyle: 'short' });
-      const storeName = (window._storeSettings && window._storeSettings.store_name) || 'ChipiPie Cafe & Pizza';
-      const branch   = (window._storeSettings && window._storeSettings.branch_name) || 'Pampang Branch';
+      const storeName   = (window._storeSettings && window._storeSettings.store_name) || 'ChipiPie Cafe & Pizza';
+      const branch      = (window._storeSettings && window._storeSettings.branch_name) || 'Pampang Branch';
+      const adminName   = (currentUser && (currentUser.full_name || currentUser.username)) || 'Admin';
 
-      const fmt  = v => Number(v || 0).toFixed(2);
-      const fmtN = v => Number(v || 0).toString();
+      const fmt  = v => Number(v||0).toLocaleString('en-PH', {minimumFractionDigits:2, maximumFractionDigits:2});
+      const fmtN = v => Number(v||0).toLocaleString();
 
-      const brd = stats.best_revenue_day;
-      const vol = stats.volume_breakdown || {};
-      const catData = stats.cat_breakdown || [];
-      const totalCatQty = catData.reduce((s, c) => s + parseInt(c.qty), 0);
+      const brd      = stats.best_revenue_day;
+      const vol      = stats.volume_breakdown || {};
+      const catData  = stats.cat_breakdown || [];
       const itemPerf = stats.item_performance || [];
       const weekDays = ['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'];
-      const weeklyData = stats.weekly_chart || [];
-      const avgDaily = stats.month?.orders > 0 ? Math.round(stats.month.revenue / 30) : 0;
+      const weeklyData   = stats.weekly_chart || [];
+      const avgDaily     = stats.month?.orders > 0 ? Math.round(stats.month.revenue / 30) : 0;
+      const totalCatQty  = catData.reduce((s,c) => s + parseInt(c.qty), 0);
 
-      const rows = [
-        // Header block
-        [`${storeName} — ${branch}`],
-        [`Analytics Report: ${monthLabel}`],
-        [`Generated: ${generatedAt}`],
-        [`Exported by: ${(currentUser && (currentUser.full_name || currentUser.username)) || 'Admin'}`],
-        [],
-        // Monthly KPIs
-        ['=== MONTHLY SUMMARY ==='],
-        ['Metric', 'Value', 'Period'],
-        ['Total Revenue (Month)', `${fmt(stats.month?.revenue)}`, monthLabel],
-        ['Total Orders (Month)', fmtN(stats.month?.orders), monthLabel],
-        ['Avg Daily Revenue', `${fmt(avgDaily)}`, 'Last 30 days'],
-        ['Best Revenue Day', brd && brd.revenue > 0 ? `${brd.day_name}, ${brd.date}` : '—', brd && brd.revenue > 0 ? `${fmt(brd.revenue)} (${brd.period})` : '—'],
-        [],
-        // Volume breakdown
-        ['=== SALES VOLUME BREAKDOWN ==='],
-        ['Period', 'Drinks Sold', 'Food Sold'],
-        ['Today',      fmtN(vol.today?.cups), fmtN(vol.today?.food)],
-        ['This Week',  fmtN(vol.week?.cups),  fmtN(vol.week?.food)],
-        ['This Month', fmtN(vol.month?.cups), fmtN(vol.month?.food)],
-        ['This Year',  fmtN(vol.year?.cups),  fmtN(vol.year?.food)],
-        [],
-        // Weekly revenue
-        ['=== WEEKLY SALES (THIS WEEK) ==='],
-        ['Day', 'Revenue (PHP)'],
-        ...weeklyData.map((v, i) => [weekDays[i] || `Day ${i+1}`, fmt(v)]),
-        [],
-        // Item performance
-        ['=== ITEM SALES PERFORMANCE ==='],
-        ['Rank', 'Item Name', 'Qty Sold', 'Revenue (PHP)', 'Status'],
-        ...itemPerf.map((it, i) => [
-          i + 1,
-          it.name,
-          fmtN(it.sold),
-          fmt(it.revenue || 0),
-          i < 3 ? 'Top Seller' : (i >= itemPerf.length - 2 ? 'Slow Moving' : ''),
-        ]),
-        [],
-        // Category breakdown
-        ['=== CATEGORY BREAKDOWN (THIS MONTH) ==='],
-        ['Category', 'Qty Sold', 'Share (%)'],
-        ...catData.map(c => [
-          c.name,
-          fmtN(c.qty),
-          totalCatQty ? Math.round((parseInt(c.qty) / totalCatQty) * 100) + '%' : '0%',
-        ]),
-      ];
+      // Capture live Chart.js canvases as base64 PNG
+      const getCanvasImg = (id) => {
+        try { const c = document.getElementById(id); return (c && c.getContext) ? c.toDataURL('image/png') : ''; }
+        catch(e) { return ''; }
+      };
+      const weeklyImgSrc  = getCanvasImg('repWeeklyChart');
+      const hourlyImgSrc  = getCanvasImg('hourlyChart');
+      const monthlyImgSrc = getCanvasImg('monthlyChart');
+      const itemImgSrc    = getCanvasImg('itemChart');
 
-      // Build CSV string
-      const csvContent = rows.map(row =>
-        row.map(cell => {
-          const str = String(cell ?? '');
-          return str.includes(',') || str.includes('"') || str.includes('\n')
-            ? `"${str.replace(/"/g, '""')}"` : str;
-        }).join(',')
-      ).join('\r\n');
+      const imgTag = (src, alt) => src
+        ? `<img src="${src}" alt="${escHtml(alt)}" style="width:100%;max-width:680px;border-radius:6px;border:1px solid #d4c5b9">`
+        : `<em style="color:#aaa;font-size:11px">Chart not available</em>`;
 
-      // BOM for Excel to open in UTF-8 properly
-      const blob = new Blob(['\uFEFF' + csvContent], { type: 'text/csv;charset=utf-8;' });
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      const fileName = `ChipiPie_Analytics_${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,'0')}.csv`;
-      a.href = url;
-      a.download = fileName;
-      document.body.appendChild(a);
-      a.click();
-      document.body.removeChild(a);
-      URL.revokeObjectURL(url);
-      showToast(`📥 ${fileName} downloaded — open with Excel or Google Sheets.`, 'success');
+      const th = t => `<th style="background:#5c2a00;color:#fff;padding:7px 10px;border:1px solid #4a2200;font-size:12px;text-align:left">${t}</th>`;
+
+      const td = (v, right) => `<td style="padding:5px 10px;border:1px solid #ddd;${right?'text-align:right':''}">${v}</td>`;
+
+      const itemRows = itemPerf.map((it,i) => `<tr style="background:${i%2===0?'#fff':'#fdf8f4'}">
+        ${td(i+1)}${td(escHtml(it.name))}${td(fmtN(it.sold),true)}${td('&#8369;'+fmt(it.revenue||0),true)}${td(i<3?'Top Seller':(i>=itemPerf.length-2?'Slow Moving':''))}
+      </tr>`).join('');
+
+      const catRows = catData.map((c,i) => `<tr style="background:${i%2===0?'#fff':'#fdf8f4'}">
+        ${td(escHtml(c.name))}${td(fmtN(c.qty),true)}${td((totalCatQty?Math.round((parseInt(c.qty)/totalCatQty)*100):0)+'%',true)}
+      </tr>`).join('');
+
+      const volRows = [['Today',vol.today],['This Week',vol.week],['This Month',vol.month],['This Year',vol.year]].map(([lbl,v],i) =>
+        `<tr style="background:${i%2===0?'#fff':'#fdf8f4'}">${td(lbl)}${td(fmtN(v?.cups),true)}${td(fmtN(v?.food),true)}</tr>`).join('');
+
+      const weeklyRows = weeklyData.map((v,i) =>
+        `<tr style="background:${i%2===0?'#fff':'#fdf8f4'}">${td(weekDays[i]||'Day '+(i+1))}${td('&#8369;'+fmt(v),true)}</tr>`).join('');
+
+      const xlsHtml = `<html xmlns:o="urn:schemas-microsoft-com:office:office"
+  xmlns:x="urn:schemas-microsoft-com:office:excel"
+  xmlns="http://www.w3.org/TR/REC-html40">
+<head><meta charset="UTF-8">
+<!--[if gte mso 9]><xml><x:ExcelWorkbook><x:ExcelWorksheets>
+<x:ExcelWorksheet><x:Name>Analytics</x:Name>
+<x:WorksheetOptions><x:DisplayGridlines/></x:WorksheetOptions>
+</x:ExcelWorksheet></x:ExcelWorksheets></x:ExcelWorkbook></xml><![endif]-->
+<style>
+body{font-family:Calibri,Arial,sans-serif;font-size:11pt;color:#111}
+h2{font-size:13px;font-weight:bold;color:#5c2a00;border-bottom:1.5px solid #d4c5b9;padding-bottom:5px;margin:18px 0 10px}
+.kpi-row td{border:1px solid #d4c5b9;padding:10px 14px;background:#fdf8f4;width:25%;vertical-align:top}
+.lbl{font-size:9px;color:#888;text-transform:uppercase}
+.val{font-size:17px;font-weight:bold;color:#5c2a00;margin:4px 0 2px}
+.sub{font-size:9px;color:#aaa}
+.chart-wrap{margin:10px 0 14px;padding:10px 12px;border:1px solid #d4c5b9;background:#fdf8f4;border-radius:6px}
+.clbl{font-size:11px;font-weight:bold;color:#5c2a00;margin-bottom:7px}
+.footer{font-size:10px;color:#aaa;text-align:center;margin-top:18px;border-top:1px solid #eee;padding-top:8px}
+</style></head><body>
+
+<div style="text-align:center;border-bottom:3px solid #5c2a00;padding-bottom:12px;margin-bottom:20px">
+  <h1 style="font-size:21px;color:#5c2a00;font-weight:bold;margin:0 0 4px">${escHtml(storeName)}</h1>
+  <p style="font-size:11px;color:#666;margin:2px 0">${escHtml(branch)} | Analytics Report | ${monthLabel}</p>
+  <p style="font-size:10px;color:#aaa;margin:2px 0">Generated: ${generatedAt} | Exported by: ${escHtml(adminName)}</p>
+</div>
+
+<h2>Monthly Summary &mdash; ${monthLabel}</h2>
+<table style="width:100%;border-collapse:collapse;margin-bottom:16px"><tr class="kpi-row">
+  <td><div class="lbl">Total Revenue</div><div class="val">&#8369;${fmt(stats.month?.revenue)}</div><div class="sub">${monthLabel}</div></td>
+  <td><div class="lbl">Total Orders</div><div class="val">${fmtN(stats.month?.orders)}</div><div class="sub">${monthLabel}</div></td>
+  <td><div class="lbl">Avg Daily Revenue</div><div class="val">&#8369;${fmt(avgDaily)}</div><div class="sub">Last 30 days</div></td>
+  <td><div class="lbl">Best Revenue Day</div><div class="val" style="font-size:13px">${escHtml(brd&&brd.revenue>0?brd.day_name+', '+brd.date:'N/A')}</div><div class="sub">${escHtml(brd&&brd.revenue>0?fmt(brd.revenue)+' ('+brd.period+')':'No data')}</div></td>
+</tr></table>
+
+<h2>Weekly Sales Overview</h2>
+<div class="chart-wrap"><div class="clbl">Weekly Sales Chart</div>${imgTag(weeklyImgSrc,'Weekly Sales Chart')}</div>
+<table style="width:50%;border-collapse:collapse;margin-bottom:16px">
+  <tr>${th('Day')}${th('Revenue (PHP)')}</tr>
+  ${weeklyRows||'<tr><td colspan="2" style="color:#aaa;padding:5px 10px;border:1px solid #ddd">No data</td></tr>'}
+</table>
+
+<h2>Hourly Sales &amp; Monthly Revenue Trend</h2>
+<table style="width:100%;border-collapse:collapse;margin-bottom:16px"><tr>
+  <td style="width:50%;vertical-align:top;padding-right:10px;border:none">
+    <div class="chart-wrap"><div class="clbl">Hourly Sales</div>${imgTag(hourlyImgSrc,'Hourly Sales')}</div>
+  </td>
+  <td style="width:50%;vertical-align:top;border:none">
+    <div class="chart-wrap"><div class="clbl">Monthly Revenue Trend</div>${imgTag(monthlyImgSrc,'Monthly Revenue Trend')}</div>
+  </td>
+</tr></table>
+
+<h2>Item Sales Performance</h2>
+<div class="chart-wrap"><div class="clbl">Item Sales Chart</div>${imgTag(itemImgSrc,'Item Sales Performance')}</div>
+<table style="border-collapse:collapse;margin-bottom:16px">
+  <tr>${th('#')}${th('Item Name')}${th('Qty Sold')}${th('Revenue (PHP)')}${th('Status')}</tr>
+  ${itemRows||'<tr><td colspan="5" style="color:#aaa;padding:5px 10px;border:1px solid #ddd">No data yet</td></tr>'}
+</table>
+
+<h2>Category Breakdown (This Month)</h2>
+<table style="width:55%;border-collapse:collapse;margin-bottom:16px">
+  <tr>${th('Category')}${th('Qty Sold')}${th('Share (%)')}</tr>
+  ${catRows||'<tr><td colspan="3" style="color:#aaa;padding:5px 10px;border:1px solid #ddd">No data</td></tr>'}
+</table>
+
+<h2>Sales Volume Breakdown</h2>
+<table style="width:60%;border-collapse:collapse;margin-bottom:20px">
+  <tr>${th('Period')}${th('Drinks Sold')}${th('Food Sold')}</tr>
+  ${volRows}
+</table>
+
+<div class="footer">ChipiPie Cafe &amp; Pizza POS | Exported by ${escHtml(adminName)} | ${generatedAt}</div>
+</body></html>`;
+
+      const blob = new Blob([xlsHtml], { type: 'application/vnd.ms-excel;charset=utf-8' });
+      const url  = URL.createObjectURL(blob);
+      const a    = document.createElement('a');
+      const fileName = `ChipiPie_Analytics_${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,'0')}.xls`;
+      a.href = url; a.download = fileName;
+      document.body.appendChild(a); a.click();
+      document.body.removeChild(a); URL.revokeObjectURL(url);
+      showToast('📥 ' + fileName + ' downloaded — open with Microsoft Excel.', 'success');
     }
+    const exportAnalyticsExcel = exportAnalyticsCSV;
 
     function escHtml(str) {
       return String(str || '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
@@ -11852,6 +11894,8 @@ $_CSRF_TOKEN = getCsrfToken();
           mgmtLabel.style.display = 'none';
           menuBtn.style.display = 'flex';
           reportsBtn.style.display = 'none';
+          const exportBar = document.getElementById('analytics-export-bar');
+          if (exportBar) exportBar.style.setProperty('display', 'none', 'important');
           if (usersBtn) usersBtn.style.display = 'none';
           if (orderFilterTabs) orderFilterTabs.style.display = 'none';
           if (orderCashierTab) orderCashierTab.style.display = 'flex';
@@ -11915,6 +11959,8 @@ $_CSRF_TOKEN = getCsrfToken();
       currentUser = null;
       _isUserAdmin = false;
       window.posIsAdmin = false;
+      const exportBar = document.getElementById('analytics-export-bar');
+      if (exportBar) exportBar.style.setProperty('display', 'none', 'important');
       document.documentElement.classList.remove('has-active-session');
       document.getElementById('login-user').value = '';
       document.getElementById('login-pass').value = '';
