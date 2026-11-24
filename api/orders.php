@@ -835,12 +835,72 @@ function handleStats() {
         }
     }
 
+    // 12. Day-of-week sales & zero-sales days analysis (current month)
+    $currentMonth = intval(date('m'));
+    $currentYear  = intval(date('Y'));
+    $dowSales = $db->query("
+        SELECT 
+            DAYOFWEEK(created_at) as dow,
+            DAYNAME(DATE(created_at)) as day_name,
+            COUNT(*) as orders_count,
+            COALESCE(SUM(total), 0) as total_revenue
+        FROM orders
+        WHERE YEAR(created_at) = {$currentYear} 
+          AND MONTH(created_at) = {$currentMonth}
+          AND status = 'Completed'
+        GROUP BY DAYOFWEEK(created_at), DAYNAME(DATE(created_at))
+    ")->fetchAll(PDO::FETCH_ASSOC);
+
+    $daysOrder = [
+        2 => 'Monday',
+        3 => 'Tuesday',
+        4 => 'Wednesday',
+        5 => 'Thursday',
+        6 => 'Friday',
+        7 => 'Saturday',
+        1 => 'Sunday'
+    ];
+
+    $salesByDow = [];
+    foreach ($dowSales as $row) {
+        $salesByDow[intval($row['dow'])] = [
+            'day_name' => $row['day_name'],
+            'orders'   => intval($row['orders_count']),
+            'revenue'  => floatval($row['total_revenue'])
+        ];
+    }
+
+    $dowBreakdown = [];
+    $zeroSalesDays = [];
+    foreach ($daysOrder as $dowNum => $dayName) {
+        if (isset($salesByDow[$dowNum]) && $salesByDow[$dowNum]['orders'] > 0) {
+            $dowBreakdown[] = [
+                'dow'       => $dowNum,
+                'day'       => $dayName,
+                'orders'    => $salesByDow[$dowNum]['orders'],
+                'revenue'   => $salesByDow[$dowNum]['revenue'],
+                'has_sales' => true
+            ];
+        } else {
+            $dowBreakdown[] = [
+                'dow'       => $dowNum,
+                'day'       => $dayName,
+                'orders'    => 0,
+                'revenue'   => 0.0,
+                'has_sales' => false
+            ];
+            $zeroSalesDays[] = $dayName;
+        }
+    }
+
     jsonResponse([
         'success' => true,
         'today' => ['orders' => $todayOrders, 'revenue' => $todayRevenue],
         'week'  => ['orders' => $weekOrders,  'revenue' => $weekRevenue],
         'month' => ['orders' => $monthOrders, 'revenue' => $monthRevenue],
         'best_revenue_day' => $bestRevenueDay,
+        'dow_breakdown'   => $dowBreakdown,
+        'zero_sales_days' => $zeroSalesDays,
         'cups_sold' => $cupsSold,
         'food_sold' => $foodSold,
         'top_seller' => $topSeller ? ['name' => $topSeller['name'], 'sold' => intval($topSeller['sold'])] : null,
