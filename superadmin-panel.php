@@ -7378,22 +7378,11 @@ if (typeof gsap === "undefined") { document.write('<script src="https://cdn.jsde
         return;
       }
 
-      // Check if session has expired while the tab was closed (>= 5 minutes = 300,000 ms)
-      const lastSaAct = parseInt(localStorage.getItem('chipipie_sa_last_activity') || '0', 10);
+      // Session validity is determined authoritatively by the server (auth.php?action=session).
+      // No client-side pre-check here — it caused false "session expired" toasts on normal
+      // refreshes when lastSaAct was simply a few minutes old (e.g. user refreshed after
+      // being idle for a bit but their PHP session was still valid).
       const saSid = sessionStorage.getItem('chipipie_sa_session_id') || localStorage.getItem('chipipie_sa_session_id');
-      const now = Date.now();
-      const SA_TIMEOUT_MS = SA_INACTIVITY_TIMEOUT_SECONDS * 1000; // 5 minutes
-
-      if (saSid && lastSaAct > 0 && (now - lastSaAct >= SA_TIMEOUT_MS)) {
-        document.documentElement.classList.remove('has-active-session');
-        hideSALoadingScreen();
-        sessionStorage.removeItem('chipipie_sa_session_id');
-        localStorage.removeItem('chipipie_sa_session_id');
-        localStorage.removeItem('chipipie_sa_last_activity');
-        localStorage.removeItem('chipipie_session_id');
-        handleSASessionExpired('Session expired due to 5 minutes of inactivity while tab was closed. Please sign in again.');
-        return;
-      }
 
       if (saSid) {
         saApi('auth.php?action=session').then(res => {
