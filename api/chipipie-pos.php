@@ -6330,11 +6330,9 @@ $_CSRF_TOKEN = getCsrfToken();
           <button type="button" class="btn btn-sm btn-outline-secondary" onclick="printPizzaKitchenTicketFromModal()" style="border-radius: 10px; font-weight: 600; padding: 8px 16px;">
             <i class="bi bi-printer me-1"></i>Print Kitchen Slip
           </button>
-          <button type="button" class="btn btn-sm" data-bs-dismiss="modal" style="background: linear-gradient(135deg, #c2410c, #ea580c); color: #fff; border: none; border-radius: 10px; font-weight: 700; padding: 8px 22px; box-shadow: 0 4px 12px rgba(194, 65, 12, 0.35);">
           <div id="pom-modal-action-btns" style="display: flex; gap: 8px; align-items: center;">
-            <button type="button" class="btn btn-sm btn-primary" data-bs-dismiss="modal" style="border-radius:10px; font-weight:700; padding:8px 20px;"><i class="bi bi-check2-circle me-1"></i>Acknowledge</button>
+            <button type="button" class="btn btn-sm btn-primary" data-bs-dismiss="modal" style="border-radius: 10px; font-weight: 700; padding: 8px 20px;"><i class="bi bi-check2-circle me-1"></i>Acknowledge</button>
           </div>
-          </button>
         </div>
       </div>
     </div>
@@ -9162,8 +9160,8 @@ $_CSRF_TOKEN = getCsrfToken();
         const stType = order.target_station || (isCafe ? 'cafe' : 'pizza');
         if (!isAck) {
           actionBtnsContainer.innerHTML = `
-            <button type="button" class="btn btn-sm btn-primary" onclick="acknowledgeStationOrder(${order.id}, '${stType}'); bootstrap.Modal.getOrCreateInstance(document.getElementById('viewPizzaOrderModal')).hide();" style="border-radius:10px; font-weight:700; padding:8px 18px; box-shadow:0 3px 10px rgba(37,99,235,0.35);">
-              <i class="bi bi-check2-circle me-1"></i>Acknowledge & Minimize
+            <button type="button" class="btn btn-sm btn-primary" onclick="acknowledgeStationOrder(${order.id}, '${stType}'); bootstrap.Modal.getOrCreateInstance(document.getElementById('viewPizzaOrderModal')).hide();" title="Acknowledge and minimize away from cart" style="border-radius:10px; font-weight:700; padding:8px 18px; box-shadow:0 3px 10px rgba(37,99,235,0.35);">
+              <i class="bi bi-check2-circle me-1"></i>Acknowledge
             </button>
             <button type="button" class="btn btn-sm btn-success" onclick="finishStationOrder(${order.id}, '${stType}');" style="border-radius:10px; font-weight:700; padding:8px 18px; box-shadow:0 3px 10px rgba(16,185,129,0.35);">
               <i class="bi bi-check-circle-fill me-1"></i>Finish Order
