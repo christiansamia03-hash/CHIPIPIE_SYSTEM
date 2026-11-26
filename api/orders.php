@@ -442,6 +442,27 @@ function handleCheckout() {
         $cashierName = $_SESSION['full_name'] ?? $_SESSION['username'] ?? 'Staff';
         $formattedDate = date('M d, Y h:i A');
 
+        $pizzaCatIds = [10, 11, 12, 13, 14, 15, 16];
+        $hasPizza = false;
+        $hasCafe = false;
+        foreach ($lineItems as $li) {
+            $catStmt = $db->prepare("SELECT category_id FROM menu_items WHERE id = ?");
+            $catStmt->execute([$li['item_id']]);
+            $cId = (int)$catStmt->fetchColumn();
+            if (in_array($cId, $pizzaCatIds, true)) {
+                $hasPizza = true;
+            } else {
+                $hasCafe = true;
+            }
+        }
+
+        $crossStationNote = null;
+        if ($originBranch === 'cafe' && $hasPizza) {
+            $crossStationNote = 'Note: Pizza items can be seen in Pizza side.';
+        } elseif ($originBranch === 'pizza' && $hasCafe) {
+            $crossStationNote = 'Note: Cafe items can be seen in Cafe side.';
+        }
+
         jsonResponse([
             'success' => true,
             'message' => "Order $orderNum placed — ₱" . number_format($total, 2),
@@ -453,6 +474,7 @@ function handleCheckout() {
                 'payment_method' => $paymentMethod,
                 'status' => 'Completed',
                 'origin_branch' => $originBranch,
+                'cross_station_note' => $crossStationNote,
                 'time' => date('g:i A'),
                 'date' => date('M d, Y'),
                 'created_at' => date('Y-m-d H:i:s'),
@@ -598,7 +620,7 @@ function handleFetchOrders() {
 
     $sql = "
         SELECT o.id, o.order_number, o.total, o.payment_method, o.status,
-               o.created_at, MAX(u.full_name) AS cashier,
+               o.created_at, COALESCE(o.origin_branch, 'cafe') AS origin_branch, MAX(u.full_name) AS cashier,
                GROUP_CONCAT(
                  CONCAT(
                    oi.quantity, '× ', m.name,
@@ -610,7 +632,7 @@ function handleFetchOrders() {
         LEFT JOIN order_items oi ON oi.order_id = o.id
         LEFT JOIN menu_items m ON oi.menu_item_id = m.id
         $where
-        GROUP BY o.id, o.order_number, o.total, o.payment_method, o.status, o.created_at
+        GROUP BY o.id, o.order_number, o.total, o.payment_method, o.status, o.created_at, o.origin_branch
         ORDER BY o.created_at DESC
         LIMIT 500
     ";
@@ -1874,12 +1896,14 @@ function handleStationOrders() {
         if ($ord['is_from_cafe'] && !empty($pizzaItems)) {
             $ord['target_station'] = 'pizza';
             $ord['notice_title']   = '🍕 NEW PIZZA ORDER FROM CAFE SIDE';
+            $ord['station_note']   = 'Punched at Cafe Counter — can be seen in Pizza side';
             $ord['action_items']   = $pizzaItems;
             $ord['action_summary'] = $ord['pizza_summary'];
             $ord['other_items']    = $cafeItems;
         } elseif ($ord['is_from_pizza'] && !empty($cafeItems)) {
             $ord['target_station'] = 'cafe';
             $ord['notice_title']   = '☕ NEW CAFE/DRINK ORDER FROM PIZZA SIDE';
+            $ord['station_note']   = 'Punched at Pizza Counter — can be seen in Cafe side';
             $ord['action_items']   = $cafeItems;
             $ord['action_summary'] = $ord['cafe_summary'];
             $ord['other_items']    = $pizzaItems;

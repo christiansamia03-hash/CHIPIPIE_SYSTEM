@@ -4865,6 +4865,7 @@ $_CSRF_TOKEN = getCsrfToken();
                 </div>
               </div>
               <div class="cart-footer">
+                <div id="cart-cross-station-note" style="display:none;"></div>
                 <div class="cart-total-row">
                   <span>Total</span>
                   <span id="cart-total">₱0.00</span>
@@ -5992,6 +5993,8 @@ $_CSRF_TOKEN = getCsrfToken();
           <div class="pad-value" id="pay-amount-display">₱0.00</div>
         </div>
 
+        <div id="pay-cross-station-note" style="display:none;"></div>
+
         <!-- Method tabs -->
         <div class="pay-method-tabs">
           <button class="pay-method-btn active" id="pm-cash-btn" onclick="selectPayMethod('Cash')">
@@ -6214,6 +6217,7 @@ $_CSRF_TOKEN = getCsrfToken();
         <div class="poi-icon"><i class="bi bi-printer-fill"></i></div>
         <h5>Payment Confirmed! ✓</h5>
         <p>Order <strong id="poi-order-num">#001</strong> &mdash; Select print option</p>
+        <div id="poi-cross-station-note" style="display:none;"></div>
       </div>
       <div class="print-opts-body">
         <!-- Option 1: Kitchen Only -->
@@ -6268,13 +6272,13 @@ $_CSRF_TOKEN = getCsrfToken();
         <div style="background: linear-gradient(135deg, #2b1307 0%, #4a210d 100%); padding: 20px 24px; color: #fff; position: relative;">
           <div style="display: flex; align-items: center; justify-content: space-between;">
             <div style="display: flex; align-items: center; gap: 12px;">
-              <div style="width: 44px; height: 44px; border-radius: 12px; background: rgba(224, 102, 36, 0.25); border: 1.5px solid #e06624; display: flex; align-items: center; justify-content: center; font-size: 22px;">
+              <div id="pom-header-icon" style="width: 44px; height: 44px; border-radius: 12px; background: rgba(224, 102, 36, 0.25); border: 1.5px solid #e06624; display: flex; align-items: center; justify-content: center; font-size: 22px;">
                 🍕
               </div>
               <div>
                 <h5 style="margin: 0; font-weight: 800; font-size: 19px; color: #fff; letter-spacing: -0.3px;" id="pom-order-number">Order #---</h5>
-                <span style="font-size: 12px; color: #e8a87c; font-weight: 500;">
-                  <i class="bi bi-shop me-1"></i>Punched at Cafe Counter &bull; <span id="pom-order-time">--:--</span>
+                <span style="font-size: 12px; color: #e8a87c; font-weight: 500;" id="pom-order-time">
+                  <i class="bi bi-shop me-1"></i>Punched at Cafe Counter &bull; --:--
                 </span>
               </div>
             </div>
@@ -6285,7 +6289,7 @@ $_CSRF_TOKEN = getCsrfToken();
         <!-- Body -->
         <div class="modal-body" style="padding: 22px 24px; background: #ffffff;">
           <!-- Cashier & Status Meta Bar -->
-          <div style="display: flex; justify-content: space-between; align-items: center; background: #fff8f3; border: 1px solid #fed7aa; padding: 10px 14px; border-radius: 12px; margin-bottom: 18px; font-size: 12.5px;">
+          <div style="display: flex; justify-content: space-between; align-items: center; background: #fff8f3; border: 1px solid #fed7aa; padding: 10px 14px; border-radius: 12px; margin-bottom: 14px; font-size: 12.5px;">
             <div>
               <span style="color: #78350f; font-weight: 600;"><i class="bi bi-person-badge me-1"></i>Punched by:</span>
               <strong id="pom-cashier" style="color: #9a3412;">--</strong>
@@ -6295,10 +6299,13 @@ $_CSRF_TOKEN = getCsrfToken();
             </div>
           </div>
 
-          <!-- Section: Pizza Station Items to Prepare -->
+          <!-- Cross-Station Notice Banner -->
+          <div id="pom-cross-station-banner"></div>
+
+          <!-- Section: Station Items to Prepare -->
           <div style="margin-bottom: 18px;">
             <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
-              <span style="font-size: 12px; font-weight: 800; color: #c2410c; text-transform: uppercase; letter-spacing: 0.5px;">
+              <span id="pom-section-title" style="font-size: 12px; font-weight: 800; color: #c2410c; text-transform: uppercase; letter-spacing: 0.5px;">
                 <i class="bi bi-fire me-1"></i>Pizza Items to Prepare (<span id="pom-pizza-count">0</span>)
               </span>
               <span style="font-size: 11px; color: #ea580c; font-weight: 600; background: #ffedd5; padding: 2px 8px; border-radius: 12px;">Kitchen Action</span>
@@ -7134,6 +7141,60 @@ $_CSRF_TOKEN = getCsrfToken();
     }
 
     /* ========== POS ========== */
+    const POS_PIZZA_CAT_IDS = new Set([10, 11, 12, 13, 14, 15, 16]);
+
+    function isItemPizza(item) {
+      if (!item) return false;
+      const catId = Number(item.category_id || item.categoryId || 0);
+      return POS_PIZZA_CAT_IDS.has(catId);
+    }
+
+    function getCartCrossStationInfo() {
+      if (typeof cart === 'undefined') return null;
+      const keys = Object.keys(cart);
+      if (!keys.length) return null;
+
+      const originStation = (_userAssignedStation === 'pizza') ? 'pizza'
+                          : (_userAssignedStation === 'cafe') ? 'cafe'
+                          : (_activeBranch === 'pizza' ? 'pizza' : 'cafe');
+
+      let pizzaCount = 0;
+      let cafeCount = 0;
+
+      keys.forEach(k => {
+        const entry = cart[k];
+        if (!entry) return;
+        const m = (typeof menuItems !== 'undefined') ? menuItems.find(x => x.id == entry.itemId) : null;
+        if (!m) return;
+        if (isItemPizza(m)) {
+          pizzaCount += (entry.qty || 1);
+        } else {
+          cafeCount += (entry.qty || 1);
+        }
+      });
+
+      if (originStation === 'cafe' && pizzaCount > 0) {
+        return {
+          type: 'to_pizza',
+          origin: 'cafe',
+          target: 'pizza',
+          count: pizzaCount,
+          title: 'Sent to Pizza Counter',
+          note: 'Note: This order contains Pizza items and can be seen in the Pizza side for preparation.'
+        };
+      } else if (originStation === 'pizza' && cafeCount > 0) {
+        return {
+          type: 'to_cafe',
+          origin: 'pizza',
+          target: 'cafe',
+          count: cafeCount,
+          title: 'Sent to Cafe Counter',
+          note: 'Note: This order contains Cafe/Drink items and can be seen in the Cafe side for preparation.'
+        };
+      }
+      return null;
+    }
+
     let _activeBranch = 'coffee'; // 'coffee' | 'pizza'
 
     function switchBranch(branch) {
@@ -7575,6 +7636,8 @@ $_CSRF_TOKEN = getCsrfToken();
         if (mTotal) mTotal.textContent = '₱0.00';
         const mFloatTot = document.getElementById('pmf-badge-total');
         if (mFloatTot) mFloatTot.textContent = '₱0.00';
+        const noteEl = document.getElementById('cart-cross-station-note');
+        if (noteEl) { noteEl.innerHTML = ''; noteEl.style.display = 'none'; }
         if (floatBar) floatBar.classList.remove('visible');
         return;
       }
@@ -7606,6 +7669,34 @@ $_CSRF_TOKEN = getCsrfToken();
       if (mTotal) mTotal.textContent = totalFmt;
       const mFloatTot = document.getElementById('pmf-badge-total');
       if (mFloatTot) mFloatTot.textContent = totalFmt;
+
+      // Render Cross-Station Note in Cart
+      const csInfo = getCartCrossStationInfo();
+      const noteEl = document.getElementById('cart-cross-station-note');
+      if (noteEl) {
+        if (csInfo) {
+          const isToPizza = (csInfo.target === 'pizza');
+          const bg = isToPizza ? '#fff7ed' : '#fefce8';
+          const border = isToPizza ? '#fed7aa' : '#fef08a';
+          const borderLeft = isToPizza ? '#ea580c' : '#ca8a04';
+          const textCol = isToPizza ? '#9a3412' : '#854d0e';
+          const titleCol = isToPizza ? '#c2410c' : '#a16207';
+          const icon = isToPizza ? 'bi-fire' : 'bi-cup-hot-fill';
+          noteEl.innerHTML = `
+            <div style="background:${bg}; border:1.5px solid ${border}; border-left:4px solid ${borderLeft}; border-radius:10px; padding:9px 11px; margin-bottom:12px; font-size:11.5px; color:${textCol}; display:flex; align-items:flex-start; gap:8px; line-height:1.35; box-shadow:0 2px 6px rgba(0,0,0,0.04);">
+              <i class="bi ${icon}" style="font-size:15px; color:${borderLeft}; flex-shrink:0; margin-top:1px;"></i>
+              <div>
+                <strong style="color:${titleCol}; display:block;">${csInfo.title} (${csInfo.count})</strong>
+                <span>${csInfo.note}</span>
+              </div>
+            </div>
+          `;
+          noteEl.style.display = 'block';
+        } else {
+          noteEl.innerHTML = '';
+          noteEl.style.display = 'none';
+        }
+      }
 
       if (floatBar) {
         if (totalQty > 0 && _activeMobilePosTab === 'menu') {
@@ -7672,6 +7763,26 @@ $_CSRF_TOKEN = getCsrfToken();
 
       // Reset modal state
       document.getElementById('pay-amount-display').textContent = '₱' + _pendingCartTotal.toFixed(2);
+      const csInfo = getCartCrossStationInfo();
+      const payNoteEl = document.getElementById('pay-cross-station-note');
+      if (payNoteEl) {
+        if (csInfo) {
+          const isToPizza = (csInfo.target === 'pizza');
+          const bg = isToPizza ? '#fff7ed' : '#fefce8';
+          const border = isToPizza ? '#fed7aa' : '#fef08a';
+          const textCol = isToPizza ? '#9a3412' : '#854d0e';
+          const icon = isToPizza ? '🍕' : '☕';
+          payNoteEl.innerHTML = `
+            <div style="background:${bg}; border:1.5px solid ${border}; border-radius:10px; padding:9px 12px; margin-bottom:14px; font-size:12px; color:${textCol}; font-weight:600; text-align:center;">
+              ${icon} <strong>Note:</strong> Contains ${isToPizza ? 'Pizza' : 'Cafe/Drink'} items &mdash; will be seen on the <strong>${isToPizza ? 'Pizza' : 'Cafe'} side</strong> for preparation.
+            </div>
+          `;
+          payNoteEl.style.display = 'block';
+        } else {
+          payNoteEl.innerHTML = '';
+          payNoteEl.style.display = 'none';
+        }
+      }
       document.getElementById('pay-tendered').value = '';
       document.getElementById('pay-change-display').textContent = '₱0.00';
       const changeRow = document.getElementById('pay-change-row');
@@ -8092,6 +8203,43 @@ $_CSRF_TOKEN = getCsrfToken();
       _pendingPrintData = data;
       const numEl = document.getElementById('poi-order-num');
       if (numEl) numEl.textContent = data.orderNumber || ('#' + String(data.id || 1).padStart(3, '0'));
+
+      const noteEl = document.getElementById('poi-cross-station-note');
+      if (noteEl) {
+        let hasPizza = false;
+        let hasCafe = false;
+        const items = data.items || [];
+        items.forEach(it => {
+          const m = (typeof menuItems !== 'undefined') ? menuItems.find(x => x.id == (it.id || it.itemId || it.item_id)) : null;
+          const catId = m ? Number(m.category_id) : Number(it.category_id || 0);
+          if (POS_PIZZA_CAT_IDS.has(catId)) hasPizza = true;
+          else hasCafe = true;
+        });
+
+        const origin = (_userAssignedStation === 'pizza') ? 'pizza'
+                     : (_userAssignedStation === 'cafe') ? 'cafe'
+                     : (_activeBranch === 'pizza' ? 'pizza' : 'cafe');
+
+        if (origin === 'cafe' && hasPizza) {
+          noteEl.innerHTML = `
+            <div style="background:#fff7ed; border:1.5px solid #fed7aa; color:#9a3412; padding:9px 12px; border-radius:10px; font-size:12px; font-weight:600; margin-top:10px; text-align:center;">
+              🍕 <strong>Note:</strong> Pizza items from this order can be seen in the <strong>Pizza side</strong>.
+            </div>
+          `;
+          noteEl.style.display = 'block';
+        } else if (origin === 'pizza' && hasCafe) {
+          noteEl.innerHTML = `
+            <div style="background:#fefce8; border:1.5px solid #fef08a; color:#854d0e; padding:9px 12px; border-radius:10px; font-size:12px; font-weight:600; margin-top:10px; text-align:center;">
+              ☕ <strong>Note:</strong> Cafe items from this order can be seen in the <strong>Cafe side</strong>.
+            </div>
+          `;
+          noteEl.style.display = 'block';
+        } else {
+          noteEl.innerHTML = '';
+          noteEl.style.display = 'none';
+        }
+      }
+
       const modal = document.getElementById('printOptsModal');
       if (modal) {
         modal.classList.add('open');
@@ -8124,6 +8272,24 @@ $_CSRF_TOKEN = getCsrfToken();
         timeStr = String(timeStr).replace(/,\s*\d{4}/, '');
       }
       const items = data.items || [];
+      let stationNoticeHtml = '';
+      let hasPizza = false;
+      let hasCafe = false;
+      items.forEach(it => {
+        const m = (typeof menuItems !== 'undefined') ? menuItems.find(x => x.id == (it.id || it.itemId || it.item_id)) : null;
+        const catId = m ? Number(m.category_id) : Number(it.category_id || 0);
+        if (POS_PIZZA_CAT_IDS.has(catId)) hasPizza = true;
+        else hasCafe = true;
+      });
+      const origin = (_userAssignedStation === 'pizza') ? 'pizza'
+                   : (_userAssignedStation === 'cafe') ? 'cafe'
+                   : (_activeBranch === 'pizza' ? 'pizza' : 'cafe');
+      if (origin === 'cafe' && hasPizza) {
+        stationNoticeHtml = `<div style="text-align:center;font-size:8.5px;font-weight:900;border:1px solid #000;padding:2px;margin:2px 0;">* NOTE: CAN BE SEEN IN PIZZA SIDE *</div>`;
+      } else if (origin === 'pizza' && hasCafe) {
+        stationNoticeHtml = `<div style="text-align:center;font-size:8.5px;font-weight:900;border:1px solid #000;padding:2px;margin:2px 0;">* NOTE: CAN BE SEEN IN CAFE SIDE *</div>`;
+      }
+
       const itemRows = items.map(it => {
         const qty  = it.qty || it.quantity || 1;
         const name = escapeHtml(it.name || 'Item');
@@ -8142,6 +8308,7 @@ $_CSRF_TOKEN = getCsrfToken();
         <div style="text-align:center;margin-bottom:3px;">
           <div style="font-size:12px;font-weight:900;letter-spacing:0.5px;color:#000;">** KITCHEN ORDER **</div>
           <div style="font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:0.5px;margin-top:1px;color:#000;">CHIPIPIE CAFE</div>
+          ${stationNoticeHtml}
         </div>
         <div style="border-top:2px solid #000;margin:3px 0;"></div>
         <div style="display:flex;justify-content:space-between;align-items:center;margin:2px 0;">
@@ -8461,10 +8628,19 @@ $_CSRF_TOKEN = getCsrfToken();
             items: (res.order && res.order.line_items && res.order.line_items.length) ? res.order.line_items : cartSnapshot
           };
 
+          const csInfo = getCartCrossStationInfo();
           // ── Close pay modal THEN immediately show print options (no overlap) ──
           closePayModal();
           clearCart();
-          showToast('✅ ' + methodLabel + ' payment confirmed! ' + res.message);
+          let csToastExtra = '';
+          if (csInfo) {
+            csToastExtra = (csInfo.target === 'pizza')
+              ? ' 🍕 Note: Pizza items can now be seen in the Pizza side.'
+              : ' ☕ Note: Cafe items can now be seen in the Cafe side.';
+          } else if (res.order && res.order.cross_station_note) {
+            csToastExtra = ' ' + res.order.cross_station_note;
+          }
+          showToast('✅ ' + methodLabel + ' payment confirmed!' + csToastExtra);
           showPrintOptionsModal(receiptData);
 
           // Background refreshes (fire-and-forget — non-blocking)
@@ -8920,6 +9096,9 @@ $_CSRF_TOKEN = getCsrfToken();
         </div>
         <div style="font-size:11px; color:#e2d9d2; margin-bottom:10px;">
           <i class="bi bi-shop me-1"></i>${originLabel} &bull; ${escapeHtml(cashierName)}
+          <div style="margin-top:3px; color:#fde047; font-weight:700; font-size:11px;">
+            <i class="bi bi-arrow-right-circle me-1"></i>Note: Can be seen in ${isCafeCard ? 'Cafe' : 'Pizza'} side
+          </div>
         </div>
         <div class="pizza-order-footer">
           <button type="button" class="pizza-order-ack-btn" onclick="event.stopPropagation(); acknowledgeStationOrder(${order.id}, '${stationType}');" title="Acknowledge and minimize away from cart">
@@ -9084,21 +9263,56 @@ $_CSRF_TOKEN = getCsrfToken();
       const payEl = document.getElementById('pom-payment-badge');
       const totEl = document.getElementById('pom-total');
       const countEl = document.getElementById('pom-pizza-count');
+      const iconEl = document.getElementById('pom-header-icon');
+      const bannerEl = document.getElementById('pom-cross-station-banner');
+      const secTitleEl = document.getElementById('pom-section-title');
 
       if (numEl) numEl.textContent = `Order ${order.order_number || '#---'}`;
+      if (iconEl) iconEl.textContent = isCafe ? '☕' : '🍕';
       if (timeEl) {
-        const originDesc = isCafe ? 'Punched at Pizza Counter' : 'Punched at Cafe Counter';
-        timeEl.innerHTML = `<i class="bi bi-shop me-1"></i>${originDesc} &bull; ${escapeHtml(order.time || '')} &bull; ${escapeHtml(order.date || '')}`;
+        const originDesc = isCafe ? 'Punched at Pizza Counter &bull; Visible on Cafe side' : 'Punched at Cafe Counter &bull; Visible on Pizza side';
+        timeEl.innerHTML = `<i class="bi bi-shop me-1"></i><strong>${originDesc}</strong> &bull; ${escapeHtml(order.time || '')} &bull; ${escapeHtml(order.date || '')}`;
       }
       if (cashEl) cashEl.textContent = order.cashier || 'Staff';
       if (payEl) payEl.textContent = order.payment_method || 'Cash';
       if (totEl) totEl.textContent = '₱' + parseFloat(order.total || 0).toLocaleString('en-US', { minimumFractionDigits: 2 });
 
+      if (bannerEl) {
+        if (isCafe) {
+          bannerEl.innerHTML = `
+            <div style="background:#fefce8; border:1.5px solid #fef08a; border-left:4px solid #ca8a04; border-radius:10px; padding:10px 12px; margin-bottom:14px; font-size:12px; color:#854d0e; display:flex; align-items:center; gap:8px;">
+              <i class="bi bi-info-circle-fill" style="font-size:16px; color:#ca8a04; flex-shrink:0;"></i>
+              <span><strong>Cross-Station Note:</strong> Cashier from <strong>Pizza Counter</strong> ordered drinks/cafe items. It can be seen and prepared here in the <strong>Cafe side</strong>.</span>
+            </div>
+          `;
+          bannerEl.style.display = 'block';
+        } else {
+          bannerEl.innerHTML = `
+            <div style="background:#fff7ed; border:1.5px solid #fed7aa; border-left:4px solid #ea580c; border-radius:10px; padding:10px 12px; margin-bottom:14px; font-size:12px; color:#9a3412; display:flex; align-items:center; gap:8px;">
+              <i class="bi bi-info-circle-fill" style="font-size:16px; color:#ea580c; flex-shrink:0;"></i>
+              <span><strong>Cross-Station Note:</strong> Cashier from <strong>Cafe Counter</strong> ordered pizza items. It can be seen and prepared here in the <strong>Pizza side</strong>.</span>
+            </div>
+          `;
+          bannerEl.style.display = 'block';
+        }
+      }
+
       // Action items to prepare
       const actionItems = order.action_items || (isCafe ? order.cafe_items : order.pizza_items) || [];
       const otherItems  = order.other_items  || (isCafe ? order.pizza_items : order.cafe_items) || [];
 
-      if (countEl) countEl.textContent = actionItems.reduce((sum, it) => sum + (it.qty || 1), 0);
+      const prepCount = actionItems.reduce((sum, it) => sum + (it.qty || 1), 0);
+      if (countEl) countEl.textContent = prepCount;
+
+      if (secTitleEl) {
+        if (isCafe) {
+          secTitleEl.style.color = '#b45309';
+          secTitleEl.innerHTML = `<i class="bi bi-cup-hot-fill me-1"></i>Cafe / Drinks Items to Prepare (<span id="pom-pizza-count">${prepCount}</span>)`;
+        } else {
+          secTitleEl.style.color = '#c2410c';
+          secTitleEl.innerHTML = `<i class="bi bi-fire me-1"></i>Pizza Items to Prepare (<span id="pom-pizza-count">${prepCount}</span>)`;
+        }
+      }
 
       const pizzaList = document.getElementById('pom-pizza-items-list');
       if (pizzaList) {
@@ -9495,6 +9709,15 @@ $_CSRF_TOKEN = getCsrfToken();
             const isRefunded  = o.status === 'Refunded';
             const isCompleted = o.status === 'Completed';
             const pmColor     = o.payment_method === 'GCash' ? '#0070f3' : '#059669';
+
+            let stationBadge = '';
+            const originBr = o.origin_branch || 'cafe';
+            if (originBr === 'cafe' && o.items && /pizza|quesadilla|patatas|pasta|chickenpops|gipitmeal/i.test(o.items)) {
+              stationBadge = ` &nbsp;·&nbsp; <span style="background:#fff7ed;color:#c2410c;border:1px solid #fed7aa;border-radius:20px;padding:1px 7px;font-size:9.5px;font-weight:700;"><i class="bi bi-fire me-1"></i>Seen in Pizza side</span>`;
+            } else if (originBr === 'pizza' && o.items && /coffee|tea|milktea|mojito|boba|float|frapp/i.test(o.items)) {
+              stationBadge = ` &nbsp;·&nbsp; <span style="background:#fefce8;color:#a16207;border:1px solid #fef08a;border-radius:20px;padding:1px 7px;font-size:9.5px;font-weight:700;"><i class="bi bi-cup-hot-fill me-1"></i>Seen in Cafe side</span>`;
+            }
+
             const statusBadge = isVoided
               ? `<span style="background:#fee2e2;color:#b91c1c;border-radius:20px;padding:2px 10px;font-size:10px;font-weight:700;">Voided</span>`
               : isRefunded
@@ -9516,7 +9739,7 @@ $_CSRF_TOKEN = getCsrfToken();
                 <div class="order-card-num">${o.order_number}</div>
                 <div class="order-card-meta">
                   <div>${o.date}</div>
-                  <div>${o.time} &nbsp;·&nbsp; ${o.cashier || 'Cashier'} &nbsp;·&nbsp; <span style="background:${pmColor}15;color:${pmColor};border-radius:20px;padding:2px 8px;font-size:10px;font-weight:700;">${o.payment_method}</span></div>
+                  <div>${o.time} &nbsp;·&nbsp; ${o.cashier || 'Cashier'} &nbsp;·&nbsp; <span style="background:${pmColor}15;color:${pmColor};border-radius:20px;padding:2px 8px;font-size:10px;font-weight:700;">${o.payment_method}</span>${stationBadge}</div>
                 </div>
                 <div class="order-card-total">₱${parseFloat(o.total).toLocaleString(undefined,{minimumFractionDigits:2})}</div>
                 ${statusBadge}
@@ -10202,7 +10425,7 @@ $_CSRF_TOKEN = getCsrfToken();
 
     /* ========== MENU TABLE ========== */
 
-    const POS_PIZZA_CAT_IDS = new Set([10, 11, 12, 13, 14, 15, 16]);
+    // POS_PIZZA_CAT_IDS defined globally above
     let currentMenuFilter = null; // null=all, string=category name
 
     function buildMenuDropdowns() {
