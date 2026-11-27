@@ -4865,7 +4865,17 @@ $_CSRF_TOKEN = getCsrfToken();
                 </div>
               </div>
               <div class="cart-footer">
-                <div id="cart-cross-station-note" style="display:none;"></div>
+                <div id="cart-order-note-box" style="margin-bottom: 12px; display: none;">
+                  <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 5px;">
+                    <label for="cart-order-notes" id="cart-order-notes-label" style="font-size: 11.5px; font-weight: 700; color: #57534e; margin: 0; display: flex; align-items: center; gap: 4px;">
+                      <i class="bi bi-pencil-square" style="color: var(--cafe-amber);"></i>
+                      <span>Order Note / Instructions</span>
+                    </label>
+                    <span id="cart-order-notes-tag" style="font-size: 10px; font-weight: 700; padding: 2px 7px; border-radius: 12px; display: none;"></span>
+                  </div>
+                  <textarea id="cart-order-notes" class="form-control" rows="2" placeholder="Input note for pizza/station..." style="font-size: 12px; border-radius: 8px; border: 1px solid #d6d3d1; resize: none; padding: 6px 10px; background: #fff;"></textarea>
+                  <div id="cart-cross-station-note" style="display: none; margin-top: 6px;"></div>
+                </div>
                 <div class="cart-total-row">
                   <span>Total</span>
                   <span id="cart-total">₱0.00</span>
@@ -5993,7 +6003,17 @@ $_CSRF_TOKEN = getCsrfToken();
           <div class="pad-value" id="pay-amount-display">₱0.00</div>
         </div>
 
-        <div id="pay-cross-station-note" style="display:none;"></div>
+        <div id="pay-order-note-box" style="margin-bottom: 14px;">
+          <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 4px;">
+            <label for="pay-order-notes" id="pay-order-notes-label" style="font-size: 11.5px; font-weight: 700; color: #57534e; margin: 0; display: flex; align-items: center; gap: 4px;">
+              <i class="bi bi-pencil-square" style="color: var(--cafe-amber);"></i>
+              <span>Order Note / Instructions</span>
+            </label>
+            <span id="pay-order-notes-tag" style="font-size: 10px; font-weight: 700; padding: 2px 7px; border-radius: 12px; display: none;"></span>
+          </div>
+          <textarea id="pay-order-notes" class="form-control" rows="2" placeholder="Input note for pizza/station..." style="font-size: 12px; border-radius: 8px; border: 1px solid #d6d3d1; resize: none; padding: 6px 10px; background: #fff;" oninput="syncNotesFromPayModal(this.value)"></textarea>
+          <div id="pay-cross-station-note" style="display: none; margin-top: 6px;"></div>
+        </div>
 
         <!-- Method tabs -->
         <div class="pay-method-tabs">
@@ -6301,6 +6321,33 @@ $_CSRF_TOKEN = getCsrfToken();
 
           <!-- Cross-Station Notice Banner -->
           <div id="pom-cross-station-banner"></div>
+
+          <!-- Station Order Note (Editable & Visible) -->
+          <div id="pom-order-note-container" style="background: #fffbeb; border: 1.5px solid #fef3c7; border-left: 4px solid #f59e0b; border-radius: 12px; padding: 12px 14px; margin-bottom: 18px;">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px;">
+              <span style="font-size: 12px; font-weight: 800; color: #92400e; text-transform: uppercase; letter-spacing: 0.5px; display: flex; align-items: center; gap: 6px;">
+                <i class="bi bi-chat-left-dots-fill" style="color: #d97706; font-size: 14px;"></i>
+                <span id="pom-notes-heading">Station Note / Special Instructions</span>
+              </span>
+              <button type="button" class="btn btn-sm" id="pom-edit-note-btn" onclick="togglePomNoteEdit()" style="font-size: 11px; font-weight: 700; color: #92400e; background: #fef3c7; border: 1px solid #fde68a; border-radius: 6px; padding: 2px 8px;">
+                <i class="bi bi-pencil me-1"></i>Edit Note
+              </button>
+            </div>
+            <!-- View Mode -->
+            <div id="pom-notes-view" style="font-size: 13px; color: #78350f; font-weight: 600; line-height: 1.4; word-break: break-word;">
+              No special note added.
+            </div>
+            <!-- Edit Mode -->
+            <div id="pom-notes-edit" style="display: none; margin-top: 8px;">
+              <textarea id="pom-notes-input" class="form-control" rows="2" placeholder="Input or edit note for this order..." style="font-size: 12.5px; border-radius: 8px; border: 1px solid #fde68a; padding: 6px 10px; background: #fff;"></textarea>
+              <div style="display: flex; gap: 6px; justify-content: flex-end; margin-top: 8px;">
+                <button type="button" class="btn btn-sm btn-outline-secondary" onclick="cancelPomNoteEdit()" style="font-size: 11.5px; padding: 4px 10px; border-radius: 6px;">Cancel</button>
+                <button type="button" class="btn btn-sm btn-warning" id="pom-save-note-btn" onclick="savePomNoteEdit()" style="font-size: 11.5px; font-weight: 700; padding: 4px 12px; border-radius: 6px; background: #d97706; color: #fff; border: none;">
+                  <i class="bi bi-check me-1"></i>Save Note
+                </button>
+              </div>
+            </div>
+          </div>
 
           <!-- Section: Station Items to Prepare -->
           <div style="margin-bottom: 18px;">
@@ -7195,6 +7242,20 @@ $_CSRF_TOKEN = getCsrfToken();
       return null;
     }
 
+    let _currentCartNotes = '';
+
+    function syncNotesFromPayModal(val) {
+      _currentCartNotes = val;
+      const cartInput = document.getElementById('cart-order-notes');
+      if (cartInput) cartInput.value = val;
+    }
+
+    function syncNotesFromCart(val) {
+      _currentCartNotes = val;
+      const payInput = document.getElementById('pay-order-notes');
+      if (payInput) payInput.value = val;
+    }
+
     let _activeBranch = 'coffee'; // 'coffee' | 'pizza'
 
     function switchBranch(branch) {
@@ -7636,6 +7697,11 @@ $_CSRF_TOKEN = getCsrfToken();
         if (mTotal) mTotal.textContent = '₱0.00';
         const mFloatTot = document.getElementById('pmf-badge-total');
         if (mFloatTot) mFloatTot.textContent = '₱0.00';
+        const noteBox = document.getElementById('cart-order-note-box');
+        if (noteBox) noteBox.style.display = 'none';
+        _currentCartNotes = '';
+        const cartNotesInput = document.getElementById('cart-order-notes');
+        if (cartNotesInput) cartNotesInput.value = '';
         const noteEl = document.getElementById('cart-cross-station-note');
         if (noteEl) { noteEl.innerHTML = ''; noteEl.style.display = 'none'; }
         if (floatBar) floatBar.classList.remove('visible');
@@ -7670,9 +7736,56 @@ $_CSRF_TOKEN = getCsrfToken();
       const mFloatTot = document.getElementById('pmf-badge-total');
       if (mFloatTot) mFloatTot.textContent = totalFmt;
 
-      // Render Cross-Station Note in Cart
+      // Render Cross-Station / Order Note Box in Cart
       const csInfo = getCartCrossStationInfo();
+      const noteBox = document.getElementById('cart-order-note-box');
+      const noteLabel = document.getElementById('cart-order-notes-label');
+      const noteTag = document.getElementById('cart-order-notes-tag');
+      const noteInput = document.getElementById('cart-order-notes');
       const noteEl = document.getElementById('cart-cross-station-note');
+
+      if (noteBox) {
+        noteBox.style.display = 'block';
+        if (noteInput) {
+          noteInput.value = _currentCartNotes || '';
+          noteInput.oninput = function() {
+            syncNotesFromCart(this.value);
+          };
+        }
+        if (csInfo) {
+          const isToPizza = (csInfo.target === 'pizza');
+          if (noteLabel) {
+            noteLabel.innerHTML = isToPizza
+              ? `<i class="bi bi-pencil-square" style="color:#ea580c;"></i> <span>Note for Pizza Side:</span>`
+              : `<i class="bi bi-pencil-square" style="color:#ca8a04;"></i> <span>Note for Cafe Side:</span>`;
+          }
+          if (noteTag) {
+            noteTag.style.display = 'inline-block';
+            noteTag.style.background = isToPizza ? '#ffedd5' : '#fef9c3';
+            noteTag.style.color = isToPizza ? '#c2410c' : '#a16207';
+            noteTag.style.border = isToPizza ? '1px solid #fed7aa' : '1px solid #fef08a';
+            noteTag.innerHTML = isToPizza
+              ? `<i class="bi bi-fire me-1"></i>Can be seen in Pizza side`
+              : `<i class="bi bi-cup-hot-fill me-1"></i>Can be seen in Cafe side`;
+          }
+          if (noteInput && !noteInput.value) {
+            noteInput.placeholder = isToPizza
+              ? `Input note for Pizza Counter (e.g., Less spicy, well done, Table 4...)`
+              : `Input note for Cafe Counter (e.g., Less ice, extra hot, oat milk...)`;
+          }
+        } else {
+          if (noteLabel) {
+            noteLabel.innerHTML = `<i class="bi bi-pencil-square" style="color:var(--cafe-amber);"></i> <span>Order / Kitchen Note:</span>`;
+          }
+          if (noteTag) {
+            noteTag.style.display = 'none';
+          }
+          if (noteInput && !noteInput.value) {
+            noteInput.placeholder = `Add note for preparation / special requests (optional)...`;
+          }
+        }
+      }
+
       if (noteEl) {
         if (csInfo) {
           const isToPizza = (csInfo.target === 'pizza');
@@ -7731,6 +7844,11 @@ $_CSRF_TOKEN = getCsrfToken();
 
     function clearCart() {
       cart = {};
+      _currentCartNotes = '';
+      const cartNotesInput = document.getElementById('cart-order-notes');
+      if (cartNotesInput) cartNotesInput.value = '';
+      const payNotesInput = document.getElementById('pay-order-notes');
+      if (payNotesInput) payNotesInput.value = '';
       renderCart();
       if (window.innerWidth <= 768 && _activeMobilePosTab === 'cart') {
         setTimeout(() => switchMobilePosTab('menu'), 250);
@@ -7764,21 +7882,55 @@ $_CSRF_TOKEN = getCsrfToken();
       // Reset modal state
       document.getElementById('pay-amount-display').textContent = '₱' + _pendingCartTotal.toFixed(2);
       const csInfo = getCartCrossStationInfo();
+      const payNotesInput = document.getElementById('pay-order-notes');
+      const payNotesLabel = document.getElementById('pay-order-notes-label');
+      const payNotesTag   = document.getElementById('pay-order-notes-tag');
       const payNoteEl = document.getElementById('pay-cross-station-note');
-      if (payNoteEl) {
-        if (csInfo) {
-          const isToPizza = (csInfo.target === 'pizza');
-          const bg = isToPizza ? '#fff7ed' : '#fefce8';
-          const border = isToPizza ? '#fed7aa' : '#fef08a';
-          const textCol = isToPizza ? '#9a3412' : '#854d0e';
+
+      if (payNotesInput) {
+        payNotesInput.value = _currentCartNotes || '';
+      }
+      if (csInfo) {
+        const isToPizza = (csInfo.target === 'pizza');
+        if (payNotesLabel) {
+          payNotesLabel.innerHTML = isToPizza
+            ? `<i class="bi bi-pencil-square" style="color:#ea580c;"></i> <span>Note for Pizza Side:</span>`
+            : `<i class="bi bi-pencil-square" style="color:#ca8a04;"></i> <span>Note for Cafe Side:</span>`;
+        }
+        if (payNotesTag) {
+          payNotesTag.style.display = 'inline-block';
+          payNotesTag.style.background = isToPizza ? '#ffedd5' : '#fef9c3';
+          payNotesTag.style.color = isToPizza ? '#c2410c' : '#a16207';
+          payNotesTag.style.border = isToPizza ? '1px solid #fed7aa' : '1px solid #fef08a';
+          payNotesTag.innerHTML = isToPizza
+            ? `<i class="bi bi-fire me-1"></i>Can be seen in Pizza side`
+            : `<i class="bi bi-cup-hot-fill me-1"></i>Can be seen in Cafe side`;
+        }
+        if (payNotesInput && !payNotesInput.value) {
+          payNotesInput.placeholder = isToPizza
+            ? `Input note for Pizza Counter (e.g., Less spicy, well done, Table 4...)`
+            : `Input note for Cafe Counter (e.g., Less ice, extra hot, oat milk...)`;
+        }
+        if (payNoteEl) {
           const icon = isToPizza ? '🍕' : '☕';
           payNoteEl.innerHTML = `
-            <div style="background:${bg}; border:1.5px solid ${border}; border-radius:10px; padding:9px 12px; margin-bottom:14px; font-size:12px; color:${textCol}; font-weight:600; text-align:center;">
+            <div style="background:${isToPizza ? '#fff7ed' : '#fefce8'}; border:1.5px solid ${isToPizza ? '#fed7aa' : '#fef08a'}; border-radius:10px; padding:7px 12px; margin-bottom:10px; font-size:11.5px; color:${isToPizza ? '#9a3412' : '#854d0e'}; font-weight:600; text-align:center;">
               ${icon} <strong>Note:</strong> Contains ${isToPizza ? 'Pizza' : 'Cafe/Drink'} items &mdash; will be seen on the <strong>${isToPizza ? 'Pizza' : 'Cafe'} side</strong> for preparation.
             </div>
           `;
           payNoteEl.style.display = 'block';
-        } else {
+        }
+      } else {
+        if (payNotesLabel) {
+          payNotesLabel.innerHTML = `<i class="bi bi-pencil-square" style="color:var(--cafe-amber);"></i> <span>Order / Kitchen Note:</span>`;
+        }
+        if (payNotesTag) {
+          payNotesTag.style.display = 'none';
+        }
+        if (payNotesInput && !payNotesInput.value) {
+          payNotesInput.placeholder = `Add note for preparation / special requests (optional)...`;
+        }
+        if (payNoteEl) {
           payNoteEl.innerHTML = '';
           payNoteEl.style.display = 'none';
         }
@@ -8290,6 +8442,16 @@ $_CSRF_TOKEN = getCsrfToken();
         stationNoticeHtml = `<div style="text-align:center;font-size:8.5px;font-weight:900;border:1px solid #000;padding:2px;margin:2px 0;">* NOTE: CAN BE SEEN IN CAFE SIDE *</div>`;
       }
 
+      const rawOrderNote = data.notes || data.order_notes || (data.order && data.order.notes) || '';
+      let orderNotesHtml = '';
+      if (rawOrderNote && String(rawOrderNote).trim()) {
+        orderNotesHtml = `
+        <div style="border:1.5px solid #000;padding:4px;margin:5px 0;font-size:9.5px;font-weight:800;color:#000;word-break:break-word;">
+          <div style="font-size:8.5px;font-weight:900;text-transform:uppercase;margin-bottom:2px;">* SPECIAL NOTE / INSTRUCTIONS *</div>
+          ${escapeHtml(String(rawOrderNote).trim())}
+        </div>`;
+      }
+
       const itemRows = items.map(it => {
         const qty  = it.qty || it.quantity || 1;
         const name = escapeHtml(it.name || 'Item');
@@ -8321,6 +8483,7 @@ $_CSRF_TOKEN = getCsrfToken();
         <div style="border-top:1.5px dashed #000;margin:3px 0 4px 0;"></div>
         <div style="font-size:9px;font-weight:900;text-transform:uppercase;margin-bottom:3px;letter-spacing:0.5px;color:#000;">ITEMS TO PREPARE:</div>
         ${itemRows}
+        ${orderNotesHtml}
         <div style="border-top:2px solid #000;margin:3px 0;"></div>
         <div style="text-align:center;font-size:9.5px;font-weight:900;letter-spacing:0.5px;color:#000;">*** PREPARE NOW ***</div>
       </div>`;
@@ -8528,7 +8691,8 @@ $_CSRF_TOKEN = getCsrfToken();
             change: 0,
             cashier: o.cashier,
             date: o.formatted_date,
-            items: o.line_items || []
+            items: o.line_items || [],
+            notes: o.notes || ''
           });
         } else {
           showToast('⚠ Failed to fetch receipt: ' + (res.message || ''));
@@ -8593,7 +8757,8 @@ $_CSRF_TOKEN = getCsrfToken();
           payment_method: _paymentMethod,
           branch: _activeBranch,
           origin_branch: originStation,
-          station: _userAssignedStation
+          station: _userAssignedStation,
+          notes: _currentCartNotes
         });
         if (res.success) {
           if (res.order && res.order.id) {
@@ -8608,6 +8773,7 @@ $_CSRF_TOKEN = getCsrfToken();
             localStorage.setItem('chipipie_station_order_event', JSON.stringify({
               order_id: (res.order && res.order.id) || 0,
               origin_branch: (res.order && res.order.origin_branch) || originStation,
+              notes: (res.order && res.order.notes) || _currentCartNotes || '',
               timestamp: Date.now()
             }));
           } catch (e) {}
@@ -8625,7 +8791,8 @@ $_CSRF_TOKEN = getCsrfToken();
             change: changeAmount,
             cashier: (res.order && res.order.cashier) || (currentUser && (currentUser.full_name || currentUser.username)) || 'Cashier',
             date: (res.order && res.order.formatted_date) || (new Date().toLocaleDateString('en-PH', { month: 'short', day: 'numeric', year: 'numeric' }) + ' ' + new Date().toLocaleTimeString('en-PH', { hour: '2-digit', minute: '2-digit' })),
-            items: (res.order && res.order.line_items && res.order.line_items.length) ? res.order.line_items : cartSnapshot
+            items: (res.order && res.order.line_items && res.order.line_items.length) ? res.order.line_items : cartSnapshot,
+            notes: (res.order && res.order.notes) || _currentCartNotes || ''
           };
 
           const csInfo = getCartCrossStationInfo();
@@ -8864,6 +9031,50 @@ $_CSRF_TOKEN = getCsrfToken();
             updateStationBranchBadges();
           }
         } catch (err) {}
+      } else if (e.key === 'chipipie_station_note_updated' && e.newValue) {
+        try {
+          const data = JSON.parse(e.newValue);
+          if (data && data.order_id) {
+            const ordId = Number(data.order_id);
+            const newNote = data.notes || '';
+            const pz = _pendingPizzaOrders.find(o => o.id == ordId);
+            if (pz) pz.notes = newNote;
+            const cf = _pendingCafeOrders.find(o => o.id == ordId);
+            if (cf) cf.notes = newNote;
+
+            if (_activeStationModalOrder && _activeStationModalOrder.id == ordId) {
+              _activeStationModalOrder.notes = newNote;
+              const noteView = document.getElementById('pom-notes-view');
+              if (noteView) {
+                if (newNote) {
+                  noteView.textContent = newNote;
+                  noteView.style.fontStyle = 'normal';
+                  noteView.style.color = '#78350f';
+                } else {
+                  noteView.textContent = 'No special note added.';
+                  noteView.style.fontStyle = 'italic';
+                  noteView.style.color = '#a8a29e';
+                }
+              }
+              const noteInput = document.getElementById('pom-notes-input');
+              const editBox = document.getElementById('pom-notes-edit');
+              if (noteInput && (!editBox || editBox.style.display === 'none')) {
+                noteInput.value = newNote;
+              }
+            }
+
+            // Update visible card if present
+            const card = document.getElementById(`station-notif-order-${ordId}`);
+            if (card) {
+              const ord = pz || cf;
+              if (ord) {
+                const stType = ord.target_station || (pz ? 'pizza' : 'cafe');
+                card.remove();
+                showStationOrderNotice(ord, stType);
+              }
+            }
+          }
+        } catch (err) {}
       }
     });
 
@@ -8949,7 +9160,8 @@ $_CSRF_TOKEN = getCsrfToken();
           pizza_items: pizzaLineItems,
           cafe_items: cafeLineItems,
           all_items: pizzaLineItems.concat(cafeLineItems),
-          pizza_count: pizzaLineItems.reduce((acc, p) => acc + p.qty, 0)
+          pizza_count: pizzaLineItems.reduce((acc, p) => acc + p.qty, 0),
+          notes: (order && order.notes) || _currentCartNotes || ''
         };
         handleIncomingStationOrder(simOrder);
       }
@@ -8975,7 +9187,8 @@ $_CSRF_TOKEN = getCsrfToken();
           pizza_items: pizzaLineItems,
           cafe_items: cafeLineItems,
           all_items: pizzaLineItems.concat(cafeLineItems),
-          cafe_count: cafeLineItems.reduce((acc, c) => acc + c.qty, 0)
+          cafe_count: cafeLineItems.reduce((acc, c) => acc + c.qty, 0),
+          notes: (order && order.notes) || _currentCartNotes || ''
         };
         handleIncomingStationOrder(simOrder);
       }
@@ -9094,6 +9307,13 @@ $_CSRF_TOKEN = getCsrfToken();
         <div class="pizza-order-items-preview">
           <strong>Prepare:</strong> ${escapeHtml(summary)}
         </div>
+        ${(order.notes && order.notes.trim()) ? `
+        <div style="background:rgba(255,255,255,0.18); border:1.5px dashed #fde047; border-radius:8px; padding:6px 10px; margin-bottom:8px; font-size:11.5px; color:#fff; word-break:break-word;">
+          <div style="font-size:10px; font-weight:800; color:#fde047; text-transform:uppercase; margin-bottom:2px; display:flex; align-items:center; gap:4px;">
+            <i class="bi bi-chat-left-text-fill"></i> ${isCafeCard ? 'Note from Pizza Counter' : 'Note from Cafe Counter'}:
+          </div>
+          <span style="font-style:italic; font-weight:600;">"${escapeHtml(order.notes.trim())}"</span>
+        </div>` : ''}
         <div style="font-size:11px; color:#e2d9d2; margin-bottom:10px;">
           <i class="bi bi-shop me-1"></i>${originLabel} &bull; ${escapeHtml(cashierName)}
           <div style="margin-top:3px; color:#fde047; font-weight:700; font-size:11px;">
@@ -9165,6 +9385,7 @@ $_CSRF_TOKEN = getCsrfToken();
           <span style="font-size:16px;">${icon}</span>
           <span class="station-mini-title">${escapeHtml(ordNum)}</span>
           <span class="station-mini-preview" title="${escapeHtml(summary)}">${escapeHtml(summary)}</span>
+          ${(order.notes && order.notes.trim()) ? `<span class="station-mini-badge" style="background:#fef3c7; color:#92400e; border:1px solid #fde68a;" title="Note: ${escapeHtml(order.notes.trim())}"><i class="bi bi-chat-left-text-fill"></i> Note</span>` : ''}
           <span class="station-mini-badge"><i class="bi bi-hourglass-split"></i> In Prep</span>
         </div>
         <div class="station-mini-actions">
@@ -9297,6 +9518,33 @@ $_CSRF_TOKEN = getCsrfToken();
         }
       }
 
+      // Order Note (view + edit)
+      const noteHeading = document.getElementById('pom-notes-heading');
+      const noteView = document.getElementById('pom-notes-view');
+      const noteInput = document.getElementById('pom-notes-input');
+      const noteEdit = document.getElementById('pom-notes-edit');
+
+      if (noteHeading) {
+        noteHeading.textContent = isCafe ? 'Note from Pizza Counter / Special Instructions' : 'Note from Cafe Counter / Special Instructions';
+      }
+      if (noteView) {
+        if (order.notes && order.notes.trim()) {
+          noteView.textContent = order.notes.trim();
+          noteView.style.fontStyle = 'normal';
+          noteView.style.color = '#78350f';
+        } else {
+          noteView.textContent = 'No special note added.';
+          noteView.style.fontStyle = 'italic';
+          noteView.style.color = '#a8a29e';
+        }
+      }
+      if (noteInput) {
+        noteInput.value = order.notes || '';
+      }
+      if (noteEdit) {
+        noteEdit.style.display = 'none';
+      }
+
       // Action items to prepare
       const actionItems = order.action_items || (isCafe ? order.cafe_items : order.pizza_items) || [];
       const otherItems  = order.other_items  || (isCafe ? order.pizza_items : order.cafe_items) || [];
@@ -9398,6 +9646,104 @@ $_CSRF_TOKEN = getCsrfToken();
       }
     }
 
+    function togglePomNoteEdit() {
+      const editBox = document.getElementById('pom-notes-edit');
+      const inputEl = document.getElementById('pom-notes-input');
+      if (!editBox) return;
+      const isVisible = (editBox.style.display !== 'none');
+      if (isVisible) {
+        editBox.style.display = 'none';
+      } else {
+        if (_activeStationModalOrder && inputEl) {
+          inputEl.value = _activeStationModalOrder.notes || '';
+        }
+        editBox.style.display = 'block';
+        if (inputEl) inputEl.focus();
+      }
+    }
+
+    function cancelPomNoteEdit() {
+      const editBox = document.getElementById('pom-notes-edit');
+      const inputEl = document.getElementById('pom-notes-input');
+      if (editBox) editBox.style.display = 'none';
+      if (inputEl && _activeStationModalOrder) {
+        inputEl.value = _activeStationModalOrder.notes || '';
+      }
+    }
+
+    async function savePomNoteEdit() {
+      if (!_activeStationModalOrder || !_activeStationModalOrder.id) return;
+      const inputEl = document.getElementById('pom-notes-input');
+      const saveBtn = document.getElementById('pom-save-note-btn');
+      const newNote = inputEl ? inputEl.value.trim() : '';
+
+      const origBtnHTML = saveBtn ? saveBtn.innerHTML : '';
+      if (saveBtn) {
+        saveBtn.disabled = true;
+        saveBtn.innerHTML = '<span class="spinner-border spinner-border-sm me-1"></span>Saving...';
+      }
+
+      try {
+        const res = await api('orders.php?action=update_order_note', {
+          order_id: _activeStationModalOrder.id,
+          notes: newNote
+        });
+        if (res && res.success) {
+          _activeStationModalOrder.notes = newNote;
+
+          // Update in pending queues
+          const pz = _pendingPizzaOrders.find(o => o.id == _activeStationModalOrder.id);
+          if (pz) pz.notes = newNote;
+          const cf = _pendingCafeOrders.find(o => o.id == _activeStationModalOrder.id);
+          if (cf) cf.notes = newNote;
+
+          // Update view mode display
+          const noteView = document.getElementById('pom-notes-view');
+          if (noteView) {
+            if (newNote) {
+              noteView.textContent = newNote;
+              noteView.style.fontStyle = 'normal';
+              noteView.style.color = '#78350f';
+            } else {
+              noteView.textContent = 'No special note added.';
+              noteView.style.fontStyle = 'italic';
+              noteView.style.color = '#a8a29e';
+            }
+          }
+          const editBox = document.getElementById('pom-notes-edit');
+          if (editBox) editBox.style.display = 'none';
+
+          // Update notice card if present
+          const card = document.getElementById(`station-notif-order-${_activeStationModalOrder.id}`);
+          if (card) {
+            const stType = _activeStationModalOrder.target_station || (pz ? 'pizza' : 'cafe');
+            card.remove();
+            showStationOrderNotice(_activeStationModalOrder, stType);
+          }
+
+          // Broadcast to other tabs
+          try {
+            localStorage.setItem('chipipie_station_note_updated', JSON.stringify({
+              order_id: _activeStationModalOrder.id,
+              notes: newNote,
+              timestamp: Date.now()
+            }));
+          } catch (e) {}
+
+          showToast('✅ Order note updated successfully!');
+        } else {
+          showToast('⚠ Failed to save note: ' + ((res && res.message) || 'Unknown error'));
+        }
+      } catch (err) {
+        showToast('⚠ Connection error while updating note.');
+      } finally {
+        if (saveBtn) {
+          saveBtn.disabled = false;
+          saveBtn.innerHTML = origBtnHTML || '<i class="bi bi-check me-1"></i>Save Note';
+        }
+      }
+    }
+
     function printPizzaKitchenTicketFromModal() {
       if (!_activeStationModalOrder) return;
       const ord = _activeStationModalOrder;
@@ -9405,7 +9751,8 @@ $_CSRF_TOKEN = getCsrfToken();
       const ticketData = {
         orderNumber: ord.order_number,
         date: (ord.date || '') + ' ' + (ord.time || ''),
-        items: printItems
+        items: printItems,
+        notes: ord.notes || ''
       };
       printKitchenTicket(ticketData);
       showToast('🖨️ Kitchen ticket sent to printer!');
@@ -9705,6 +10052,10 @@ $_CSRF_TOKEN = getCsrfToken();
               <div class="order-item-line">
                 <span><i class="bi bi-dot me-1" style="color:var(--cafe-amber);"></i>${it}</span>
               </div>`).join('');
+            const noteLine = o.notes ? `
+              <div style="background:#fffbeb;border:1px solid #fef3c7;border-left:3px solid #d97706;border-radius:6px;padding:6px 9px;margin-top:6px;font-size:11.5px;color:#92400e;word-break:break-word;">
+                <i class="bi bi-chat-left-text-fill me-1" style="color:#d97706;"></i><strong>Order Note:</strong> ${escapeHtml(o.notes)}
+              </div>` : '';
             const isVoided    = o.status === 'Voided';
             const isRefunded  = o.status === 'Refunded';
             const isCompleted = o.status === 'Completed';
@@ -9745,7 +10096,7 @@ $_CSRF_TOKEN = getCsrfToken();
                 ${statusBadge}
                 <i class="bi bi-chevron-down order-card-chevron ms-2"></i>
               </div>
-              <div class="order-card-body">${itemLines || '<span style="color:#aaa;font-size:12px;">No items</span>'}${actionBtns}</div>
+              <div class="order-card-body">${itemLines || '<span style="color:#aaa;font-size:12px;">No items</span>'}${noteLine}${actionBtns}</div>
             </div>`;
           }).join('');
         }

@@ -29,6 +29,7 @@ elseif ($method === 'GET' && $action === 'chart_weekly')       { handleChartWeek
 elseif ($method === 'GET' && $action === 'chart_hourly')       { handleChartHourly(); }
 elseif ($method === 'GET' && $action === 'chart_monthly')      { handleChartMonthly(); }
 elseif ($method === 'GET' && ($action === 'pizza_orders' || $action === 'station_orders')) { handleStationOrders(); }
+elseif ($action === 'update_order_note')                      { handleUpdateOrderNote(); }
 else { jsonResponse(['success' => false, 'message' => 'Invalid action.'], 400); }
 
 function getVoidRefundRecipients() {
@@ -413,14 +414,19 @@ function handleCheckout() {
         $countStmt = $db->query("SELECT COUNT(*) as cnt FROM orders");
         $orderNum = '#' . str_pad(($countStmt->fetch()['cnt'] + 1), 3, '0', STR_PAD_LEFT);
 
-        // Create order
-        // Create order (recording origin branch: cafe or pizza)
+        $orderNotes = trim($input['notes'] ?? $input['order_notes'] ?? '');
+        // Create order (recording origin branch: cafe or pizza, and order notes)
         try {
-            $stmt = $db->prepare("INSERT INTO orders (order_number, user_id, total, payment_method, status, origin_branch) VALUES (?, ?, ?, ?, 'Completed', ?)");
-            $stmt->execute([$orderNum, $userId, $total, $paymentMethod, $originBranch]);
+            $stmt = $db->prepare("INSERT INTO orders (order_number, user_id, total, payment_method, status, origin_branch, notes) VALUES (?, ?, ?, ?, 'Completed', ?, ?)");
+            $stmt->execute([$orderNum, $userId, $total, $paymentMethod, $originBranch, $orderNotes ?: null]);
         } catch (Exception $e) {
-            $stmt = $db->prepare("INSERT INTO orders (order_number, user_id, total, payment_method, status) VALUES (?, ?, ?, ?, 'Completed')");
-            $stmt->execute([$orderNum, $userId, $total, $paymentMethod]);
+            try {
+                $stmt = $db->prepare("INSERT INTO orders (order_number, user_id, total, payment_method, status, origin_branch) VALUES (?, ?, ?, ?, 'Completed', ?)");
+                $stmt->execute([$orderNum, $userId, $total, $paymentMethod, $originBranch]);
+            } catch (Exception $e2) {
+                $stmt = $db->prepare("INSERT INTO orders (order_number, user_id, total, payment_method, status) VALUES (?, ?, ?, ?, 'Completed')");
+                $stmt->execute([$orderNum, $userId, $total, $paymentMethod]);
+            }
         }
 
 
@@ -474,6 +480,7 @@ function handleCheckout() {
                 'payment_method' => $paymentMethod,
                 'status' => 'Completed',
                 'origin_branch' => $originBranch,
+                'notes' => $orderNotes,
                 'cross_station_note' => $crossStationNote,
                 'time' => date('g:i A'),
                 'date' => date('M d, Y'),
@@ -546,6 +553,7 @@ function handleGetReceipt() {
             'created_at' => $order['created_at'],
             'formatted_date' => $formattedDate,
             'cashier' => $cashier,
+            'notes' => $order['notes'] ?? '',
             'line_items' => array_map(function($it) {
                 return [
                     'item_id' => intval($it['menu_item_id']),
@@ -620,7 +628,7 @@ function handleFetchOrders() {
 
     $sql = "
         SELECT o.id, o.order_number, o.total, o.payment_method, o.status,
-               o.created_at, COALESCE(o.origin_branch, 'cafe') AS origin_branch, MAX(u.full_name) AS cashier,
+               o.created_at, COALESCE(o.origin_branch, 'cafe') AS origin_branch, o.notes, MAX(u.full_name) AS cashier,
                GROUP_CONCAT(
                  CONCAT(
                    oi.quantity, '× ', m.name,
@@ -632,7 +640,7 @@ function handleFetchOrders() {
         LEFT JOIN order_items oi ON oi.order_id = o.id
         LEFT JOIN menu_items m ON oi.menu_item_id = m.id
         $where
-        GROUP BY o.id, o.order_number, o.total, o.payment_method, o.status, o.created_at, o.origin_branch
+        GROUP BY o.id, o.order_number, o.total, o.payment_method, o.status, o.created_at, o.origin_branch, o.notes
         ORDER BY o.created_at DESC
         LIMIT 500
     ";
@@ -1812,6 +1820,7 @@ function handleStationOrders() {
     $sql = "
         SELECT DISTINCT o.id, o.order_number, o.total, o.payment_method, o.status,
                o.created_at, COALESCE(o.origin_branch, 'cafe') AS origin_branch,
+               o.notes,
                COALESCE(u.full_name, u.username, 'Staff') AS cashier
         FROM orders o
         JOIN order_items oi ON oi.order_id = o.id
@@ -1933,4 +1942,29 @@ function handleStationOrders() {
 
 function handlePizzaOrders() {
     handleStationOrders();
+}
+
+function handleUpdateOrderNote() {
+    requireLogin();
+    $input = getJsonInput();
+    $orderId = intval($input['order_id'] ?? $input['id'] ?? 0);
+    $notes = trim($input['notes'] ?? '');
+
+    if (!$orderId) {
+        jsonResponse(['success' => false, 'message' => 'Missing order ID.'], 400);
+    }
+
+    $db = getDB();
+    try {
+        $stmt = $db->prepare("UPDATE orders SET notes = ? WHERE id = ?");
+        $stmt->execute([$notes !== '' ? $notes : null, $orderId]);
+        jsonResponse([
+            'success' => true,
+            'message' => 'Order note updated successfully.',
+            'order_id' => $orderId,
+            'notes' => $notes
+        ]);
+    } catch (Exception $e) {
+        jsonResponse(['success' => false, 'message' => 'Failed to update note: ' . $e->getMessage()], 500);
+    }
 }
